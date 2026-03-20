@@ -47,11 +47,11 @@ fi
 
 # If the version in the VERSIONPY already differs from the previous version, then no automatic increment is needed.
 if [[ "${PREVVERSION}" != "${STAGEDVERSION}" ]]; then
-	echo "----- Pre-commit hook START -----" 1>&2
+	echo "----- Bump-version hook START -----" 1>&2
 	echo "This commit already changes the version number. No automatic increment needed." 1>&2
 	echo "Old version: ${PREVVERSION}" 1>&2
 	echo "New version: ${STAGEDVERSION}" 1>&2
-	echo "------ Pre-commit hook END ------" 1>&2
+	echo "------ Bump-version hook END ------" 1>&2
 	exit 0
 fi
 
@@ -67,20 +67,20 @@ fi
 
 # An automatic increment is needed. However, if there are unstaged changes to the VERSIONPY, then abort for safety.
 if ! [[ "$(git status --porcelain=v1 | grep "M  $RELPATH_TO_VERSIONPY" | wc -l)" =~ ^\ *0$ ]]; then
-	echo "----- Pre-commit hook START -----" 1>&2
+	echo "----- Bump-version hook START -----" 1>&2
 	echo "UNSTAGED CHANGES in '$RELPATH_TO_VERSIONPY'" 1>&2
 	echo "I cannot increment the version number in this state." 1>&2
-	echo "------ Pre-commit hook END ------" 1>&2
+	echo "------ Bump-version hook END ------" 1>&2
 	exit 5
 fi
 
 # Write the new version string to the VERSIONPY file
-echo "----- Pre-commit hook START -----" 1>&2
+echo "----- Bump-version hook START -----" 1>&2
 echo "Updating version file:" 1>&2
 echo "Old version: ${PREVVERSION}" 1>&2
 echo "New version: ${NEWVERSION}" 1>&2
 "${FULLPATH_TO_GIT_REPO}/githooks/res/setversion.py" "$FULLPATH_TO_VERSIONPY" "$NEWVERSION"
-echo "------ Pre-commit hook END ------" 1>&2
+echo "------ Bump-version hook END ------" 1>&2
 
 # Add the updated VERSIONPY file to the git commit
 git add "${FULLPATH_TO_VERSIONPY}"

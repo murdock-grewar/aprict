@@ -1,17 +1,9 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.15.6
-  hooks:
-    # Run the linter.
-    - id: ruff-check
-      args: [ --fix ]
-    # Run the formatter.
-    - id: ruff-format
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.5.6
   hooks:
     - id: insert-license # inserts the license header
+      name: Checking license headers
       files: ^src/.*\.py$
       args:
         - --license-filepath
@@ -24,8 +16,31 @@ repos:
   hooks:
     - id: version-increment
       name: Auto version increment
-      entry: ./githooks/pre-commit
+      entry: ./githooks/bump-version
       language: script
+      pass_filenames: false
+      always_run: true # run even if there are no matching filenames
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.15.6
+  hooks:
+    - id: ruff-check
+      name: ruff check
+      types_or: [ python, pyi ]
+      #args: [ --fix ]
+    - id: ruff-format
+      name: ruff format
+      types_or: [ python, pyi ]
+- repo: local
+  hooks:
+    - id: ty
+      name: ty
+      #entry: ./.venv/bin/ty check # This isn't sufficient, because ty needs to
+      #understand the whole environment to give proper 'unresolved import'
+      #errors. So, we need to run it through uv.
+      entry: uv run ty check
+      language: python
+      #files: \.py
       pass_filenames: false
       always_run: true # run even if there are no matching filenames
     - id: pytest

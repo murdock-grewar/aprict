@@ -2,7 +2,9 @@
 # Pass a two commandline arguments to this executable
 # $1 - the path to the 'version.py' file containing the version number under the variable 'version'.
 # $2 - the new version string
+"""Set the current version of the module."""
 import sys
+
 if len(sys.argv) < 2:
     raise ValueError("No filepath or version string provided.")
 if len(sys.argv) < 3:
@@ -11,7 +13,7 @@ filepath = sys.argv[1]
 new_version: str = sys.argv[2]
 
 # Read the current version file
-with open(filepath, 'r') as f:
+with open(filepath) as f:
     lines = f.readlines()
 
 # Pair the line numbers with the line contents. (Make them all lists instead of tuples so I can mutate them.)
@@ -36,4 +38,4 @@ numlines[idx_version_line][1] = f"version = '{new_version:s}'"
 # Write out the new file
 with open(filepath, 'w') as f:
     f.writelines([numline[1] for numline in numlines])
-
+    f.write('\n')
