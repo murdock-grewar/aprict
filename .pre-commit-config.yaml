@@ -3,7 +3,7 @@ repos:
   rev: v1.5.6
   hooks:
     - id: insert-license # inserts the license header
-      name: Checking license headers
+      name: (Licensing) check license headers
       files: ^src/.*\.py$
       args:
         - --license-filepath
@@ -15,7 +15,7 @@ repos:
 - repo: local
   hooks:
     - id: version-increment
-      name: Auto version increment
+      name: (Versioning) auto version increment
       entry: ./githooks/bump-version
       language: script
       pass_filenames: false
@@ -25,16 +25,16 @@ repos:
   rev: v0.15.6
   hooks:
     - id: ruff-check
-      name: ruff check
+      name: (Linting) ruff check
       types_or: [ python, pyi ]
       #args: [ --fix ]
     - id: ruff-format
-      name: ruff format
+      name: (Formatting) ruff format
       types_or: [ python, pyi ]
 - repo: local
   hooks:
     - id: ty
-      name: ty
+      name: (Type-checking) ty
       #entry: ./.venv/bin/ty check # This isn't sufficient, because ty needs to
       #understand the whole environment to give proper 'unresolved import'
       #errors. So, we need to run it through uv.
@@ -43,8 +43,14 @@ repos:
       #files: \.py
       pass_filenames: false
       always_run: true # run even if there are no matching filenames
+    - id: bandit
+      name: (Security) bandit
+      entry: uv run bandit -c bandit.toml -q -r src
+      language: python
+      pass_filenames: false
+      always_run: true
     - id: pytest
-      name: pytest
+      name: (Unit tests) pytest
       entry: ./.venv/bin/pytest
       language: system
       types: [python]
