@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# Called by "git commit" with no arguments.  The hook should
+# exit with non-zero status after issuing an appropriate message if
+# it wants to stop the commit.
+#
+# To enable this hook, name this file to "pre-commit".
+
+# This hook does the following:
+# - Check if the HEAD branch name is "dev"
+# - If it is "dev", then increment the version number in src/snookerr/version.py
+
+# Config
+RELPATH_TO_VERSIONPY="src/snookerr/version.py" # Relative path to the version file. Relative to the git root.
+BRANCHNAME_TO_APPLY_INCREMENT="dev" # Will only apply the version increment if we're committing to the branch with this name.
+
+# Calculate needed variables
+FULLPATH_TO_GIT_REPO="$(readlink -f "$(git rev-parse --show-toplevel)")"
+FULLPATH_TO_VERSIONPY="${FULLPATH_TO_GIT_REPO}/${RELPATH_TO_VERSIONPY}"
+BRANCH_NAME="$(git symbolic-ref --short HEAD)"
+
+# Exit if the commit is not being made on the appropriate branch
+[[ "$BRANCH_NAME" != "$BRANCHNAME_TO_APPLY_INCREMENT" ]] && exit 0
+
+## Exit with error if the VERSIONPY file was not found.
+#! [ -f "$FULLPATH_TO_VERSIONPY" ] && echo "Version file '$FULLPATH_TO_VERSIONPY' not found." 1>&2 && exit 2
+
+# Exit with error if the VERSIONPY file is not staged in the current commit.
+# Note: there could still be unstaged changes. It's just a matter of whether this file exists in the commmit that's about to be made.
+! git show ":$RELPATH_TO_VERSIONPY" &> /dev/null && echo "Version file '$RELPATH_TO_VERSIONPY' is not staged in the current commit. Aborting." 1>&2 && exit 4
+
+# Get the version string which is currently staged in the commit
+STAGEDVERSION="$("${FULLPATH_TO_GIT_REPO}/githooks/res/getversion.py" <(git show :"$RELPATH_TO_VERSIONPY"))"
+
+# Get the previous version string
+PREVVERSION="$("${FULLPATH_TO_GIT_REPO}/githooks/res/getversion.py" <(git show HEAD:"$RELPATH_TO_VERSIONPY"))"
+
+# If there was an issue getting the previous version, then set the previous version to the blank string.
+if [ $? -ne 0 ]; then
+	PREVVERSION=""
+fi
+
+
+## Check if the MAJOR.MINOR.MICRO part of the versions match
+#[[ "$VERSION" =~ ^(.*)([.]dev[0-9]+)$ ]] ; VERSIONMMM="${BASH_REMATCH[1]}"
+#[[ "$PREVVERSION" =~ ^(.*)([.]dev[0-9]+)$ ]] ; PREVVERSIONMMM="${BASH_REMATCH[1]}"
+
+# If the version in the VERSIONPY already differs from the previous version, then no automatic increment is needed.
+if [[ "${PREVVERSION}" != "${STAGEDVERSION}" ]]; then
+	echo "----- Pre-commit hook START -----" 1>&2
+	echo "This commit already changes the version number. No automatic increment needed." 1>&2
+	echo "Old version: ${PREVVERSION}" 1>&2
+	echo "New version: ${STAGEDVERSION}" 1>&2
+	echo "------ Pre-commit hook END ------" 1>&2
+	exit 0
+fi
+
+# Increment the version. If it ends with ".devXYZ" then increment XYZ. Otherwise, add ".dev1" to the end.
+if [[ "$STAGEDVERSION" =~ ^(.*)[.]dev([0-9]+)$ ]]; then
+	DEVNUM="${BASH_REMATCH[2]}"
+	DEVNUM="$(( DEVNUM + 1 ))"
+	NEWVERSION="${BASH_REMATCH[1]}.dev${DEVNUM}"
+else
+	! [[ "$STAGEDVERSION" =~ ^.*$ ]] && echo "Internal error. This regex match should always work. The git hook script has a bug." 1>&2 && exit 4
+	NEWVERSION="${BASH_REMATCH[0]}.dev1"
+fi
+
+# An automatic increment is needed. However, if there are unstaged changes to the VERSIONPY, then abort for safety.
+if ! [[ "$(git status --porcelain=v1 | grep "M  $RELPATH_TO_VERSIONPY" | wc -l)" =~ ^\ *0$ ]]; then
+	echo "----- Pre-commit hook START -----" 1>&2
+	echo "UNSTAGED CHANGES in '$RELPATH_TO_VERSIONPY'" 1>&2
+	echo "I cannot increment the version number in this state." 1>&2
+	echo "------ Pre-commit hook END ------" 1>&2
+	exit 5
+fi
+
+# Write the new version string to the VERSIONPY file
+echo "----- Pre-commit hook START -----" 1>&2
+echo "Updating version file:" 1>&2
+echo "Old version: ${PREVVERSION}" 1>&2
+echo "New version: ${NEWVERSION}" 1>&2
+"${FULLPATH_TO_GIT_REPO}/githooks/res/setversion.py" "$FULLPATH_TO_VERSIONPY" "$NEWVERSION"
+echo "------ Pre-commit hook END ------" 1>&2
+
+# Add the updated VERSIONPY file to the git commit
+git add "${FULLPATH_TO_VERSIONPY}"
+
