@@ -45,10 +45,12 @@ repos:
       always_run: true # run even if there are no matching filenames
     - id: bandit
       name: (Security) bandit
-      entry: uv run bandit -c bandit.toml -q -r src
+      #entry: uv run bandit -c bandit.toml -q -r src
+      #pass_filenames: false
+      #always_run: true
+      entry: uv run bandit -c bandit.toml -q
       language: python
-      pass_filenames: false
-      always_run: true
+      pass_filenames: true
     - id: pytest
       name: (Unit tests) pytest
       entry: ./.venv/bin/pytest

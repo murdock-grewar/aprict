@@ -44,7 +44,7 @@ extend-select = ["ANN", "W", "COM", "C4", "EM", "EXE", "FIX", "ICN001", "PIE",
 "RET", "SLF", "TC001", "TC002", "TC003", "TC004", "TC005", "TC010", "ARG", "I",
 "C90", "NPY", "N", "PERF", "DOC", "PLC", "PLE", "PLW", "UP", "RUF", "TRY",
 "E"]
-ignore = ["E22", "E501", "UP015", "COM812"] # ruff complaints if COM812 is included,
+ignore = ["E22", "E501", "UP015", "UP032", "E241", "COM812"] # ruff complaints if COM812 is included,
 # because it's redundant with ruff-format. Adding to ignore list to suppress
 # the warning. ruff-format should add in any missing trailing commas.
 
