@@ -16,7 +16,10 @@
 
 """Setup file for the module."""
 
+import importlib.machinery
+import importlib.util
 import os
+import sys
 
 from setuptools import setup
 
@@ -40,11 +43,20 @@ def _filename_to_command_name(script_name: str) -> str:
 
 
 # Get the version number
-# Followed the advice in https://packaging.python.org/en/latest/guides/single-sourcing-package-version/
-with open(os.path.join(my_module_dir, "version.py"), encoding="utf-8") as f:
-    d = {}
-    exec(f.read(), d)
-    version = d["version"]
+def _import_from_path(module_name: str, file_path: str):  # noqa: ANN202
+    spec: importlib.machinery.ModuleSpec = (
+        importlib.util.spec_from_file_location(module_name, file_path)
+    )  # ty: ignore [invalid-assignment]
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)  # ty: ignore [unresolved-attribute]
+    return module
+
+
+version_file_path = os.path.join(my_module_dir, "version.py")
+version: str = _import_from_path(
+    my_module_name + ".version", version_file_path
+).version
 
 setup(
     version=version,
