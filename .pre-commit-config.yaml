@@ -21,6 +21,7 @@ repos:
       language: script
       pass_filenames: false
       always_run: true # run even if there are no matching filenames
+      verbose: false # true: always show output, even when test passes
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: v0.15.6
@@ -42,7 +43,7 @@ repos:
       #understand the whole environment to give proper 'unresolved import'
       #errors. So, we need to run it through uv.
       entry: uv run ty check
-      language: python
+      language: system # language: system will use the current uv environment instead of having pre-commit create its own isolated tools... e.g. the user will have to run `uv sync`. Otherwise, language: python will use the 'default' behaviour. See https://stackoverflow.com/a/70780205
       #files: \.py
       pass_filenames: false
       always_run: true # run even if there are no matching filenames
@@ -52,11 +53,11 @@ repos:
       #pass_filenames: false
       #always_run: true
       entry: uv run bandit -c bandit.toml -q
-      language: python
+      language: system
       pass_filenames: true
     - id: pytest
       name: (Unit tests) pytest
-      entry: ./.venv/bin/pytest
+      entry: ./.venv/bin/pytest -vvv
       language: system
       types: [python]
       pass_filenames: false

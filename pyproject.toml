@@ -45,7 +45,8 @@ dev = [
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra -v"
+console_output_style = "progress"
 testpaths = [
     "src/snookerr/tests",
 ]

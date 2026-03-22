@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import re
 import typing
 
@@ -171,3 +172,14 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
         return cp.RawKernel(
             struct_layout_code, f"get_struct_layout_{struct_name}"
         )
+
+    def save_c_struct_to_file(
+        self, path: pathlib.Path | str, overwrite: bool = False
+    ) -> None:
+        """Save the C structure definition to a file."""
+        p: pathlib.Path = pathlib.Path(path)
+        if not overwrite and p.is_file():
+            msg = f"The file '{p.resolve()!s}' already exists. You may use the overwrite=True option to overwrite it."
+            raise FileExistsError(msg)
+        with open(path, "w+", encoding="utf-8") as f:
+            f.write(self.struct_definition_c)

@@ -13,11 +13,4 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""A test file used to begin writing some boilerplate."""
-
-
-def triangle_number(n: int) -> int:
-    """Compute the nth triangle number."""
-    if n < 0:
-        raise ValueError
-    return (n * (n + 1)) // 2
+"""CUDA sources for the cuda_kernels pytests."""

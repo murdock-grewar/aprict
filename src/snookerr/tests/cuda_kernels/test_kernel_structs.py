@@ -15,24 +15,30 @@
 
 """Tests for the numpy dtypes/kernel structs interface."""
 
+import importlib.resources
+
 import cupy as cp
 import numpy as np
 import pytest
 
-from ...cuda import kern_structs
+from ...cuda import header_injection, kern_structs
+from . import cusrc
 
-# Compile the CUDA kernels
 
-
-def _create_cuda_module_sum() -> tuple[
-    kern_structs.KernelStruct, cp.RawModule
-]:
-    ks = kern_structs.KernelStruct(
+@pytest.fixture
+def ks() -> kern_structs.KernelStruct:
+    """Create a custom numpy dtype."""
+    return kern_structs.KernelStruct(
         struct_name="Config_Sum",
         names=["alternate_sign", "multiply_first_term"],
         dtypes=[np.bool, np.int8],
     )
-    cuda_module = cp.RawModule(
+
+
+@pytest.fixture
+def module(ks: kern_structs.KernelStruct) -> cp.RawModule:
+    """Create a cp.RawModule corresponding to a specific KernelStruct."""
+    return cp.RawModule(
         code=(
             r"""
 
@@ -49,9 +55,14 @@ __global__ void sumsqs(Config_Sum config, T* vec, int len, T* output_num) {
     unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= len) { return; }
 
+    bool block_leader = (tid == 0);
+    if (block_leader) {
+        sum = 0;
+    }
+    __syncthreads();
+
     T myterm = vec[tid];
     myterm *= myterm;
-    bool block_leader = (tid == 0);
     if (config.alternate_sign) {
         if (tid%2 == 1) {
             myterm *= -1;
@@ -71,32 +82,53 @@ __global__ void sumsqs(Config_Sum config, T* vec, int len, T* output_num) {
         options=("-std=c++17",),
         name_expressions=["sumsqs<float>", "sumsqs<double>"],
     )
-    return ks, cuda_module
 
 
 @pytest.mark.dependency(name="ks_01")
-def test_create_module() -> None:
-    """Test if a basic kernel can be created."""
-    _create_cuda_module_sum()
+def test_compile_module(module) -> None:  # noqa: ANN001
+    """Test if the given module can be compiled."""
+    module.compile()
 
 
-@pytest.mark.dependency(depends=["ks_01"])
-def test_run_kernel_with_kernelstruct() -> None:
+@pytest.mark.dependency(name="ks_02", depends=["ks_01"])
+def test_run_kernel_float_with_kernelstruct(ks, module) -> None:  # noqa: ANN001
     """Test a basic kernel using a custom structure."""
-    ks, module = _create_cuda_module_sum()
     kern_float = module.get_function("sumsqs<float>")
     # Create an 'array' which is just a bare value; not really an array
     alternate_sign: bool = True
     multiply_first_term: int = -1
     config = np.array((alternate_sign, multiply_first_term), dtype=ks.dtype)
+    # Prepare args to pass to the kernel
     input_float_array = cp.array([1, 2, 3, 4, 5], dtype=cp.float32)
     input_len = np.int32(5)
     output_float = cp.array([0], dtype=cp.float32)
-    kern_float(
-        (1,),  # gridDims: (x,y,z)
-        (input_len,),  # blockDims: (x,y,z)
-        (config, input_float_array, input_len, output_float),  # input args
-    )
-    # Expected value is 13 = -1 - 4 + 9 - 16 + 25
-    expected = cp.array([13.0], dtype=cp.float32)
+    # Call the kernel 3 times and check that the value is as expected
+    for _ in range(3):
+        kern_float(
+            (1,),  # gridDims: (x,y,z)
+            (input_len,),  # blockDims: (x,y,z)
+            (config, input_float_array, input_len, output_float),  # input args
+        )
+    # Verify the expected output from the kernel
+    # Expected value is 39 = 3*13 = 3*(-1 - 4 + 9 - 16 + 25)
+    expected = cp.array([39.0], dtype=cp.float32)
     cp.testing.assert_array_almost_equal(output_float, expected)
+
+
+@pytest.mark.dependency(name="ks_03", depends=["ks_01", "ks_02"])
+def test_injected_kernel_with_template(ks: kern_structs.KernelStruct) -> None:
+    """Test the header injection, and a template function as kernel."""
+    # Resolve the paths to the source file and the header to output
+    with (
+        importlib.resources.path(cusrc, "cust_kernel.cu") as path_cu,
+        importlib.resources.path(cusrc, "Config_Sum.h") as path_header,
+    ):
+        # Output the header file
+        ks.save_c_struct_to_file(path_header, overwrite=True)
+        injected_module = cp.RawModule(
+            code=header_injection.inject_headers(path_cu),
+            options=("-std=c++17",),
+            name_expressions=["sumsqs<float>", "sumsqs<double>"],
+        )
+        injected_module.compile()
+        test_run_kernel_float_with_kernelstruct(ks, injected_module)
