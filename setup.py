@@ -16,10 +16,8 @@
 
 """Setup file for the module."""
 
-import importlib.machinery
-import importlib.util
 import os
-import sys
+import runpy
 
 from setuptools import setup
 
@@ -43,20 +41,9 @@ def _filename_to_command_name(script_name: str) -> str:
 
 
 # Get the version number
-def _import_from_path(module_name: str, file_path: str):  # noqa: ANN202
-    spec: importlib.machinery.ModuleSpec = (
-        importlib.util.spec_from_file_location(module_name, file_path)
-    )  # ty: ignore [invalid-assignment]
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)  # ty: ignore [unresolved-attribute]
-    return module
-
-
-version_file_path = os.path.join(my_module_dir, "version.py")
-version: str = _import_from_path(
-    my_module_name + ".version", version_file_path
-).version
+version: str = runpy.run_path(os.path.join(my_module_dir, "version.py"))[
+    "version"
+]
 
 setup(
     version=version,

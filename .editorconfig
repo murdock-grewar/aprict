@@ -4,7 +4,9 @@ charset = utf-8
 end_of_line = lf
 indent_size = 4
 indent_style = space
-max_line_length = 79
+# max_line_length = 79 # It got too annoying. There are times when I want to go
+# over the limit, such as for long comments. ruff check should take care of most
+# of it.
 trim_trailing_whitespace = true
-[*.{diff,md}]
+[*.{diff,md,txt}]
 trim_trailing_whitespace = false
