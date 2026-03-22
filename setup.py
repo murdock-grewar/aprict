@@ -17,7 +17,6 @@
 """Setup file for the module."""
 
 import os
-import runpy
 
 from setuptools import setup
 
@@ -41,9 +40,11 @@ def _filename_to_command_name(script_name: str) -> str:
 
 
 # Get the version number
-version: str = runpy.run_path(os.path.join(my_module_dir, "version.py"))[
-    "version"
-]
+# Followed the advice in https://packaging.python.org/en/latest/guides/single-sourcing-package-version/
+with open(os.path.join(my_module_dir, "version.py"), encoding="utf-8") as f:
+    d = {}
+    exec(f.read(), d)  # nosec # make bandit ignore this security issue
+    version = d["version"]
 
 setup(
     version=version,
