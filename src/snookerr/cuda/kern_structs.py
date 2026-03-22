@@ -50,8 +50,23 @@ class KernelStruct:
     def __init__(
         self,
         struct_name: str,
-        *tuples_type_name: typing.Iterable[tuple[np.dtype, str]],
+        *,
+        names: tuple[str] | list[str],
+        dtypes: tuple[typing.Any] | list[typing.Any],
+        # *tuples_type_name: typing.Iterable[tuple[np.dtype, str]],
     ) -> None:
+
+        # Validate inputs #
+        if len(names) != len(dtypes):
+            msg = f"Mismatch in length of `names` and `dtypes`. Names: {names}. dtypes: {dtypes}"
+            raise ValueError(msg)
+        # Test that all 'dtypes' can actually be interpreted by numpy as dtypes
+        for dtype in dtypes:
+            np.dtype(dtype)  # May raise a TypeError. This is intentional.
+        ###################
+
+        tuples_type_name = list(zip(dtypes, names))
+
         self.struct_definition_c = self._struct_definition(
             struct_name, *tuples_type_name
         )

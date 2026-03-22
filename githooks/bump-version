@@ -66,7 +66,7 @@ else
 fi
 
 # An automatic increment is needed. However, if there are unstaged changes to the VERSIONPY, then abort for safety.
-if ! [[ "$(git status --porcelain=v1 | grep "M  $RELPATH_TO_VERSIONPY" | wc -l)" =~ ^\ *0$ ]]; then
+if ! [[ "$(git status --porcelain=v1 | grep -E "[^ ] $RELPATH_TO_VERSIONPY" | wc -l)" =~ ^\ *0$ ]]; then
 	echo "----- Bump-version hook START -----" 1>&2
 	echo "UNSTAGED CHANGES in '$RELPATH_TO_VERSIONPY'" 1>&2
 	echo "I cannot increment the version number in this state." 1>&2

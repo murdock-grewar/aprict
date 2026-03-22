@@ -5,6 +5,7 @@ repos:
     - id: insert-license # inserts the license header
       name: (Licensing) check license headers
       files: ^src/.*\.py$
+      # exclude: ^.*__init__.py$
       args:
         - --license-filepath
         - LICENSE.txt
@@ -28,9 +29,11 @@ repos:
       name: (Linting) ruff check
       types_or: [ python, pyi ]
       #args: [ --fix ]
+      #exclude: ^src/snookerr/version.py$ # this file is edited by the version bump script, and may use single or double quotes. ruff check could interfere with it.
     - id: ruff-format
       name: (Formatting) ruff format
       types_or: [ python, pyi ]
+      exclude: ^src/snookerr/version.py$ # this file is edited by the version bump script, and may use single or double quotes. It is not aware of ruff format's preference.
 - repo: local
   hooks:
     - id: ty

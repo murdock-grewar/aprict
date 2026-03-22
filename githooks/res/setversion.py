@@ -33,7 +33,7 @@ elif num_cands > 1:
 idx_version_line = candidate_lines[0][0]
 
 # Set the new version line
-numlines[idx_version_line][1] = f"version = '{new_version:s}'"
+numlines[idx_version_line][1] = f'version = "{new_version:s}"'
 
 # Write out the new file
 with open(filepath, 'w') as f:

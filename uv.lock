@@ -571,6 +571,16 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-dependency"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "setuptools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/ea/84509533e0f6477960b8a9179d240d93c909c6543e4dd8209932026d7815/pytest_dependency-0.6.1.tar.gz", hash = "sha256:246c24d2a5fc743a942cec4408853640e56a05ba58d46e5b213a1d4b738a2464", size = 20837, upload-time = "2026-02-15T18:08:43.927Z" }
+
+[[package]]
 name = "pytest-mock"
 version = "3.15.1"
 source = { registry = "https://pypi.org/simple" }
@@ -742,6 +752,7 @@ dev = [
     { name = "ipython" },
     { name = "pre-commit" },
     { name = "pytest" },
+    { name = "pytest-dependency" },
     { name = "pytest-mock" },
     { name = "ruff" },
     { name = "setuptools" },
@@ -765,6 +776,7 @@ dev = [
     { name = "ipython", specifier = ">=9.11.0" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-dependency", specifier = ">=0.6.1" },
     { name = "pytest-mock", specifier = ">=3.15.1" },
     { name = "ruff", specifier = "==0.15.6" },
     { name = "setuptools", specifier = ">=82.0.1" },
