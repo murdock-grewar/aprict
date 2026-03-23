@@ -14,3 +14,4 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Main module."""
+from . import ImageView as imview  # noqa: F401, N813

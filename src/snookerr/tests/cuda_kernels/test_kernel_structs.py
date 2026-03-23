@@ -145,7 +145,7 @@ def test_generate_cusrc_data_directory() -> None:
     assert path_to_generated_cusrc.is_dir()
 
 
-@pytest.mark.dependency(name="ks_05", depends=["ks_04"])
+@pytest.mark.dependency(name="ks_gen_sources", depends=["ks_04"], scope="session")
 def test_a_simple_generated_kernel() -> None:
     """Test a kernel which is generated dynamically then loaded."""
     ks: kern_structs.KernelStruct = (

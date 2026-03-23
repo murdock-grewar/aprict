@@ -88,7 +88,17 @@ def generate_headers(output_dir: pathlib.Path) -> None:
         output_path.parent.mkdir(
             parents=True, exist_ok=True
         )  # Make directory if it doesn't exist
-        for objname, ks in kernstructs:
+
+        # Now order the structs so that the dependencies are first
+        kslist = [ks for _, ks in kernstructs]
+        for i in list(reversed(range(len(kslist)))):
+            ks: KernelStruct = kslist[i]
+            kslist = kslist[:i] + ks.dependent_structs + kslist[i:]
+        # Now remove duplicates, keeping the first-encountered copy of each
+        seen = set()
+        kslist = [ks for ks in kslist if not (ks in seen or seen.add(ks))]
+        # Add the structure code, in order of dependency
+        for ks in kslist:
             ks.append_c_struct_to_file(
                 path=output_path, create_ok=True, end="\n\n"
             )
