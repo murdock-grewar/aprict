@@ -45,6 +45,7 @@ _np_dtype_to_c_type = {
 class KernelStruct:
     """A custom numpy dtype with a corresponding C structure."""
 
+    struct_name: str
     dtype: np.dtype
     struct_definition_c: str
 
@@ -67,6 +68,8 @@ class KernelStruct:
         ###################
 
         tuples_type_name = list(zip(dtypes, names))
+
+        self.struct_name = struct_name
 
         self.struct_definition_c = self._struct_definition(
             struct_name, *tuples_type_name
@@ -183,3 +186,19 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             raise FileExistsError(msg)
         with open(path, "w+", encoding="utf-8") as f:
             f.write(self.struct_definition_c)
+
+    def append_c_struct_to_file(
+        self, path: pathlib.Path | str, create_ok: bool = True, end: str = ""
+    ) -> None:
+        """Append the C structure definition to a file."""
+        p: pathlib.Path = pathlib.Path(path)
+        mode: str = "a+"
+        if not p.is_file():
+            if create_ok:
+                mode = "w+"
+            else:
+                msg = f"The file '{p.resolve()!s}' does not exist. You may use the option create_ok=True to create it."
+                raise FileNotFoundError(msg)
+        with open(path, mode=mode, encoding="utf-8") as f:
+            f.write(self.struct_definition_c)
+            f.write(end)

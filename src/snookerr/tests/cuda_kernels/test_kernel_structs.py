@@ -21,8 +21,9 @@ import cupy as cp
 import numpy as np
 import pytest
 
-from ...cuda import header_injection, kern_structs
-from . import cusrc
+from ...cuda import _generate_cusrc, header_injection, kern_structs
+from ...cuda import structs as kstructs
+from . import test_cusrc
 
 
 @pytest.fixture
@@ -120,8 +121,8 @@ def test_injected_kernel_with_template(ks: kern_structs.KernelStruct) -> None:
     """Test the header injection, and a template function as kernel."""
     # Resolve the paths to the source file and the header to output
     with (
-        importlib.resources.path(cusrc, "cust_kernel.cu") as path_cu,
-        importlib.resources.path(cusrc, "Config_Sum.h") as path_header,
+        importlib.resources.path(test_cusrc, "cust_kernel.cu") as path_cu,
+        importlib.resources.path(test_cusrc, "Config_Sum.h") as path_header,
     ):
         # Output the header file
         ks.save_c_struct_to_file(path_header, overwrite=True)
@@ -132,3 +133,26 @@ def test_injected_kernel_with_template(ks: kern_structs.KernelStruct) -> None:
         )
         injected_module.compile()
         test_run_kernel_float_with_kernelstruct(ks, injected_module)
+
+
+@pytest.mark.dependency(name="ks_04", depends=["ks_03"])
+def test_generate_cusrc_data_directory() -> None:
+    """Test if an exception occurs when trying to generate the cusrc dir."""
+    path_to_generated_cusrc = _generate_cusrc.path_to_generated_cusrc
+    _generate_cusrc.delete_generated_sources()
+    assert not path_to_generated_cusrc.is_dir()
+    _generate_cusrc.main()
+    assert path_to_generated_cusrc.is_dir()
+
+
+@pytest.mark.dependency(name="ks_05", depends=["ks_04"])
+def test_a_simple_generated_kernel() -> None:
+    """Test a kernel which is generated dynamically then loaded."""
+    ks: kern_structs.KernelStruct = (
+        kstructs.test_subdir.test_config.Test_Config_Sum
+    )
+    injected_module: cp.RawModule = header_injection.load_injected_module(
+        "./test_kernel.cu",
+        name_expressions=["sumsqs<float>", "sumsqs<double>"],
+    )
+    test_run_kernel_float_with_kernelstruct(ks, injected_module)

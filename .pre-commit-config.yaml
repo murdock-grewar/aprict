@@ -1,4 +1,13 @@
 repos:
+- repo: local
+  hooks:
+    - id: generate-cusrc
+      name: (Build) Generate CUDA source files
+      entry: ./githooks/generate-cusrc.sh
+      language: script
+      pass_filenames: false
+      always_run: true
+      verbose: false
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.5.6
   hooks:

@@ -48,6 +48,10 @@ with open(os.path.join(my_module_dir, "version.py"), encoding="utf-8") as f:
 
 setup(
     version=version,
+    author="Murdock Grewar",
+    packages=[my_module_name],
+    package_dir={my_module_name: "src/" + my_module_name},
+    package_data={my_module_name: ["data/"]},
     entry_points={
         "console_scripts": [
             my_module_name
