@@ -59,8 +59,12 @@ class KernelStruct:
         struct_name: str,
         *,
         names: tuple[str] | list[str],
-        dtypes: tuple[type | KernelStruct] | list[type | KernelStruct],  # input a list/tuple of np.dtypes and/or KernelStructs.
-        extra_code: str | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
+        dtypes: tuple[type | KernelStruct]
+        | list[
+            type | KernelStruct
+        ],  # input a list/tuple of np.dtypes and/or KernelStructs.
+        extra_code: str
+        | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
     ) -> None:
 
         # Validate inputs #
@@ -74,9 +78,13 @@ class KernelStruct:
 
         tuples_type_name = list(zip(dtypes, names))
 
-        dtype_to_cname_dict: dict[np.dtype | KernelStruct, str] = dict(_np_dtype_to_c_type.items())  # Create copy
+        dtype_to_cname_dict: dict[np.dtype | KernelStruct, str] = dict(
+            _np_dtype_to_c_type.items()
+        )  # Create copy
         self.dependent_structs = [t for t in dtypes if type(t) is KernelStruct]
-        dtype_to_cname_dict.update({ks: ks.struct_name for ks in self.dependent_structs})
+        dtype_to_cname_dict.update(
+            {ks: ks.struct_name for ks in self.dependent_structs}
+        )
 
         self.struct_name = struct_name
         self.struct_definition_c = self._struct_definition(
@@ -95,7 +103,9 @@ class KernelStruct:
         sizes    = cp.ndarray(shape=(num_members,), dtype=np.uint64)
         offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
         # fmt: on
-        kernel = self._kernel_get_struct_layout(dtype_to_cname_dict, struct_name, *tuples_type_name)
+        kernel = self._kernel_get_struct_layout(
+            dtype_to_cname_dict, struct_name, *tuples_type_name
+        )
         kernel((1,), (1,), (itemsize, sizes, offsets))
         (itemsize, sizes, offsets) = map(
             cp.asnumpy, (itemsize, sizes, offsets)
@@ -118,7 +128,9 @@ class KernelStruct:
         cls,
         dtype_to_cname_dict: dict[np.dtype | KernelStruct, str],
         struct_name: str,
-        *tuples_type_name: typing.Iterable[tuple[np.dtype | KernelStruct, str]],
+        *tuples_type_name: typing.Iterable[
+            tuple[np.dtype | KernelStruct, str]
+        ],
     ) -> str:
         """Produce C++ code for a custom datatype."""
         if not cls._validate_struct_name(struct_name):
@@ -153,17 +165,25 @@ class KernelStruct:
         *tuples_type_name: typing.Iterable[tuple[np.dtype, str]],
     ) -> cp.RawKernel:
         tuples: list = [*tuples_type_name]
-        struct_definition: str = cls._struct_definition(dtype_to_cname_dict, struct_name, *tuples)
+        struct_definition: str = cls._struct_definition(
+            dtype_to_cname_dict, struct_name, *tuples
+        )
         names = [n for t, n in tuples]
         struct_layout_code = ""
         # Create an ordered list of dependencies. First are the base dependencies.
-        dependent_ks = [tup[0] for tup in tuples if type(tup[0]) is KernelStruct]
+        dependent_ks = [
+            tup[0] for tup in tuples if type(tup[0]) is KernelStruct
+        ]
         for i in list(reversed(range(len(dependent_ks)))):
             ks: KernelStruct = dependent_ks[i]
-            dependent_ks = dependent_ks[:i] + ks.dependent_structs + dependent_ks[i:]
+            dependent_ks = (
+                dependent_ks[:i] + ks.dependent_structs + dependent_ks[i:]
+            )
         # Remove duplicates. Keep first appearance of each symbol.
         seen = set()
-        dependent_ks = [ks for ks in dependent_ks if not (ks in seen or seen.add(ks))]
+        dependent_ks = [
+            ks for ks in dependent_ks if not (ks in seen or seen.add(ks))
+        ]
         # Add the structure layout code for each dependency, in the proper order
         for ks in dependent_ks:
             struct_layout_code += ks.struct_definition_c

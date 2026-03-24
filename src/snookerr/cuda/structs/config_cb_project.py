@@ -26,13 +26,20 @@ config_cb_project = kern_structs.KernelStruct(
 
 volume_chunk_spec = kern_structs.KernelStruct(
     struct_name="volume_chunk_spec",
-    names=['idx_xstart', 'idx_xstop', 'idx_ystart', 'idx_ystop', 'idx_zstart', 'idx_zstop'],
+    names=[
+        "idx_xstart",
+        "idx_xstop",
+        "idx_ystart",
+        "idx_ystop",
+        "idx_zstart",
+        "idx_zstop",
+    ],
     dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],
 )
 
 fvec3 = kern_structs.KernelStruct(
     struct_name="fvec3",
-    names=['x', 'y', 'z'],
+    names=["x", "y", "z"],
     dtypes=[np.float32, np.float32, np.float32],
     extra_code="""
 __device__ fvec3 operator+(
@@ -102,44 +109,45 @@ __device__ fvec3 operator/(
     o.z = v.z / f;
     return o;
 }
-"""
+""",
 )
 
 uivec3 = kern_structs.KernelStruct(
     struct_name="uivec3",
-    names=['x', 'y', 'z'],
+    names=["x", "y", "z"],
     dtypes=[np.uint32, np.uint32, np.uint32],
 )
 
 det_spec = kern_structs.KernelStruct(
     struct_name="det_spec",
     names=[
-        'pos',          # position of detector (nominally, the middle of it)
-        'u',            # vector pointing along the x direction. Also determines pixel width.
-        'v',            # vector pointing along the y direction. Also determines pixel height.
-        'nu', 'nv',     # number of columns/rows. i.e. length of x axis; length of y axis.
-        'type',         # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
+        "pos",  # position of detector (nominally, the middle of it)
+        "u",  # vector pointing along the x direction. Also determines pixel width.
+        "v",  # vector pointing along the y direction. Also determines pixel height.
+        "nu",
+        "nv",  # number of columns/rows. i.e. length of x axis; length of y axis.
+        "type",  # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
     ],
     dtypes=[fvec3, fvec3, fvec3, np.uint16, np.uint16, np.uint8],
 )
 
 proj_spec = kern_structs.KernelStruct(
     struct_name="proj_spec",
-    names=['sourcepos', 'dspec'],
+    names=["sourcepos", "dspec"],
     dtypes=[fvec3, det_spec],
 )
 
 vol_spec = kern_structs.KernelStruct(
     struct_name="vol_spec",
     names=[
-        'ptr_000',        # pointer to the volume array, like cp.array(...).data.ptr
-                          # the pointer should point to what will be considered the arr[0][0][0] byte.
-                          # The pointer can be added to (like an ordinary integer) to get the correct offset
-                          # for wherever the relevant part of the volume starts
-        'strides_bytes',  # strides of the 3 dimensions of the array, like cp.array(...).strides
-        'shape',          # shape of the array. The underlying data may extend beyond this, but this shape
-                          # will determine how much is considered within range and should be accessed.
-        'pos_000',        # x,y,z position of the center of the 0,0,0 voxel.
+        "ptr_000",  # pointer to the volume array, like cp.array(...).data.ptr
+        # the pointer should point to what will be considered the arr[0][0][0] byte.
+        # The pointer can be added to (like an ordinary integer) to get the correct offset
+        # for wherever the relevant part of the volume starts
+        "strides_bytes",  # strides of the 3 dimensions of the array, like cp.array(...).strides
+        "shape",  # shape of the array. The underlying data may extend beyond this, but this shape
+        # will determine how much is considered within range and should be accessed.
+        "pos_000",  # x,y,z position of the center of the 0,0,0 voxel.
     ],
     dtypes=[np.uint64, uivec3, uivec3, fvec3],
 )

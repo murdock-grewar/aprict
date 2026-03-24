@@ -19,103 +19,137 @@ import cupy as cp
 import numpy as np
 import pytest
 
-from ... import imview
-from ...cuda import header_injection, kern_structs
-from ...cuda import structs as kstructs
+# from ... import imview
+from ...cuda import header_injection
+from ...cuda.structs.config_cb_project import config_cb_project as ks_config
+from ...cuda.structs.config_cb_project import det_spec as ks_det_spec
+from ...cuda.structs.config_cb_project import fvec3 as ks_fvec3
+from ...cuda.structs.config_cb_project import proj_spec as ks_proj_spec
+from ...cuda.structs.config_cb_project import uivec3 as ks_uivec3
+from ...cuda.structs.config_cb_project import vol_spec as ks_vol_spec
 
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
-@pytest.mark.dependency(name="ks_100", depends=[str_pytest_gen_sources], scope="session")
-def test_cb_project() -> None:
+@pytest.mark.dependency(
+    name="ks_100", depends=[str_pytest_gen_sources], scope="session"
+)
+def test_cb_project_single_voxel() -> None:
     """Test a kernel which is generated dynamically then loaded."""
-    ks_config: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.config_cb_project
-    )
-    ks_volchunk_spec: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.volume_chunk_spec
-    )
-    ks_fvec3: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.fvec3
-    )
-    ks_uivec3: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.uivec3
-    )
-    ks_det_spec: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.det_spec
-    )
-    ks_proj_spec: kern_structs.KernelStruct = (
-        kstructs.config_cb_project.proj_spec
-    )
+    # Inject and compile module
     injected_module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project.cu",
         name_expressions=[
-            "doathing<float,float,4,4,4>",
-            "doathing<float,double,4,4,4>",
+            "project_CB<float,float,4,4,4>",
+            "project_CB<float,double,4,4,4>",
         ],
     )
-    config          = np.array((), dtype=ks_config.dtype)
-    vchunk_spec     = np.array((0, 4, 0, 4, 0, 4), dtype=ks_volchunk_spec.dtype)
-    sourcepos       = np.array((15, 0, 0), dtype=ks_fvec3.dtype)
-    #detpos          = np.array((-3, 0, 0), dtype=ks_fvec3.dtype)
-    dspec           = np.array((
-        np.array((-3, 0, 0), dtype=ks_fvec3.dtype),
-        np.array(( 0, .2, 0), dtype=ks_fvec3.dtype),
-        np.array(( 0, 0, .2), dtype=ks_fvec3.dtype),
-        np.uint16(100), np.uint16(100),
-        np.uint8(0),
-        ), dtype=ks_det_spec.dtype)
-    projspec = np.array((sourcepos,dspec), dtype=ks_proj_spec.dtype)
-    output_projs: cp.ndarray = cp.zeros((1, 100, 100), dtype=cp.float64)
-    vol_corner_pos  = np.array((0, 0, 0), dtype=ks_fvec3.dtype)
-    vol             = cp.array([
-            [
-                [0, 0, 0, 0],
-                [0, 1, 1, 0],
-                [0, 1, 1, 0],
-                [0, 0, 0, 0],
-            ],
-            [
-                [0, 1, 1, 0],
-                [1, 0, 1, 1],
-                [1, 1, 0, 1],
-                [0, 1, 1, 0],
-            ],
-            [
-                [0, 1, 1, 0],
-                [1, 1, 0, 1],
-                [1, 0, 1, 1],
-                [0, 1, 1, 0],
-            ],
-            [
-                [0, 0, 0, 0],
-                [0, 1, 1, 0],
-                [0, 1, 1, 0],
-                [0, 0, 0, 0],
-            ]
-        ]
-        , dtype=cp.float32)
-    vol_strides_bytes = np.array(vol.strides, dtype=ks_uivec3.dtype)
-    output_projs_strides_bytes = np.array(output_projs.strides, dtype=ks_uivec3.dtype)
-    output          = cp.array([0], dtype=cp.float64)
     injected_module.compile()
+    # Config
+    config = np.array((), dtype=ks_config.dtype)
+    # projspecs
+    # The source is here in the center of the volume
+    # The detector pixel is one quarter-voxel away from the center
+    # Both intersect the volume. This a test of the exactness of the line integrals.
+    sourcepos = np.array((0, 0, 0), dtype=ks_fvec3.dtype)
+    detwid: int = 501
+    dethei: int = 501
+    dspec = np.array(
+        (
+            np.array((-0.25, 0, 0), dtype=ks_fvec3.dtype),
+            np.array((0, 0.05, 0), dtype=ks_fvec3.dtype),
+            np.array((0, 0, 0.05), dtype=ks_fvec3.dtype),
+            np.uint16(detwid),
+            np.uint16(dethei),
+            np.uint8(0),
+        ),
+        dtype=ks_det_spec.dtype,
+    )
+    projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
+    projspec_array = cp.array([projspec for _ in range(10)])
+    # actual projection data
+    output_projs: cp.ndarray = cp.zeros((10, detwid, dethei), dtype=cp.float64)
+    output_projs_strides_bytes = np.array(
+        output_projs.strides, dtype=ks_uivec3.dtype
+    )
+    num_projs = np.uint32(output_projs.shape[0])
+    # Volume with a single hot voxel
+    vol = cp.array(
+        [
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ],
+            [
+                [0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0],
+            ],
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ],
+        ],
+        dtype=cp.float32,
+    )
+    vol_spec = np.array(
+        (
+            np.uint64(
+                vol.data.ptr
+            ),  # pointer to the byte beginning the 0,0,0 voxel (can be offset)
+            np.array(vol.strides, dtype=ks_uivec3.dtype),  # strides_bytes
+            np.array(vol.shape, dtype=ks_uivec3.dtype),  # shape
+            np.array(
+                tuple(-(np.array(vol.shape, dtype=np.float32) - 1) / 2),
+                dtype=ks_fvec3.dtype,
+            ),
+        ),
+        dtype=ks_vol_spec.dtype,
+    )
 
-    fun = injected_module.get_function("doathing<float,double,4,4,4>")
+    # Prepare the kernel
+    blockx = 8
+    blocky = 8
+    blocklayer = 10
+    fun = injected_module.get_function("project_CB<float,double,4,4,4>")
     fun(
-        (13, 13,),    # gridDims:  (x,y,z)
-        (8, 8),  # blockDims: (x,y,z)
+        (
+            int(np.ceil(output_projs.shape[1] / blockx)),
+            int(np.ceil(output_projs.shape[2] / blocky)),
+            int(np.ceil(output_projs.shape[0] / blocklayer)),
+        ),  # gridDims:  (x,y,z)
+        (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
         (  # input args
             config,
-            #vchunk_spec,
-            projspec,
-            #detpos,
-            vol_corner_pos,
-            vol_strides_bytes,
-            vol,
+            projspec_array,
+            np.uint32(num_projs),
+            vol_spec,
             output_projs_strides_bytes,
-            np.uint64(output_projs.data.ptr),  # WARNING: this passes in a np.int32 maybe? Unsure of the int type that is passed. I want to pass whatever is used for a pointer, which I guess may be uint64 for a 64-bit system.
-        )
+            np.uint64(output_projs.data.ptr),
+        ),
     )
-    imview.plot_projections(output_projs)
-    expected = cp.array([6.0], dtype=cp.float64)
-    cp.testing.assert_array_almost_equal(output_projs, expected)
+    # imview.plot_projections(output_projs)
+
+    # Tests
+    # The center pixel should read exactly 0.25.
+    cp.testing.assert_array_almost_equal(
+        output_projs[:, detwid // 2, dethei // 2], 0.25
+    )
+    cp.testing.assert_array_almost_equal(cp.amin(output_projs), 0.25)
+    # The maximum reading shoud be along the line goin from (0,0,0) to (-0.25, 0.5, 0.5)
+    val = np.sqrt(0.25**2 + 0.5**2 + 0.5**2)
+    cp.testing.assert_array_almost_equal(
+        output_projs[:, detwid // 2 + 10, dethei // 2 + 10], val
+    )
+    cp.testing.assert_array_almost_equal(
+        output_projs[:, detwid // 2 - 10, dethei // 2 + 10], val
+    )
+    cp.testing.assert_array_almost_equal(
+        output_projs[:, detwid // 2 + 10, dethei // 2 - 10], val
+    )
+    cp.testing.assert_array_almost_equal(
+        output_projs[:, detwid // 2 - 10, dethei // 2 - 10], val
+    )
+    cp.testing.assert_array_almost_equal(cp.amax(output_projs), val)
