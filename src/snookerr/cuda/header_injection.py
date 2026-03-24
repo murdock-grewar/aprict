@@ -48,7 +48,7 @@ def inject_headers(path_to_c_file: pathlib.Path | str) -> str:
 def load_injected_module(
     rel_path_to_uninjected_cu: pathlib.Path | str,
     *,
-    options: tuple[str, ...] = ("-std=c++17",),
+    options: tuple[str, ...] = ("-std=c++17", "-use_fast_math"),
     extraoptions: tuple[str, ...] | None = None,
     name_expressions: list[str] | None = None,
 ) -> cp.RawModule:

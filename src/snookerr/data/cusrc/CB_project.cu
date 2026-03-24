@@ -169,11 +169,10 @@ __device__ Tp exact_line_integral(
     float nextxbound, nextybound, nextzbound; // each records the next x/y/z value which would trigger a crossing into a new voxel
 
     float length_per_step = norm3d(lis.dx, lis.dy, lis.dz);
-    float steps_to_xbound, steps_to_ybound, steps_to_zbound;
     float steps_to_end = 1.f; // By definition of lis.dx,dy,dz, a single step goes from start to end.
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
-    unsigned int idx_x, idx_y, idx_z;
+    int idx_x, idx_y, idx_z;
     while (steps_to_end > 0) { // Loop until 'steps_to_end' becomes nonpositive, which would indicate that we have reached the end of the line integral
         // Find the critical values of x, y, z
         // Initially, I had planned to calculate this once at the beginning, and only update the necessary x/y/z values as necessary.
@@ -181,6 +180,12 @@ __device__ Tp exact_line_integral(
         if (xdir <= 0) { nextxbound = ceil(lis.x) - 1; } else { nextxbound = floor(lis.x) + 1; }
         if (ydir <= 0) { nextybound = ceil(lis.y) - 1; } else { nextybound = floor(lis.y) + 1; }
         if (zdir <= 0) { nextzbound = ceil(lis.z) - 1; } else { nextzbound = floor(lis.z) + 1; }
+        if ((xdir <= 0) && (nextxbound < 0))              { break; }
+        if ((xdir >  0) && (nextxbound > volchunk_Xsize)) { break; }
+        if ((ydir <= 0) && (nextybound < 0))              { break; }
+        if ((ydir >  0) && (nextybound > volchunk_Ysize)) { break; }
+        if ((zdir <= 0) && (nextzbound < 0))              { break; }
+        if ((zdir >  0) && (nextzbound > volchunk_Zsize)) { break; }
 
         // Calculate how many 'dx,dy,dz' steps to take until hitting the next boundary.
         if (xdir == 0) { steps_to_take_x = 1.f; } else { steps_to_take_x = (nextxbound - lis.x)/lis.dx; }
@@ -219,7 +224,7 @@ __device__ Tp exact_line_integral(
         idx_y = ((int)nextybound - ((1+ydir)/2)); // y index in surface
         idx_z = ((int)nextzbound - ((1+zdir)/2)); // z index in surface
 
-        if (
+        if ( // Don't integrate the volume outside the bounds of the chunk!
             (idx_x >= 0) && (idx_x < volchunk_Xsize) &&
             (idx_y >= 0) && (idx_y < volchunk_Ysize) &&
             (idx_z >= 0) && (idx_z < volchunk_Zsize)
@@ -259,20 +264,19 @@ template<
     unsigned int volchunk_Xsize,  // volume chunk size in X dimension
     unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
     unsigned int volchunk_Zsize>  // volume chunk size in Z dimension
-__global__ void project_CB(
-        config_CB_project   config,          // any miscellaneous config for the CB projection
+__global__ void project_CB_sharedmem(
+        const config_CB_project   config,          // any miscellaneous config for the CB projection
         //volume_chunk_spec   vchunk_spec,   // specifies the indices of the volume chunk.
-        proj_spec*          projspecs,       // contains the source and detector configurations
-        unsigned int        num_projs,       // length of projspecs array
-        vol_spec            volspec,
-        uivec3              output_projs_strides,
-        Tp*                 output_projs
+        const proj_spec*          projspecs,       // contains the source and detector configurations
+        const unsigned int        num_projs,       // length of projspecs array
+        const vol_spec            volspec,
+        const uivec3              output_projs_strides,
+        Tp*                       output_projs
 )
 {
 
-    fvec3  vol_corner_pos = volspec.pos_000;
-    uivec3 vol_strides    = volspec.strides_bytes;
-    Tv*    volume         = (Tv*)volspec.ptr_000;
+    const uivec3 vol_strides    = volspec.strides_bytes;
+    const Tv*    volume         = (Tv*)volspec.ptr_000;
     // This kernel should be used with a blockDim.z of 1.
     // i.e. only use blocks with a X and Y width. These blocks will be tiled on the detector
     // pixels, and each thread will write to one detector pixel.
@@ -286,14 +290,14 @@ __global__ void project_CB(
     // It will be assumed that the volume has memory strides that are smallest in x, then y,
     // then the largest strides in z. #TODO: generalise this.
     __shared__ Tv vchunk_shm[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize];
-    unsigned long threadid = (
+    const unsigned long threadid = (
         threadIdx.x +
-        threadIdx.y * blockDim.x //+
-        //threadIdx.z * blockDim.x * blockDim.y // It is assumed that blockDim.z == 1, i.e. threadIdx.z == 0.
+        threadIdx.y * blockDim.x +
+        threadIdx.z * blockDim.x * blockDim.y
     );
     // Calculate the number of volume elemnts that each thread must load
-    unsigned long vol_chunk_size = volchunk_Xsize*volchunk_Ysize*volchunk_Zsize;//vchunk_size(vchunk_spec);
-    unsigned short num_volels_per_thread = ceil(vol_chunk_size / (float)(blockDim.x * blockDim.y * blockDim.z));
+    const unsigned long vol_chunk_size = volchunk_Xsize*volchunk_Ysize*volchunk_Zsize;//vchunk_size(vchunk_spec);
+    const unsigned short num_volels_per_thread = ceil(vol_chunk_size / (float)(blockDim.x * blockDim.y * blockDim.z));
     // No reason to calculate these
     /*
     unsigned long blockid = (
@@ -308,7 +312,6 @@ __global__ void project_CB(
     unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
     unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
-    //printf("val: %.2f\n", val);
 
     // Populate the shared memory with the volume chunk
     for (int i = num_volels_per_thread*threadid; i < num_volels_per_thread*(threadid+1); i++) {
@@ -321,9 +324,9 @@ __global__ void project_CB(
         j -= volidx_y*volchunk_Xsize;
         unsigned int volidx_x = j;
         if (
-            (volidx_x >= 0) && (volidx_x < volchunk_Xsize) &&
-            (volidx_y >= 0) && (volidx_y < volchunk_Ysize) &&
-            (volidx_z >= 0) && (volidx_z < volchunk_Zsize)
+            (volidx_x < volspec.shape.x) &&
+            (volidx_y < volspec.shape.y) &&
+            (volidx_z < volspec.shape.z)
         ) {
             // Load the volume data into the shared memory
             unsigned long mem_idx = (
@@ -371,24 +374,4 @@ __global__ void project_CB(
     // Add the result atomically.
     // (using atomicAdd allows us to launch other kernels concurrently, if desired)
     atomicAdd(output_projs + det_idx, val);
-
-
-    return;
-
-    //unsigned int det_idx_z = threadIdx.z + blockIdx.z * blockDim.z;
-    if (det_idx_y > 0) { return; }
-    //atomicAdd(output_val, (Tp)det_idx_x);
-    //output_val[0] = (Tp)(vchunk_spec.idx_xstop + vchunk_spec.idx_ystop);
-    //output_val[0] = (Tp)num_volels_per_thread;
-    if (det_idx_x > 0) { return; }
-    Tv accum = 0;
-    for (int i = 0; i < volchunk_Xsize; i++) {
-        for (int j = 0; j < volchunk_Ysize; j++) {
-            for (int k = 0; k < volchunk_Zsize; k++) {
-                accum += vchunk_shm[i][j][k];
-            }
-        }
-    }
-    output_projs[0] = accum;
-    output_projs[0] = 1.;
 }
