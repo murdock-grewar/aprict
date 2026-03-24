@@ -34,7 +34,7 @@ str_pytest_gen_sources: str = "ks_gen_sources"
 @pytest.mark.dependency(
     name="ks_100", depends=[str_pytest_gen_sources], scope="session"
 )
-def test_cb_project_single_voxel() -> None:
+def test_cb_project_single_voxel_offset_detector() -> None:
     """Test a kernel which is generated dynamically then loaded."""
     # Inject and compile module
     injected_module: cp.RawModule = header_injection.load_injected_module(
@@ -51,12 +51,19 @@ def test_cb_project_single_voxel() -> None:
     # The source is here in the center of the volume
     # The detector pixel is one quarter-voxel away from the center
     # Both intersect the volume. This a test of the exactness of the line integrals.
+    # Imagine a top-down view with the source on the right-hand side.
+    # The x coordinate points to the right.
+    # The y coordinate points upwards.
+    # The z coordinates points out of the page.
     sourcepos = np.array((0, 0, 0), dtype=ks_fvec3.dtype)
     detwid: int = 501
     dethei: int = 501
     dspec = np.array(
         (
-            np.array((-0.25, 0, 0), dtype=ks_fvec3.dtype),
+            # Detector is shifted along positive y and z.
+            # The output image is viewed from the front of the detector-- the same side as the source.
+            # From this perspective, the detector is shifted mostly right and a little up.
+            np.array((-0.25, 10, 3), dtype=ks_fvec3.dtype),
             np.array((0, 0.05, 0), dtype=ks_fvec3.dtype),
             np.array((0, 0, 0.05), dtype=ks_fvec3.dtype),
             np.uint16(detwid),
@@ -133,23 +140,25 @@ def test_cb_project_single_voxel() -> None:
     # imview.plot_projections(output_projs)
 
     # Tests
+    offy = 200  # 200*0.05 = 10
+    offz = 60  # 60*0.05 = 3
     # The center pixel should read exactly 0.25.
     cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2, dethei // 2], 0.25
+        output_projs[:, detwid // 2 - offy, dethei // 2 - offz], 0.25
     )
     cp.testing.assert_array_almost_equal(cp.amin(output_projs), 0.25)
     # The maximum reading shoud be along the line goin from (0,0,0) to (-0.25, 0.5, 0.5)
     val = np.sqrt(0.25**2 + 0.5**2 + 0.5**2)
     cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 + 10, dethei // 2 + 10], val
+        output_projs[:, detwid // 2 + 10 - offy, dethei // 2 + 10 - offz], val
     )
     cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 - 10, dethei // 2 + 10], val
+        output_projs[:, detwid // 2 - 10 - offy, dethei // 2 + 10 - offz], val
     )
     cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 + 10, dethei // 2 - 10], val
+        output_projs[:, detwid // 2 + 10 - offy, dethei // 2 - 10 - offz], val
     )
     cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 - 10, dethei // 2 - 10], val
+        output_projs[:, detwid // 2 - 10 - offy, dethei // 2 - 10 - offz], val
     )
     cp.testing.assert_array_almost_equal(cp.amax(output_projs), val)
