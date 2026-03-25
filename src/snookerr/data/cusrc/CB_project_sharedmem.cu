@@ -21,27 +21,39 @@ template<
     unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
     unsigned int volchunk_Zsize>  // volume chunk size in Z dimension
 __device__ Tp exact_line_integral(
-        fvec3               v1,
-        fvec3               v2,
+        const fvec3         v1,
+        const fvec3         v2,
         const vol_spec      volspec,
         Tv                  (*vchunk_shm)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],  // These values will be used instead of the volume from 'volspec'.
         bool                (*vchunk_shm_loadedflag)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
-        const bool                  return_false_steps = false)
+        const bool          return_false_steps = false)
 {
     // MODE OF OPERATION
     // This function steps between boundaries of voxels, and adds the exact line integral components.
     const uivec3 vol_strides    = volspec.strides_bytes;
     const Tv*    volume         = (Tv*)volspec.ptr_000;
 
+    const fvec3 minxyz = {0.f, 0.f, 0.f};
+    const fvec3 maxxyz = {
+        (float)min(volspec.shape.x, volchunk_Xsize),
+        (float)min(volspec.shape.y, volchunk_Ysize),
+        (float)min(volspec.shape.z, volchunk_Zsize)
+    };
     // Measure distances relative to the bottom-left corner of the 000 voxel.
     // This way, integer values for x,y,z correspond to voxel boundaries.
-    float xstart = v1.x - volspec.pos_000.x + (1./2.);
-    float ystart = v1.y - volspec.pos_000.y + (1./2.);
-    float zstart = v1.z - volspec.pos_000.z + (1./2.);
-    float xend   = v2.x - volspec.pos_000.x + (1./2.);
-    float yend   = v2.y - volspec.pos_000.y + (1./2.);
-    float zend   = v2.z - volspec.pos_000.z + (1./2.);
+    const float xstart = v1.x - volspec.pos_000.x + (1./2.);
+    const float xend   = v2.x - volspec.pos_000.x + (1./2.);
+    if ((xstart < minxyz.x) && (xend < minxyz.x)) { return 0.; }
+    if ((xstart > maxxyz.x) && (xend > maxxyz.x)) { return 0.; }
+    const float ystart = v1.y - volspec.pos_000.y + (1./2.);
+    const float yend   = v2.y - volspec.pos_000.y + (1./2.);
+    if ((ystart < minxyz.y) && (yend < minxyz.y)) { return 0.; }
+    if ((ystart > maxxyz.y) && (yend > maxxyz.y)) { return 0.; }
+    const float zstart = v1.z - volspec.pos_000.z + (1./2.);
+    const float zend   = v2.z - volspec.pos_000.z + (1./2.);
+    if ((zstart < minxyz.z) && (zend < minxyz.z)) { return 0.; }
+    if ((zstart > maxxyz.z) && (zend > maxxyz.z)) { return 0.; }
 
     Tp accum_val = 0;
 
@@ -69,20 +81,7 @@ __device__ Tp exact_line_integral(
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
     int idx_x, idx_y, idx_z;
-    /*
-    const fvec3 minxyz = volspec.offsets;
-    const fvec3 maxxyz = {
-        (float)min(volspec.shape.x, volspec.offsets.x + volchunk_Xsize),
-        (float)min(volspec.shape.y, volspec.offsets.y + volchunk_Ysize),
-        (float)min(volspec.shape.z, volspec.offsets.z + volchunk_Zsize)
-    }
-    */
-    const fvec3 minxyz = {0.f, 0.f, 0.f};
-    const fvec3 maxxyz = {
-        (float)min(volspec.shape.x, volchunk_Xsize),
-        (float)min(volspec.shape.y, volchunk_Ysize),
-        (float)min(volspec.shape.z, volchunk_Zsize)
-    };
+
     //// Skip to the first intersection with the volume (plus an extra voxel for safety)
     float advance_steps = 0;
     if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 1./2. - lis.x)/lis.dx); }
