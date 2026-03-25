@@ -37,10 +37,62 @@ volume_chunk_spec = kern_structs.KernelStruct(
     dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],
 )
 
+uivec3 = kern_structs.KernelStruct(
+    struct_name="uivec3",
+    names=["x", "y", "z"],
+    dtypes=[np.uint32, np.uint32, np.uint32],
+    extra_code="""
+__device__ uivec3 operator+(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    uivec3 v3;
+    v3.x = v1.x + v2.x;
+    v3.y = v1.y + v2.y;
+    v3.z = v1.z + v2.z;
+    return v3;
+}
+
+
+__device__ uivec3 operator-(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    uivec3 v3;
+    v3.x = v1.x - v2.x;
+    v3.y = v1.y - v2.y;
+    v3.z = v1.z - v2.z;
+    return v3;
+}
+
+
+__device__ float dot_prod(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+}
+
+""",
+)
+
 fvec3 = kern_structs.KernelStruct(
     struct_name="fvec3",
     names=["x", "y", "z"],
     dtypes=[np.float32, np.float32, np.float32],
+    force_dependencies=[
+        uivec3
+    ],  # used to define a constructor in terms of uivec3
+    insert_into_struct="""
+public:
+    // implicit constructor from a uivec3
+    fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
+    // default constructor, used with i.e. 'fvec3 v;'
+    fvec3() = default;
+""",
     extra_code="""
 __device__ fvec3 operator+(
         fvec3 v1,
@@ -112,11 +164,6 @@ __device__ fvec3 operator/(
 """,
 )
 
-uivec3 = kern_structs.KernelStruct(
-    struct_name="uivec3",
-    names=["x", "y", "z"],
-    dtypes=[np.uint32, np.uint32, np.uint32],
-)
 
 det_spec = kern_structs.KernelStruct(
     struct_name="det_spec",
@@ -150,4 +197,14 @@ vol_spec = kern_structs.KernelStruct(
         "pos_000",  # x,y,z position of the center of the 0,0,0 voxel.
     ],
     dtypes=[np.uint64, uivec3, uivec3, fvec3],
+)
+
+vol_tex_chunk_spec = kern_structs.KernelStruct(
+    struct_name="vol_tex_chunk_spec",
+    names=[
+        "offsets",  # unsigned integer offsets from the 0,0,0 base of the texture
+        "shape",  # unsigned shape of the chunk
+        "texpos",  # The 0,0,0 corner of the texture of which chunk is a part. NOTE: this is NOT the position of the center of the 0,0,0 voxel! It is the position of the corner of that voxel.
+    ],
+    dtypes=[uivec3, uivec3, fvec3],
 )

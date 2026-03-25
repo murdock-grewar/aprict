@@ -15,13 +15,16 @@
 
 """Tests for the CB projection kernel(s)."""
 
+# ruff: disable[D101,D102,N801,ANN201]
 import itertools
+import time  # noqa: F401
 
 import cupy as cp
+import numexpr as ne
 import numpy as np
 import pytest
 
-# from ... import imview
+from ... import imview  # noqa: F401, RUF100
 from ...cuda import header_injection
 from ...cuda.structs.config_cb_project import config_cb_project as ks_config
 from ...cuda.structs.config_cb_project import det_spec as ks_det_spec
@@ -29,15 +32,19 @@ from ...cuda.structs.config_cb_project import fvec3 as ks_fvec3
 from ...cuda.structs.config_cb_project import proj_spec as ks_proj_spec
 from ...cuda.structs.config_cb_project import uivec3 as ks_uivec3
 from ...cuda.structs.config_cb_project import vol_spec as ks_vol_spec
+from ...cuda.structs.config_cb_project import (
+    vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
+)
+from ...lib import phantoms_FORBILD, texture_tools
 
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
 @pytest.fixture
-def injected_module() -> cp.RawModule:  # noqa: D103
+def injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
-        "./CB_project.cu",
+        "./CB_project_sharedmem.cu",
         name_expressions=[
             "project_CB_sharedmem<float,float,4,4,4>",
             "project_CB_sharedmem<float,double,4,4,4>",
@@ -53,11 +60,24 @@ def injected_module() -> cp.RawModule:  # noqa: D103
     return module
 
 
+def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
+    # Inject and compile module
+    module: cp.RawModule = header_injection.load_injected_module(
+        "./CB_project_texture_chunked.cu",
+        name_expressions=[
+            "project_CB_texture_chunked<float,float>",
+            "project_CB_texture_chunked<float,double>",
+        ],
+    )
+    module.compile()
+    return module
+
+
 @pytest.mark.dependency(
     name="ks_100", depends=[str_pytest_gen_sources], scope="session"
 )
 def test_cb_project_single_voxel_offset_detector(
-    injected_module: cp.RawModule,
+    injected_module_sharedmem: cp.RawModule,
 ) -> None:
     """Test a kernel which is generated dynamically then loaded."""
     # Config
@@ -135,7 +155,7 @@ def test_cb_project_single_voxel_offset_detector(
     blockx = 8
     blocky = 8
     blocklayer = 10
-    fun = injected_module.get_function(
+    fun = injected_module_sharedmem.get_function(
         "project_CB_sharedmem<float,double,4,4,4>"
     )
     fun(
@@ -154,6 +174,7 @@ def test_cb_project_single_voxel_offset_detector(
             np.uint64(output_projs.data.ptr),
         ),
     )
+    cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
     # imview.plot_projections(output_projs)
 
     # Tests
@@ -181,9 +202,10 @@ def test_cb_project_single_voxel_offset_detector(
     cp.testing.assert_array_almost_equal(cp.amax(output_projs), val)
 
 
-# Defunct test. Still useful to have it here to test this method in the future.
-@pytest.mark.dependency(depends=["ks_100"], scope="session")
-def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
+@pytest.mark.dependency(scope="session")
+def test_cb_project_random_noise_sharedmem(
+    injected_module_sharedmem: cp.RawModule,
+) -> None:
     """Test a kernel which is generated dynamically then loaded."""
     # Config
     config = np.array((), dtype=ks_config.dtype)
@@ -192,7 +214,7 @@ def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
     # The x coordinate points to the right.
     # The y coordinate points upwards.
     # The z coordinates points out of the page.
-    sourcepos = np.array((300, 0, 0), dtype=ks_fvec3.dtype)
+    sourcepos = np.array((500, 0, 0), dtype=ks_fvec3.dtype)
     num_projs = np.uint32(10)
     detwid: int = 1001
     dethei: int = 1001
@@ -202,8 +224,8 @@ def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
             # The output image is viewed from the front of the detector-- the same side as the source.
             # From this perspective, the detector is shifted mostly right and a little up.
             np.array((-300, 0, 0), dtype=ks_fvec3.dtype),
-            np.array((0, 0.3, 0), dtype=ks_fvec3.dtype),
-            np.array((0, 0, 0.3), dtype=ks_fvec3.dtype),
+            np.array((0, 0.1, 0), dtype=ks_fvec3.dtype),
+            np.array((0, 0, 0.1), dtype=ks_fvec3.dtype),
             np.uint16(detwid),
             np.uint16(dethei),
             np.uint8(0),
@@ -219,10 +241,9 @@ def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
     output_projs_strides_bytes = np.array(
         output_projs.strides, dtype=ks_uivec3.dtype
     )
-    # Volume with a single hot voxel
-    vol = cp.abs(cp.random.randn(2501, 2501, 2, dtype=cp.float32))
-    cp.mean(vol)
-    print("Created the volume. Now launching kernels.", flush=True)
+    # Very short volume.
+    vol = cp.abs(cp.random.randn(501, 500, 4, dtype=cp.float32))
+    # print("Created the volume. Now launching kernels.", flush=True)
 
     # Prepare the kernel
     blockx = 10
@@ -232,7 +253,7 @@ def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
     volblockx = 18
     volblocky = 18
     volblockz = 18
-    fun = injected_module.get_function(
+    fun = injected_module_sharedmem.get_function(
         f"project_CB_sharedmem<float,float,{volblockx:d},{volblocky:d},{volblockz:d}>"
     )
     for i, j, k in itertools.product(
@@ -286,28 +307,284 @@ def _test_cb_project_random_noise(injected_module: cp.RawModule) -> None:
                 np.uint64(output_projs.data.ptr),
             ),
         )
+    cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
     # imview.plot_projections(output_projs)
 
     # Tests
-    offy = 200  # 200*0.05 = 10
-    offz = 60  # 60*0.05 = 3
-    # The center pixel should read exactly 0.25.
-    cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 - offy, dethei // 2 - offz], 0.25
+    # Check that x extremities at z=0 are nonzero
+    cp.testing.assert_array_less(
+        0, cp.abs(output_projs[:, 0, dethei // 2]) - 1
     )
-    cp.testing.assert_array_almost_equal(cp.amin(output_projs), 0.25)
-    # The maximum reading shoud be along the line goin from (0,0,0) to (-0.25, 0.5, 0.5)
-    val = np.sqrt(0.25**2 + 0.5**2 + 0.5**2)
-    cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 + 10 - offy, dethei // 2 + 10 - offz], val
+    cp.testing.assert_array_less(
+        0, cp.abs(output_projs[:, -1, dethei // 2]) - 1
     )
-    cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 - 10 - offy, dethei // 2 + 10 - offz], val
+    # Check that z extremities are zero
+    cp.testing.assert_array_almost_equal(output_projs[:, :, 0], 0)
+    cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
+
+
+class TestCB_texture_randomnoise:
+    def setup_method(self) -> None:
+        # Config
+        config = np.array((), dtype=ks_config.dtype)
+        # projspecs
+        # Imagine a top-down view with the source on the right-hand side.
+        # The x coordinate points to the right.
+        # The y coordinate points upwards.
+        # The z coordinates points out of the page.
+        sourcepos = np.array((500, 0, 0), dtype=ks_fvec3.dtype)
+        num_projs = np.uint32(10)
+        detwid: int = 1001
+        dethei: int = 1001
+        dspec = np.array(
+            (
+                # Detector is shifted along positive y and z.
+                # The output image is viewed from the front of the detector-- the same side as the source.
+                # From this perspective, the detector is shifted mostly right and a little up.
+                np.array((-300, 0, 0), dtype=ks_fvec3.dtype),
+                np.array((0, 0.1, 0), dtype=ks_fvec3.dtype),
+                np.array((0, 0, 0.1), dtype=ks_fvec3.dtype),
+                np.uint16(detwid),
+                np.uint16(dethei),
+                np.uint8(0),
+            ),
+            dtype=ks_det_spec.dtype,
+        )
+        projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
+        projspec_array = cp.array([projspec for _ in range(num_projs)])
+        # actual projection data
+        output_projs: cp.ndarray = cp.zeros(
+            (num_projs, detwid, dethei), dtype=cp.float32
+        )
+        output_projs_strides_bytes = np.array(
+            output_projs.strides, dtype=ks_uivec3.dtype
+        )
+        # Very short volume.
+        vol = np.abs(np.random.randn(501, 500, 20).astype(np.float32)).copy()  # noqa: NPY002
+        vtex = texture_tools.Texture(
+            vol,
+            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+        )
+        cp.mean(vol)
+        # print("Created the volume. Now launching kernels.", flush=True)
+        # Save fields for use in the test method
+        self.vol = vol
+        self.vtex = vtex
+        self.config = config
+        self.projspec_array = projspec_array
+        self.module = injected_module_texture_chunked()
+        self.output_projs = output_projs
+        self.num_projs = num_projs
+        self.output_projs_strides_bytes = output_projs_strides_bytes
+        self.dethei = dethei
+        self.detwid = detwid
+
+    def teardown_method(self) -> None:
+        self.output_projs.fill(0)
+
+    @pytest.mark.parametrize(
+        "blockdims",
+        [[18, 18, 18], [None, None, None]],
+        ids=["18x18x18", "nochunk"],
     )
-    cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 + 10 - offy, dethei // 2 - 10 - offz], val
-    )
-    cp.testing.assert_array_almost_equal(
-        output_projs[:, detwid // 2 - 10 - offy, dethei // 2 - 10 - offz], val
-    )
-    cp.testing.assert_array_almost_equal(cp.amax(output_projs), val)
+    def test_project(self, blockdims: list[int | None]) -> None:
+        vol = self.vol
+        config = self.config
+        vtex = self.vtex
+        projspec_array = self.projspec_array
+        module = self.module
+        output_projs = self.output_projs
+        num_projs = self.num_projs
+        output_projs_strides_bytes = self.output_projs_strides_bytes
+        dethei = self.dethei
+        detwid = self.detwid  # noqa: F841
+        # Prepare the kernel
+        blockx = 10
+        blocky = 10
+        blocklayer = 10
+        # 48 kB shared memory in a block gives a maximum vol block size of 18x18x18
+        volchunkx, volchunky, volchunkz = blockdims
+        volblockx = vol.shape[0] if volchunkx is None else volchunkx
+        volblocky = vol.shape[1] if volchunky is None else volchunky
+        volblockz = vol.shape[2] if volchunkz is None else volchunkz
+        fun = module.get_function("project_CB_texture_chunked<float,float>")
+        for i, j, k in itertools.product(
+            range(int(np.ceil(vol.shape[0] / volblockx))),
+            range(int(np.ceil(vol.shape[1] / volblocky))),
+            range(int(np.ceil(vol.shape[2] / volblockz))),
+        ):
+            texchunkspec = np.array(
+                (
+                    np.array(
+                        (
+                            i * volblockx,
+                            j * volblocky,
+                            k * volblockz,
+                        ),
+                        dtype=ks_uivec3.dtype,
+                    ),  # offsets
+                    # I don't think I really need the shape after all...
+                    # the texture fetching will return 0 if out of bounds of the texture.
+                    np.array(
+                        (
+                            min(volblockx, vol.shape[0] - i * volblockx),
+                            min(volblocky, vol.shape[1] - j * volblocky),
+                            min(volblockz, vol.shape[2] - k * volblockz),
+                        ),
+                        dtype=ks_uivec3.dtype,
+                    ),  # shape
+                    np.array(
+                        tuple(-np.array(vol.shape, dtype=np.float32) / 2),
+                        dtype=ks_fvec3.dtype,
+                    ),  # texpos
+                ),
+                dtype=ks_vol_tex_chunk_spec.dtype,
+            )
+            fun(
+                (
+                    int(np.ceil(output_projs.shape[1] / blockx)),
+                    int(np.ceil(output_projs.shape[2] / blocky)),
+                    int(np.ceil(output_projs.shape[0] / blocklayer)),
+                ),  # gridDims:  (x,y,z)
+                (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
+                (  # input args
+                    config,
+                    projspec_array,
+                    np.uint32(num_projs),
+                    texchunkspec,
+                    vtex.texobj,
+                    output_projs_strides_bytes,
+                    np.uint64(output_projs.data.ptr),
+                ),
+            )
+        cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
+        # imview.plot_projections(output_projs)
+
+        # Tests
+        # Check that x extremities at z=0 are nonzero
+        cp.testing.assert_array_less(
+            0, cp.abs(output_projs[:, 0, dethei // 2])
+        )
+        cp.testing.assert_array_less(
+            0, cp.abs(output_projs[:, -1, dethei // 2])
+        )
+        # Check that z extremities are zero
+        cp.testing.assert_array_almost_equal(output_projs[:, :, 0], 0)
+        cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
+
+
+@pytest.mark.parametrize("volres", [312, 625])  # , 1250])
+class TestCB_texture_FORBILD:
+    @pytest.fixture(scope="function", autouse=True)
+    def setup_and_teardown(self, volres: int):
+        # Setup phase
+        # Get the FORBILD phantom.
+        v, voxwid_mm = phantoms_FORBILD.FORBILD_HU(volres)  # noqa: RUF059
+        # Convert from Hounsfield units to attenuation coefficient
+        # v = v[:,:,v.shape[2]//4:-(v.shape[2]//4)]
+        self.vol = np.empty(v.shape, dtype=np.float32)
+        ne.evaluate("(v/1000 + 1)*0.02*voxwid_mm", out=self.vol)
+        # Create a texture
+        self.vtex = texture_tools.Texture(
+            self.vol,
+            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+        )
+        # Set up configuration objects etc
+        self.config = np.array((), dtype=ks_config.dtype)
+        num_projs = np.uint32(1000)
+        detwid: int = int(4 / 5 * volres)
+        dethei: int = int(4 / 5 * volres)
+        self.output_projs: cp.ndarray = cp.zeros(
+            (num_projs, detwid, dethei), dtype=cp.float32
+        )
+        self.output_projs_strides_bytes = np.array(
+            self.output_projs.strides, dtype=ks_uivec3.dtype
+        )
+        # Prepare the source/detector positions
+        projspec_array = []
+        ts = np.linspace(0, 2 * np.pi, endpoint=False, num=num_projs)
+        for theta in ts:
+            sourcepos = np.array(
+                (
+                    1750 * volres / 2501 * np.cos(theta),
+                    1750 * volres / 2501 * np.sin(theta),
+                    0,
+                ),
+                dtype=ks_fvec3.dtype,
+            )
+            dspec = np.array(
+                (
+                    # Detector is shifted along positive y and z.
+                    # The output image is viewed from the front of the detector-- the same side as the source.
+                    # From this perspective, the detector is shifted mostly right and a little up.
+                    np.array(
+                        (-volres * np.cos(theta), -volres * np.sin(theta), 0),
+                        dtype=ks_fvec3.dtype,
+                    ),
+                    np.array(
+                        (-4.25 * np.sin(theta), 4.25 * np.cos(theta), 0),
+                        dtype=ks_fvec3.dtype,
+                    ),
+                    np.array((0, 0, 4.25), dtype=ks_fvec3.dtype),
+                    np.uint16(detwid),
+                    np.uint16(dethei),
+                    np.uint8(0),
+                ),
+                dtype=ks_det_spec.dtype,
+            )
+            projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
+            projspec_array.append(projspec)
+        self.projspec_array = cp.array(projspec_array)
+        self.module = injected_module_texture_chunked()
+        self.kern = self.module.get_function(
+            "project_CB_texture_chunked<float,float>"
+        )
+
+        # yield to the timed test
+        cp.cuda.get_current_stream().synchronize()
+        yield
+
+        # Teardown phase
+        # imview.plot_projections(self.output_projs)
+        self.output_projs.fill(0)
+
+    def test_project(self, volres: int) -> None:  # noqa: ARG002
+        # Prepare the kernel
+        blockx = 10
+        blocky = 10
+        blocklayer = 10
+        texchunkspec = np.array(
+            (
+                np.array((0, 0, 0), dtype=ks_uivec3.dtype),  # offsets
+                np.array(self.vol.shape, dtype=ks_uivec3.dtype),  # shape
+                np.array(
+                    tuple(-np.array(self.vol.shape, dtype=np.float32) / 2),
+                    dtype=ks_fvec3.dtype,
+                ),  # texpos
+            ),
+            dtype=ks_vol_tex_chunk_spec.dtype,
+        )
+        # Launch the kernel
+        self.kern(
+            (
+                int(np.ceil(self.output_projs.shape[1] / blockx)),
+                int(np.ceil(self.output_projs.shape[2] / blocky)),
+                int(np.ceil(self.output_projs.shape[0] / blocklayer)),
+            ),  # gridDims:  (x,y,z)
+            (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
+            (  # input args
+                self.config,
+                self.projspec_array,
+                np.uint32(self.output_projs.shape[0]),
+                texchunkspec,
+                self.vtex.texobj,
+                self.output_projs_strides_bytes,
+                np.uint64(self.output_projs.data.ptr),
+            ),
+        )
+        cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
+
+
+# ruff: enable[D101,D102,N801,ANN201]

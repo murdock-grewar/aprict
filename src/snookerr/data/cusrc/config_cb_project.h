@@ -1,10 +1,57 @@
 struct config_CB_project {
 };
 
+struct uivec3 {
+    unsigned int x;
+    unsigned int y;
+    unsigned int z;
+};
+__device__ uivec3 operator+(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    uivec3 v3;
+    v3.x = v1.x + v2.x;
+    v3.y = v1.y + v2.y;
+    v3.z = v1.z + v2.z;
+    return v3;
+}
+
+
+__device__ uivec3 operator-(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    uivec3 v3;
+    v3.x = v1.x - v2.x;
+    v3.y = v1.y - v2.y;
+    v3.z = v1.z - v2.z;
+    return v3;
+}
+
+
+__device__ float dot_prod(
+        uivec3 v1,
+        uivec3 v2
+)
+{
+    return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+}
+
+
+
 struct fvec3 {
     float x;
     float y;
     float z;
+
+public:
+    // implicit constructor from a uivec3
+    fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
+    // default constructor, used with i.e. 'fvec3 v;'
+    fvec3() = default;
 };
 __device__ fvec3 operator+(
         fvec3 v1,
@@ -89,17 +136,17 @@ struct proj_spec {
     det_spec dspec;
 };
 
-struct uivec3 {
-    unsigned int x;
-    unsigned int y;
-    unsigned int z;
-};
-
 struct vol_spec {
     unsigned long ptr_000;
     uivec3 strides_bytes;
     uivec3 shape;
     fvec3 pos_000;
+};
+
+struct vol_tex_chunk_spec {
+    uivec3 offsets;
+    uivec3 shape;
+    fvec3 texpos;
 };
 
 struct volume_chunk_spec {

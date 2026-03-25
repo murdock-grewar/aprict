@@ -3,113 +3,6 @@
 // Provides config_CB_project, volume_chunk_spec, det_spec, fvec3
 #include "config_cb_project.h"
 
-__device__ fvec3 vchunk_idx_to_pos(
-        fvec3 idx_f,
-        volume_chunk_spec   vchunk_spec,
-        fvec3               vol_corner_pos)
-{
-    fvec3 pos;
-    pos.x = vol_corner_pos.x + idx_f.x + (float)vchunk_spec.idx_xstart;
-    pos.y = vol_corner_pos.y + idx_f.y + (float)vchunk_spec.idx_ystart;
-    pos.z = vol_corner_pos.z + idx_f.z + (float)vchunk_spec.idx_zstart;
-    return pos;
-}
-
-
-__device__ fvec3 vchunk_minbounds(
-        volume_chunk_spec   vchunk_spec,
-        fvec3               vol_corner_pos)
-{
-    fvec3 idx_f;
-    idx_f.x = -(1./2) + vchunk_spec.idx_xstart;
-    idx_f.y = -(1./2) + vchunk_spec.idx_ystart;
-    idx_f.z = -(1./2) + vchunk_spec.idx_zstart;
-    return vchunk_idx_to_pos(idx_f, vchunk_spec, vol_corner_pos);
-}
-
-
-__device__ fvec3 vchunk_maxbounds(
-        volume_chunk_spec   vchunk_spec,
-        fvec3               vol_corner_pos)
-{
-    fvec3 idx_f;
-    idx_f.x = -(1./2) + vchunk_spec.idx_xstop;
-    idx_f.y = -(1./2) + vchunk_spec.idx_ystop;
-    idx_f.z = -(1./2) + vchunk_spec.idx_zstop;
-    return vchunk_idx_to_pos(idx_f, vchunk_spec, vol_corner_pos);
-}
-
-
-__device__ fvec3 vchunk_center_idx_f( // float index of the center of the chunk
-        volume_chunk_spec   vchunk_spec,
-        fvec3               vol_corner_pos
-)
-{
-    fvec3 idx_f;
-    idx_f.x = ((float)(vchunk_spec.idx_xstart + vchunk_spec.idx_xstop - 1))/2.f;
-    idx_f.x = ((float)(vchunk_spec.idx_xstart + vchunk_spec.idx_xstop - 1))/2.f;
-    idx_f.x = ((float)(vchunk_spec.idx_xstart + vchunk_spec.idx_xstop - 1))/2.f;
-    return idx_f;
-}
-
-
-__device__ fvec3 vchunk_center_pos( // float position of the center of the chunk
-        volume_chunk_spec   vchunk_spec,
-        fvec3               vol_corner_pos
-)
-{
-    return vchunk_idx_to_pos(vchunk_center_idx_f(vchunk_spec, vol_corner_pos), vchunk_spec, vol_corner_pos);
-}
-
-
-__device__ unsigned long vchunk_size(
-        volume_chunk_spec   vchunk_spec // specifies the indices of the volume chunk.
-)
-{
-    return (
-        (unsigned long)(vchunk_spec.idx_xstop - vchunk_spec.idx_xstart) *
-        (unsigned long)(vchunk_spec.idx_ystop - vchunk_spec.idx_ystart) *
-        (unsigned long)(vchunk_spec.idx_zstop - vchunk_spec.idx_zstart)
-    );
-}
-
-/*
-template<typename Tv, typename Tp> // These types are intended to be floating point.
-__device__ Tp project_vchunk(
-        config_CB_project   config,
-        volume_chunk_spec   vchunk_spec, // specifies the indices of the volume chunk.
-        fvec3               sourcepos,
-        fvec3               det_pos,
-        fvec3               vol_corner_pos, // position of the 0,0,0 voxel of the volume
-        // Shared memory containing the volume chunk data.
-        //__shared__ cuda::atomic<Tv, cuda::thread_scope_block>* vchunk_shm)
-        Tv***               vchunk_shm)
-{
-    // Abort if the projection line is entirely outside the rectangular bounds.
-    // HOTFIX: for now, I will just check if the line is outside the circumscribed sphere
-
-    // Check the rectangular bounds of the volume chunk.
-    //fvec3 volminbounds = vchunk_minbounds(vchunk_spec, vol_corner_pos);
-    //fvec3 volmaxbounds = vchunk_maxbounds(vchunk_spec, vol_corner_pos);
-
-    fvec3 chunk_center = vchunk_center_pos(vchunk_spec, vol_corner_pos);
-    fvec3 delta_pos = det_pos - sourcepos;
-    delta_pos = delta_pos / norm_fvec3(delta_pos);
-    fvec3 nearest_point = sourcepos - (delta_pos * dot_prod(sourcepos - chunk_center, delta_pos));
-    float maxrad = max(
-            vchunk_spec.idx_xstop - volchunk_spec.idx_xstart,
-            vchunk_spec.idx_ystop - volchunk_spec.idx_ystart,
-            vchunk_spec.idx_zstop - volchunk_spec.idx_zstart
-    );
-    if (norm_fvec3(nearest_point - chunk_center) > maxrad) {
-        return (Tp)0.;
-    }
-    return (Tp)1.;
-
-}
-*/
-
-
 // Define a structure and method to compute line integrals through voxelised volumes
 typedef struct {
     float x;
@@ -129,14 +22,17 @@ template<
     unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
     unsigned int volchunk_Zsize>  // volume chunk size in Z dimension
 __device__ Tp exact_line_integral(
-        fvec3       v1,
-        fvec3       v2,
-        vol_spec    volspec,
-        Tv          (*vchunk_shm)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize]  // These values will be used instead of the volume from 'volspec'.
+        fvec3               v1,
+        fvec3               v2,
+        const vol_spec      volspec,
+        Tv                  (*vchunk_shm)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],  // These values will be used instead of the volume from 'volspec'.
+        bool                (*vchunk_shm_loadedflag)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize]
 )
 {
     // MODE OF OPERATION
     // This function steps between boundaries of voxels, and adds the exact line integral components.
+    const uivec3 vol_strides    = volspec.strides_bytes;
+    const Tv*    volume         = (Tv*)volspec.ptr_000;
 
     // Measure distances relative to the bottom-left corner of the 000 voxel.
     // This way, integer values for x,y,z correspond to voxel boundaries.
@@ -229,6 +125,17 @@ __device__ Tp exact_line_integral(
             (idx_y >= 0) && (idx_y < volchunk_Ysize) &&
             (idx_z >= 0) && (idx_z < volchunk_Zsize)
         ) {
+            if (!(*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z]) {
+                // Load the volume data into the shared memory
+                // Race conditions are OK here.
+                unsigned long mem_idx = (
+                    vol_strides.x * (idx_x) +
+                    vol_strides.y * (idx_y) +
+                    vol_strides.z * (idx_z)
+                )/sizeof(Tv);
+                (*vchunk_shm)[idx_x][idx_y][idx_z] = volume[mem_idx];
+                (*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z] = true;
+            }
             accum_val += steps_to_take * (*vchunk_shm)[idx_x][idx_y][idx_z];
         }
 
@@ -255,6 +162,21 @@ __device__ fvec3 detpos(
         dpos = dspec.pos + dspec.u*xnum + dspec.v*ynum;
     }
     return dpos;
+}
+
+template<
+    typename Tv,
+    unsigned int volchunk_Xsize,  // volume chunk size in X dimension
+    unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
+    unsigned int volchunk_Zsize>  // volume chunk size in Z dimensio
+__global__ void load_volchunk_into_texture()
+{
+    return;
+}
+
+__global__ void release_texture_memory()
+{
+    return;
 }
 
 
@@ -290,6 +212,7 @@ __global__ void project_CB_sharedmem(
     // It will be assumed that the volume has memory strides that are smallest in x, then y,
     // then the largest strides in z. #TODO: generalise this.
     __shared__ Tv vchunk_shm[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize];
+    __shared__ bool vchunk_shm_loadedflag[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize];
     const unsigned long threadid = (
         threadIdx.x +
         threadIdx.y * blockDim.x +
@@ -328,6 +251,7 @@ __global__ void project_CB_sharedmem(
             (volidx_y < volspec.shape.y) &&
             (volidx_z < volspec.shape.z)
         ) {
+            /*
             // Load the volume data into the shared memory
             unsigned long mem_idx = (
                 vol_strides.x * (volidx_x) +
@@ -335,9 +259,12 @@ __global__ void project_CB_sharedmem(
                 vol_strides.z * (volidx_z)
             )/sizeof(Tv);
             vchunk_shm[volidx_x][volidx_y][volidx_z] = volume[mem_idx];
+            */
+            vchunk_shm_loadedflag[volidx_x][volidx_y][volidx_z] = false;
         } else {
             // The position is out of bounds of the volumue. Set it to 0 in the shared memory.
             vchunk_shm[volidx_x][volidx_y][volidx_z] = 0.;
+            vchunk_shm_loadedflag[volidx_x][volidx_y][volidx_z] = true;
         }
     }
     __syncthreads(); // Let all the threads add to shared memory before continuing
@@ -367,7 +294,7 @@ __global__ void project_CB_sharedmem(
     // ...
     Tp val = 0;
     val = exact_line_integral<Tv, Tp, volchunk_Xsize, volchunk_Ysize, volchunk_Zsize>(
-            source_pos, det_pos, volspec, &vchunk_shm);
+            source_pos, det_pos, volspec, &vchunk_shm, &vchunk_shm_loadedflag);
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

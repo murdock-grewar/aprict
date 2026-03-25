@@ -63,6 +63,9 @@ class KernelStruct:
         | list[
             type | KernelStruct
         ],  # input a list/tuple of np.dtypes and/or KernelStructs.
+        force_dependencies: list[KernelStruct] | None = None,
+        insert_into_struct: str
+        | None = None,  # extra code to put INSIDE the struct. Useful for defining implicit constuctors and the like
         extra_code: str
         | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
     ) -> None:
@@ -82,13 +85,34 @@ class KernelStruct:
             _np_dtype_to_c_type.items()
         )  # Create copy
         self.dependent_structs = [t for t in dtypes if type(t) is KernelStruct]
+        if force_dependencies is not None:
+            self.dependent_structs.extend([t for t in force_dependencies])  # noqa: C416
+        # Add the dependents of dependents. Make sure it's ordered, with base dependencies on the left.
+        for i in list(reversed(range(len(self.dependent_structs)))):
+            ks: KernelStruct = self.dependent_structs[i]
+            self.dependent_structs = (
+                self.dependent_structs[:i]
+                + ks.dependent_structs
+                + self.dependent_structs[i:]
+            )
+        # Now remove duplicates, keeping the first-encountered copy of each
+        seen = set()
+        self.dependent_structs = [
+            ks
+            for ks in self.dependent_structs
+            if not (ks in seen or seen.add(ks))
+        ]
+
         dtype_to_cname_dict.update(
             {ks: ks.struct_name for ks in self.dependent_structs}
         )
 
         self.struct_name = struct_name
         self.struct_definition_c = self._struct_definition(
-            dtype_to_cname_dict, struct_name, *tuples_type_name
+            dtype_to_cname_dict,
+            struct_name,
+            insert_into_struct,
+            *tuples_type_name,
         ) + ("" if extra_code is None else extra_code)
 
         # Run a CUDA kernel with the appropriate set of arguments, and find out
@@ -104,7 +128,11 @@ class KernelStruct:
         offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
         # fmt: on
         kernel = self._kernel_get_struct_layout(
-            dtype_to_cname_dict, struct_name, *tuples_type_name
+            dtype_to_cname_dict,
+            struct_name,
+            force_dependencies,
+            insert_into_struct,
+            *tuples_type_name,
         )
         kernel((1,), (1,), (itemsize, sizes, offsets))
         (itemsize, sizes, offsets) = map(
@@ -128,6 +156,7 @@ class KernelStruct:
         cls,
         dtype_to_cname_dict: dict[np.dtype | KernelStruct, str],
         struct_name: str,
+        insert_into_struct: str | None,
         *tuples_type_name: typing.Iterable[
             tuple[np.dtype | KernelStruct, str]
         ],
@@ -146,6 +175,7 @@ class KernelStruct:
                         for dtype, fieldname in tuples_type_name
                     ]
                 )
+                + ("" if insert_into_struct is None else insert_into_struct)
                 + "};"
             )
         except KeyError as e:
@@ -162,11 +192,13 @@ class KernelStruct:
         cls,
         dtype_to_cname_dict: dict[np.dtype | KernelStruct, str],
         struct_name: str,
+        force_dependencies: list[KernelStruct] | None,
+        insert_into_struct: str | None,
         *tuples_type_name: typing.Iterable[tuple[np.dtype, str]],
     ) -> cp.RawKernel:
         tuples: list = [*tuples_type_name]
         struct_definition: str = cls._struct_definition(
-            dtype_to_cname_dict, struct_name, *tuples
+            dtype_to_cname_dict, struct_name, insert_into_struct, *tuples
         )
         names = [n for t, n in tuples]
         struct_layout_code = ""
@@ -174,6 +206,8 @@ class KernelStruct:
         dependent_ks = [
             tup[0] for tup in tuples if type(tup[0]) is KernelStruct
         ]
+        if force_dependencies is not None:
+            dependent_ks.extend(list(force_dependencies))
         for i in list(reversed(range(len(dependent_ks)))):
             ks: KernelStruct = dependent_ks[i]
             dependent_ks = (

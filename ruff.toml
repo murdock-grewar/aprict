@@ -27,6 +27,8 @@ exclude = [
     "site-packages",
     "venv",
     "githooks",
+    # Actual source files
+    "src/*/lib/phantoms_FORBILD.py",
 ]
 
 line-length = 79
