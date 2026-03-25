@@ -19,8 +19,8 @@ template<
     typename Tv,
     typename Tp>  // type of projection data. e.g. float or double
 __device__ Tp exact_line_integral(
-        fvec3                       v1,
-        fvec3                       v2,
+        const fvec3                 v1,
+        const fvec3                 v2,
         const vol_tex_chunk_spec    texchunkspec,
         cudaTextureObject_t         volume_texture,
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
@@ -29,14 +29,23 @@ __device__ Tp exact_line_integral(
     // MODE OF OPERATION
     // This function steps between boundaries of voxels, and adds the exact line integral components.
 
+    const fvec3 minxyz = texchunkspec.offsets;
+    const fvec3 maxxyz = minxyz + texchunkspec.shape;
+
     // Measure distances relative to the bottom-left corner of the 000 voxel of the overall texture.
     // This way, integer values for x,y,z correspond to voxel boundaries.
     float xstart = v1.x - texchunkspec.texpos.x;
-    float ystart = v1.y - texchunkspec.texpos.y;
-    float zstart = v1.z - texchunkspec.texpos.z;
     float xend   = v2.x - texchunkspec.texpos.x;
+    if ((xstart < minxyz.x) && (xend < minxyz.x)) { return 0.; }
+    if ((xstart > maxxyz.x) && (xend > maxxyz.x)) { return 0.; }
+    float ystart = v1.y - texchunkspec.texpos.y;
     float yend   = v2.y - texchunkspec.texpos.y;
+    if ((ystart < minxyz.y) && (yend < minxyz.y)) { return 0.; }
+    if ((ystart > maxxyz.y) && (yend > maxxyz.y)) { return 0.; }
+    float zstart = v1.z - texchunkspec.texpos.z;
     float zend   = v2.z - texchunkspec.texpos.z;
+    if ((zstart < minxyz.z) && (zend < minxyz.z)) { return 0.; }
+    if ((zstart > maxxyz.z) && (zend > maxxyz.z)) { return 0.; }
 
     Tp accum_val = 0;
 
@@ -64,8 +73,6 @@ __device__ Tp exact_line_integral(
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
     int idx_x, idx_y, idx_z;
-    const fvec3 minxyz = texchunkspec.offsets;
-    const fvec3 maxxyz = minxyz + texchunkspec.shape;
     //// Skip to the first intersection with the volume (plus an extra voxel for safety)
     float advance_steps = 0;
     if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 1./2. - lis.x)/lis.dx); }
