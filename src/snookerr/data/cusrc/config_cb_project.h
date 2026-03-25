@@ -48,6 +48,8 @@ struct fvec3 {
     float z;
 
 public:
+    // implicit constructor from floats
+    fvec3(float xi, float yi, float zi) : x(xi), y(yi), z(zi) {}
     // implicit constructor from a uivec3
     fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
     // default constructor, used with i.e. 'fvec3 v;'

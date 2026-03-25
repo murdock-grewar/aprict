@@ -14,7 +14,6 @@ typedef struct {
     float dz;
 } LineIntegState;
 
-
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp,  // type of projection data. e.g. float or double
@@ -26,8 +25,9 @@ __device__ Tp exact_line_integral(
         fvec3               v2,
         const vol_spec      volspec,
         Tv                  (*vchunk_shm)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],  // These values will be used instead of the volume from 'volspec'.
-        bool                (*vchunk_shm_loadedflag)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize]
-)
+        bool                (*vchunk_shm_loadedflag)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],
+        // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
+        const bool                  return_false_steps = false)
 {
     // MODE OF OPERATION
     // This function steps between boundaries of voxels, and adds the exact line integral components.
@@ -69,19 +69,60 @@ __device__ Tp exact_line_integral(
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
     int idx_x, idx_y, idx_z;
+    /*
+    const fvec3 minxyz = volspec.offsets;
+    const fvec3 maxxyz = {
+        (float)min(volspec.shape.x, volspec.offsets.x + volchunk_Xsize),
+        (float)min(volspec.shape.y, volspec.offsets.y + volchunk_Ysize),
+        (float)min(volspec.shape.z, volspec.offsets.z + volchunk_Zsize)
+    }
+    */
+    const fvec3 minxyz = {0.f, 0.f, 0.f};
+    const fvec3 maxxyz = {
+        (float)min(volspec.shape.x, volchunk_Xsize),
+        (float)min(volspec.shape.y, volchunk_Ysize),
+        (float)min(volspec.shape.z, volchunk_Zsize)
+    };
+    //// Skip to the first intersection with the volume (plus an extra voxel for safety)
+    float advance_steps = 0;
+    if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 1./2. - lis.x)/lis.dx); }
+    if (xdir > 0) { advance_steps = max(advance_steps, (minxyz.x - 1./2. - lis.x)/lis.dx); }
+    if (ydir < 0) { advance_steps = max(advance_steps, (maxxyz.y + 1./2. - lis.y)/lis.dy); }
+    if (ydir > 0) { advance_steps = max(advance_steps, (minxyz.y - 1./2. - lis.y)/lis.dy); }
+    if (zdir < 0) { advance_steps = max(advance_steps, (maxxyz.z + 1./2. - lis.z)/lis.dz); }
+    if (zdir > 0) { advance_steps = max(advance_steps, (minxyz.z - 1./2. - lis.z)/lis.dz); }
+    if (advance_steps > 0) {
+        lis.x += advance_steps * lis.dx;
+        lis.y += advance_steps * lis.dy;
+        lis.z += advance_steps * lis.dz;
+        steps_to_end -= advance_steps;
+    }
+    ///////
     while (steps_to_end > 0) { // Loop until 'steps_to_end' becomes nonpositive, which would indicate that we have reached the end of the line integral
         // Find the critical values of x, y, z
         // Initially, I had planned to calculate this once at the beginning, and only update the necessary x/y/z values as necessary.
         // However, that approach would miss corner cases where the ray hits two boundaries at once. It's safer to totally recalculate these each loop.
-        if (xdir <= 0) { nextxbound = ceil(lis.x) - 1; } else { nextxbound = floor(lis.x) + 1; }
-        if (ydir <= 0) { nextybound = ceil(lis.y) - 1; } else { nextybound = floor(lis.y) + 1; }
-        if (zdir <= 0) { nextzbound = ceil(lis.z) - 1; } else { nextzbound = floor(lis.z) + 1; }
-        if ((xdir <= 0) && (nextxbound < 0))              { break; }
-        if ((xdir >  0) && (nextxbound > volchunk_Xsize)) { break; }
-        if ((ydir <= 0) && (nextybound < 0))              { break; }
-        if ((ydir >  0) && (nextybound > volchunk_Ysize)) { break; }
-        if ((zdir <= 0) && (nextzbound < 0))              { break; }
-        if ((zdir >  0) && (nextzbound > volchunk_Zsize)) { break; }
+        if (xdir <= 0) {
+            nextxbound = ceil(lis.x) - 1;
+        } else {
+            nextxbound = floor(lis.x) + 1;
+        }
+        if (ydir <= 0) {
+            nextybound = ceil(lis.y) - 1;
+        } else {
+            nextybound = floor(lis.y) + 1;
+        }
+        if (zdir <= 0) {
+            nextzbound = ceil(lis.z) - 1;
+        } else {
+            nextzbound = floor(lis.z) + 1;
+        }
+        if ((xdir <= 0) && (nextxbound < minxyz.x)) { break; }
+        if ((xdir >  0) && (nextxbound > maxxyz.x)) { break; }
+        if ((ydir <= 0) && (nextybound < minxyz.y)) { break; }
+        if ((ydir >  0) && (nextybound > maxxyz.y)) { break; }
+        if ((zdir <= 0) && (nextzbound < minxyz.z)) { break; }
+        if ((zdir >  0) && (nextzbound > maxxyz.z)) { break; }
 
         // Calculate how many 'dx,dy,dz' steps to take until hitting the next boundary.
         if (xdir == 0) { steps_to_take_x = 1.f; } else { steps_to_take_x = (nextxbound - lis.x)/lis.dx; }
@@ -121,28 +162,39 @@ __device__ Tp exact_line_integral(
         idx_z = ((int)nextzbound - ((1+zdir)/2)); // z index in surface
 
         if ( // Don't integrate the volume outside the bounds of the chunk!
-            (idx_x >= 0) && (idx_x < volchunk_Xsize) &&
-            (idx_y >= 0) && (idx_y < volchunk_Ysize) &&
-            (idx_z >= 0) && (idx_z < volchunk_Zsize)
+            (idx_x >= 0) && (idx_x < maxxyz.x) &&
+            (idx_y >= 0) && (idx_y < maxxyz.y) &&
+            (idx_z >= 0) && (idx_z < maxxyz.z)
         ) {
-            if (!(*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z]) {
-                // Load the volume data into the shared memory
-                // Race conditions are OK here.
-                unsigned long mem_idx = (
-                    vol_strides.x * (idx_x) +
-                    vol_strides.y * (idx_y) +
-                    vol_strides.z * (idx_z)
-                )/sizeof(Tv);
-                (*vchunk_shm)[idx_x][idx_y][idx_z] = volume[mem_idx];
-                (*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z] = true;
-            }
+            if (!return_false_steps) {
+                if (steps_to_take < 0) {
+                    printf("Negative value encountered! %.3f\n", steps_to_take);
+                }
+                if (!(*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z]) {
+                    // Load the volume data into the shared memory
+                    // Race conditions are OK here.
+                    unsigned long mem_idx = (
+                        vol_strides.x * (idx_x) +
+                        vol_strides.y * (idx_y) +
+                        vol_strides.z * (idx_z)
+                    )/sizeof(Tv);
+                    (*vchunk_shm)[idx_x][idx_y][idx_z] = volume[mem_idx];
+                    (*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z] = true;
+                }
             accum_val += steps_to_take * (*vchunk_shm)[idx_x][idx_y][idx_z];
+            }
+        } else {
+            if (return_false_steps) {
+                accum_val += 1.;
+            }
         }
 
         steps_to_end -= steps_to_take; // If we've reached the end, then steps_to_end should be exactly 0.f, and the loop should stop
     }
 
-    accum_val *= length_per_step;
+    if (!return_false_steps) {
+        accum_val *= length_per_step;
+    }
     return accum_val;
 }
 
@@ -159,26 +211,10 @@ __device__ fvec3 detpos(
         // Flat panel detector
         float xnum = ((float)det_idx_x - (dspec.nu-1)/2.);
         float ynum = ((float)det_idx_y - (dspec.nv-1)/2.);
-        dpos = dspec.pos + dspec.u*xnum + dspec.v*ynum;
+        dpos = dspec.pos + (dspec.u*xnum) + (dspec.v*ynum);
     }
     return dpos;
 }
-
-template<
-    typename Tv,
-    unsigned int volchunk_Xsize,  // volume chunk size in X dimension
-    unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
-    unsigned int volchunk_Zsize>  // volume chunk size in Z dimensio
-__global__ void load_volchunk_into_texture()
-{
-    return;
-}
-
-__global__ void release_texture_memory()
-{
-    return;
-}
-
 
 template<
     typename Tv,  // type of volume data. e.g. float or double.
