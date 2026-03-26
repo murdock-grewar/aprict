@@ -16,4 +16,4 @@
 # This file is read from by 'setup.py', from '__init__.py', and also by a git hook which increments the dev number each time a commit is made on the 'dev' branch. There should only be one line in the file which begins with "version".
 """File which stores the current version number of this module."""
 
-version = "0.0.0.dev16"
+version = "0.0.0.dev17"

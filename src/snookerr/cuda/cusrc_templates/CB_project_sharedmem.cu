@@ -25,7 +25,6 @@ __device__ Tp exact_line_integral(
         const fvec3         v2,
         const vol_spec      volspec,
         Tv                  (*vchunk_shm)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],  // These values will be used instead of the volume from 'volspec'.
-        bool                (*vchunk_shm_loadedflag)[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize],
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
         const bool          return_false_steps = false)
 {
@@ -169,18 +168,7 @@ __device__ Tp exact_line_integral(
                 if (steps_to_take < 0) {
                     printf("Negative value encountered! %.3f\n", steps_to_take);
                 }
-                if (!(*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z]) {
-                    // Load the volume data into the shared memory
-                    // Race conditions are OK here.
-                    unsigned long mem_idx = (
-                        vol_strides.x * (idx_x) +
-                        vol_strides.y * (idx_y) +
-                        vol_strides.z * (idx_z)
-                    )/sizeof(Tv);
-                    (*vchunk_shm)[idx_x][idx_y][idx_z] = volume[mem_idx];
-                    (*vchunk_shm_loadedflag)[idx_x][idx_y][idx_z] = true;
-                }
-            accum_val += steps_to_take * (*vchunk_shm)[idx_x][idx_y][idx_z];
+                accum_val += steps_to_take * (*vchunk_shm)[idx_x][idx_y][idx_z];
             }
         } else {
             if (return_false_steps) {
@@ -247,7 +235,6 @@ __global__ void project_CB_sharedmem(
     // It will be assumed that the volume has memory strides that are smallest in x, then y,
     // then the largest strides in z. #TODO: generalise this.
     __shared__ Tv vchunk_shm[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize];
-    __shared__ bool vchunk_shm_loadedflag[volchunk_Xsize][volchunk_Ysize][volchunk_Zsize];
     const unsigned long threadid = (
         threadIdx.x +
         threadIdx.y * blockDim.x +
@@ -267,9 +254,9 @@ __global__ void project_CB_sharedmem(
     // Calculate the pixel on the detector corresponding to this thread
     // Note: so that thread warps can return early, I want the projection index (proj_idx)
     // to correspond to the largest stride in thread number. Hence, it is associated with Z.
-    unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
-    unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
-    unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
+    const unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
+    const unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
+    const unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
 
     // Populate the shared memory with the volume chunk
     for (int i = num_volels_per_thread*threadid; i < num_volels_per_thread*(threadid+1); i++) {
@@ -286,7 +273,7 @@ __global__ void project_CB_sharedmem(
             (volidx_y < volspec.shape.y) &&
             (volidx_z < volspec.shape.z)
         ) {
-            /*
+
             // Load the volume data into the shared memory
             unsigned long mem_idx = (
                 vol_strides.x * (volidx_x) +
@@ -294,12 +281,9 @@ __global__ void project_CB_sharedmem(
                 vol_strides.z * (volidx_z)
             )/sizeof(Tv);
             vchunk_shm[volidx_x][volidx_y][volidx_z] = volume[mem_idx];
-            */
-            vchunk_shm_loadedflag[volidx_x][volidx_y][volidx_z] = false;
         } else {
             // The position is out of bounds of the volumue. Set it to 0 in the shared memory.
             vchunk_shm[volidx_x][volidx_y][volidx_z] = 0.;
-            vchunk_shm_loadedflag[volidx_x][volidx_y][volidx_z] = true;
         }
     }
     __syncthreads(); // Let all the threads add to shared memory before continuing
@@ -308,28 +292,27 @@ __global__ void project_CB_sharedmem(
     if (proj_idx >= num_projs) {
         return;
     }
-    proj_spec projspec = projspecs[proj_idx];
+    const proj_spec projspec = projspecs[proj_idx];
     if ((det_idx_x >= projspec.dspec.nu) ||
         (det_idx_y >= projspec.dspec.nv)) {
         return;
     }
 
     // Get the index 'det_idx' of the detector data that this thread should write to
-    unsigned long det_idx = (
+    const unsigned long det_idx = (
         output_projs_strides.y * det_idx_x +
         output_projs_strides.z * det_idx_y +
         output_projs_strides.x * proj_idx
     )/sizeof(Tp);
 
     // Get the start and end points of the projection line
-    fvec3 source_pos = projspec.sourcepos;
-    fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
+    const fvec3 source_pos = projspec.sourcepos;
+    const fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
 
     // Calculate projection
     // ...
-    Tp val = 0;
-    val = exact_line_integral<Tv, Tp, volchunk_Xsize, volchunk_Ysize, volchunk_Zsize>(
-            source_pos, det_pos, volspec, &vchunk_shm, &vchunk_shm_loadedflag);
+    Tp val = exact_line_integral<Tv, Tp, volchunk_Xsize, volchunk_Ysize, volchunk_Zsize>(
+            source_pos, det_pos, volspec, &vchunk_shm);
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

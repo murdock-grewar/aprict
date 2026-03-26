@@ -40,8 +40,7 @@ from ...lib import phantoms_FORBILD, texture_tools
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
-@pytest.fixture
-def injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
+def create_injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_sharedmem.cu",
@@ -58,6 +57,11 @@ def injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
     )
     module.compile()
     return module
+
+
+@pytest.fixture
+def injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
+    return create_injected_module_sharedmem()
 
 
 def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
@@ -202,125 +206,154 @@ def test_cb_project_single_voxel_offset_detector(
     cp.testing.assert_array_almost_equal(cp.amax(output_projs), val)
 
 
-@pytest.mark.dependency(scope="session")
-def test_cb_project_random_noise_sharedmem(
-    injected_module_sharedmem: cp.RawModule,
-) -> None:
-    """Test a kernel which is generated dynamically then loaded."""
-    # Config
-    config = np.array((), dtype=ks_config.dtype)
-    # projspecs
-    # Imagine a top-down view with the source on the right-hand side.
-    # The x coordinate points to the right.
-    # The y coordinate points upwards.
-    # The z coordinates points out of the page.
-    sourcepos = np.array((500, 0, 0), dtype=ks_fvec3.dtype)
-    num_projs = np.uint32(10)
-    detwid: int = 1001
-    dethei: int = 1001
-    dspec = np.array(
-        (
-            # Detector is shifted along positive y and z.
-            # The output image is viewed from the front of the detector-- the same side as the source.
-            # From this perspective, the detector is shifted mostly right and a little up.
-            np.array((-300, 0, 0), dtype=ks_fvec3.dtype),
-            np.array((0, 0.1, 0), dtype=ks_fvec3.dtype),
-            np.array((0, 0, 0.1), dtype=ks_fvec3.dtype),
-            np.uint16(detwid),
-            np.uint16(dethei),
-            np.uint8(0),
-        ),
-        dtype=ks_det_spec.dtype,
-    )
-    projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
-    projspec_array = cp.array([projspec for _ in range(num_projs)])
-    # actual projection data
-    output_projs: cp.ndarray = cp.zeros(
-        (num_projs, detwid, dethei), dtype=cp.float32
-    )
-    output_projs_strides_bytes = np.array(
-        output_projs.strides, dtype=ks_uivec3.dtype
-    )
-    # Very short volume.
-    vol = cp.abs(cp.random.randn(501, 500, 4, dtype=cp.float32))
-    # print("Created the volume. Now launching kernels.", flush=True)
-
-    # Prepare the kernel
-    blockx = 10
-    blocky = 10
-    blocklayer = 10
-    # 48 kB shared memory in a block gives a maximum vol block size of 18x18x18
-    volblockx = 18
-    volblocky = 18
-    volblockz = 18
-    fun = injected_module_sharedmem.get_function(
-        f"project_CB_sharedmem<float,float,{volblockx:d},{volblocky:d},{volblockz:d}>"
-    )
-    for i, j, k in itertools.product(
-        range(int(np.ceil(vol.shape[0] / volblockx))),
-        range(int(np.ceil(vol.shape[1] / volblocky))),
-        range(int(np.ceil(vol.shape[2] / volblockz))),
-    ):
-        vol_spec = np.array(
+class TestCB_sharedmem_randomnoise:
+    def setup_method(self) -> None:
+        # Config
+        config = np.array((), dtype=ks_config.dtype)
+        # projspecs
+        # Imagine a top-down view with the source on the right-hand side.
+        # The x coordinate points to the right.
+        # The y coordinate points upwards.
+        # The z coordinates points out of the page.
+        sourcepos = np.array((500, 0, 0), dtype=ks_fvec3.dtype)
+        num_projs = np.uint32(10)
+        detwid: int = 1001
+        dethei: int = 1001
+        dspec = np.array(
             (
-                np.uint64(
-                    vol.data.ptr
-                    + i * vol.strides[0] * volblockx
-                    + j * vol.strides[1] * volblocky
-                    + k * vol.strides[2] * volblockz
-                ),  # pointer to the byte beginning the 0,0,0 voxel (can be offset)
-                np.array(vol.strides, dtype=ks_uivec3.dtype),  # strides_bytes
-                np.array(
-                    (
-                        vol.shape[0] - i * volblockx,
-                        vol.shape[1] - j * volblocky,
-                        vol.shape[2] - k * volblockz,
+                # Detector is shifted along positive y and z.
+                # The output image is viewed from the front of the detector-- the same side as the source.
+                # From this perspective, the detector is shifted mostly right and a little up.
+                np.array((-300, 0, 0), dtype=ks_fvec3.dtype),
+                np.array((0, 0.1, 0), dtype=ks_fvec3.dtype),
+                np.array((0, 0, 0.1), dtype=ks_fvec3.dtype),
+                np.uint16(detwid),
+                np.uint16(dethei),
+                np.uint8(0),
+            ),
+            dtype=ks_det_spec.dtype,
+        )
+        projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
+        projspec_array = cp.array([projspec for _ in range(num_projs)])
+        # actual projection data
+        output_projs: cp.ndarray = cp.zeros(
+            (num_projs, detwid, dethei), dtype=cp.float32
+        )
+        output_projs_strides_bytes = np.array(
+            output_projs.strides, dtype=ks_uivec3.dtype
+        )
+        # Very short volume.
+        vol: cp.ndarray = cp.abs(
+            cp.random.randn(501, 500, 20, dtype=cp.float32)
+        )
+        cp.mean(vol)
+        # print("Created the volume. Now launching kernels.", flush=True)
+        # Save fields for use in the test method
+        self.vol = vol
+        self.config = config
+        self.projspec_array = projspec_array
+        self.module = create_injected_module_sharedmem()
+        self.output_projs = output_projs
+        self.num_projs = num_projs
+        self.output_projs_strides_bytes = output_projs_strides_bytes
+        self.dethei = dethei
+        self.detwid = detwid
+
+    def teardown_method(self) -> None:
+        self.output_projs.fill(0)
+
+    @pytest.mark.parametrize(
+        "blockdims",
+        [[18, 18, 18]],
+        ids=["18x18x18"],
+    )
+    def test_project(self, blockdims: list[int | None]) -> None:
+        vol = self.vol
+        config = self.config
+        projspec_array = self.projspec_array
+        output_projs = self.output_projs
+        num_projs = self.num_projs
+        output_projs_strides_bytes = self.output_projs_strides_bytes
+        dethei = self.dethei
+        detwid = self.detwid  # noqa: F841
+        # Prepare the kernel
+        blockx = 10
+        blocky = 10
+        blocklayer = 10
+        # 48 kB shared memory in a block gives a maximum vol block size of 18x18x18
+        volblockx = blockdims[0]
+        volblocky = blockdims[1]
+        volblockz = blockdims[2]
+        fun = self.module.get_function(
+            f"project_CB_sharedmem<float,float,{volblockx:d},{volblocky:d},{volblockz:d}>"
+        )
+        for i, j, k in itertools.product(
+            range(int(np.ceil(vol.shape[0] / volblockx))),
+            range(int(np.ceil(vol.shape[1] / volblocky))),
+            range(int(np.ceil(vol.shape[2] / volblockz))),
+        ):
+            vol_spec = np.array(
+                (
+                    np.uint64(
+                        vol.data.ptr
+                        + i * vol.strides[0] * volblockx
+                        + j * vol.strides[1] * volblocky
+                        + k * vol.strides[2] * volblockz
+                    ),  # pointer to the byte beginning the 0,0,0 voxel (can be offset)
+                    np.array(
+                        vol.strides, dtype=ks_uivec3.dtype
+                    ),  # strides_bytes
+                    np.array(
+                        (
+                            vol.shape[0] - i * volblockx,
+                            vol.shape[1] - j * volblocky,
+                            vol.shape[2] - k * volblockz,
+                        ),
+                        dtype=ks_uivec3.dtype,
+                    ),  # shape
+                    np.array(
+                        tuple(
+                            -(np.array(vol.shape, dtype=np.float32) - 1) / 2
+                            + np.array(
+                                [i * volblockx, j * volblocky, k * volblockz],
+                                dtype=np.float32,
+                            )
+                        ),
+                        dtype=ks_fvec3.dtype,
                     ),
-                    dtype=ks_uivec3.dtype,
-                ),  # shape
-                np.array(
-                    tuple(
-                        -(np.array(vol.shape, dtype=np.float32) - 1) / 2
-                        + np.array(
-                            [i * volblockx, j * volblocky, k * volblockz],
-                            dtype=np.float32,
-                        )
-                    ),
-                    dtype=ks_fvec3.dtype,
                 ),
-            ),
-            dtype=ks_vol_spec.dtype,
-        )
-        fun(
-            (
-                int(np.ceil(output_projs.shape[1] / blockx)),
-                int(np.ceil(output_projs.shape[2] / blocky)),
-                int(np.ceil(output_projs.shape[0] / blocklayer)),
-            ),  # gridDims:  (x,y,z)
-            (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
-            (  # input args
-                config,
-                projspec_array,
-                np.uint32(num_projs),
-                vol_spec,
-                output_projs_strides_bytes,
-                np.uint64(output_projs.data.ptr),
-            ),
-        )
-    cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
-    # imview.plot_projections(output_projs)
+                dtype=ks_vol_spec.dtype,
+            )
+            fun(
+                (
+                    int(np.ceil(output_projs.shape[1] / blockx)),
+                    int(np.ceil(output_projs.shape[2] / blocky)),
+                    int(np.ceil(output_projs.shape[0] / blocklayer)),
+                ),  # gridDims:  (x,y,z)
+                (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
+                (  # input args
+                    config,
+                    projspec_array,
+                    np.uint32(num_projs),
+                    vol_spec,
+                    output_projs_strides_bytes,
+                    np.uint64(output_projs.data.ptr),
+                ),
+            )
+        cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
+        # imview.plot_projections(output_projs)
 
-    # Tests
-    # Check that x extremities at z=0 are nonzero
-    cp.testing.assert_array_less(
-        0, cp.abs(output_projs[:, 0, dethei // 2]) - 1
-    )
-    cp.testing.assert_array_less(
-        0, cp.abs(output_projs[:, -1, dethei // 2]) - 1
-    )
-    # Check that z extremities are zero
-    cp.testing.assert_array_almost_equal(output_projs[:, :, 0], 0)
-    cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
+        # Tests
+        # Check that x extremities at z=0 are nonzero
+        cp.testing.assert_array_less(
+            0, cp.abs(output_projs[:, 0, dethei // 2])
+        )
+        cp.testing.assert_array_less(
+            0, cp.abs(output_projs[:, -1, dethei // 2])
+        )
+        # Check that z extremities are zero
+        cp.testing.assert_array_almost_equal(output_projs[:, :, 0], 0)
+        cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
 
 
 class TestCB_texture_randomnoise:
@@ -474,7 +507,7 @@ class TestCB_texture_randomnoise:
         cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
 
 
-@pytest.mark.parametrize("volres", [312, 625])  # , 1250])
+@pytest.mark.parametrize("volres", [156, 312])  # , 625])  # , 1250])
 class TestCB_texture_FORBILD:
     @pytest.fixture(scope="function", autouse=True)
     def setup_and_teardown(self, volres: int):
