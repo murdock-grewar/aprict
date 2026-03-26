@@ -31,7 +31,9 @@ from ...cuda.structs.config_cb_project import det_spec as ks_det_spec
 from ...cuda.structs.config_cb_project import fvec3 as ks_fvec3
 from ...cuda.structs.config_cb_project import proj_spec as ks_proj_spec
 from ...cuda.structs.config_cb_project import uivec3 as ks_uivec3
-from ...cuda.structs.config_cb_project import vol_spec as ks_vol_spec
+from ...cuda.structs.config_cb_project import (
+    vol_spec as ks_vol_spec,
+)
 from ...cuda.structs.config_cb_project import (
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
 )
