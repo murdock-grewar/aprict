@@ -17,6 +17,14 @@
 import numpy as np
 
 from .. import kern_structs
+from .base import fvec3, uivec3
+
+__all__ = [
+    "config_cb_project",
+    "vol_spec",
+    "vol_tex_chunk_spec",
+    "volume_chunk_spec",
+]
 
 config_cb_project = kern_structs.KernelStruct(
     struct_name="config_CB_project",
@@ -35,155 +43,6 @@ volume_chunk_spec = kern_structs.KernelStruct(
         "idx_zstop",
     ],
     dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],
-)
-
-uivec3 = kern_structs.KernelStruct(
-    struct_name="uivec3",
-    names=["x", "y", "z"],
-    dtypes=[np.uint32, np.uint32, np.uint32],
-    extra_code="""
-__device__ uivec3 operator+(
-        uivec3 v1,
-        uivec3 v2
-)
-{
-    uivec3 v3;
-    v3.x = v1.x + v2.x;
-    v3.y = v1.y + v2.y;
-    v3.z = v1.z + v2.z;
-    return v3;
-}
-
-
-__device__ uivec3 operator-(
-        uivec3 v1,
-        uivec3 v2
-)
-{
-    uivec3 v3;
-    v3.x = v1.x - v2.x;
-    v3.y = v1.y - v2.y;
-    v3.z = v1.z - v2.z;
-    return v3;
-}
-
-
-__device__ float dot_prod(
-        uivec3 v1,
-        uivec3 v2
-)
-{
-    return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
-}
-
-""",
-)
-
-fvec3 = kern_structs.KernelStruct(
-    struct_name="fvec3",
-    names=["x", "y", "z"],
-    dtypes=[np.float32, np.float32, np.float32],
-    force_dependencies=[
-        uivec3
-    ],  # used to define a constructor in terms of uivec3
-    insert_into_struct="""
-public:
-    // implicit constructor from floats
-    fvec3(float xi, float yi, float zi) : x(xi), y(yi), z(zi) {}
-    // implicit constructor from a uivec3
-    fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
-    // default constructor, used with i.e. 'fvec3 v;'
-    fvec3() = default;
-""",
-    extra_code="""
-__device__ fvec3 operator+(
-        fvec3 v1,
-        fvec3 v2
-)
-{
-    fvec3 v3;
-    v3.x = v1.x + v2.x;
-    v3.y = v1.y + v2.y;
-    v3.z = v1.z + v2.z;
-    return v3;
-}
-
-
-__device__ fvec3 operator-(
-        fvec3 v1,
-        fvec3 v2
-)
-{
-    fvec3 v3;
-    v3.x = v1.x - v2.x;
-    v3.y = v1.y - v2.y;
-    v3.z = v1.z - v2.z;
-    return v3;
-}
-
-
-__device__ float dot_prod(
-        fvec3 v1,
-        fvec3 v2
-)
-{
-    return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
-}
-
-
-__device__ float norm_fvec3(
-        fvec3 v
-)
-{
-    return sqrt(dot_prod(v,v));
-}
-
-
-__device__ fvec3 operator*(
-        fvec3 v,
-        float f
-)
-{
-    fvec3 o;
-    o.x = v.x * f;
-    o.y = v.y * f;
-    o.z = v.z * f;
-    return o;
-}
-
-
-__device__ fvec3 operator/(
-        fvec3 v,
-        float f
-)
-{
-    fvec3 o;
-    o.x = v.x / f;
-    o.y = v.y / f;
-    o.z = v.z / f;
-    return o;
-}
-""",
-)
-
-
-det_spec = kern_structs.KernelStruct(
-    struct_name="det_spec",
-    names=[
-        "pos",  # position of detector (nominally, the middle of it)
-        "u",  # vector pointing along the x direction. Also determines pixel width.
-        "v",  # vector pointing along the y direction. Also determines pixel height.
-        "nu",
-        "nv",  # number of columns/rows. i.e. length of x axis; length of y axis.
-        "type",  # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
-    ],
-    dtypes=[fvec3, fvec3, fvec3, np.uint16, np.uint16, np.uint8],
-)
-
-proj_spec = kern_structs.KernelStruct(
-    struct_name="proj_spec",
-    names=["sourcepos", "dspec"],
-    dtypes=[fvec3, det_spec],
 )
 
 vol_spec = kern_structs.KernelStruct(

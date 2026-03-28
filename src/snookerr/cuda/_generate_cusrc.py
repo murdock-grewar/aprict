@@ -69,7 +69,9 @@ def import_submodules(package, anchor, recursive=True):  # noqa: ANN001, ANN202
     return results
 
 
-def generate_headers(output_dir: pathlib.Path) -> None:
+def generate_headers(
+    output_dir: pathlib.Path, include_dependencies: bool = False
+) -> None:
     prefix: str = structs.__name__
     for submodname, submod in import_submodules(
         package=structs, anchor=structs, recursive=True
@@ -81,6 +83,12 @@ def generate_headers(output_dir: pathlib.Path) -> None:
         kernstructs: list[tuple[str, KernelStruct]] = list(
             inspect.getmembers(submod, lambda x: type(x) is KernelStruct)
         )
+        if not include_dependencies:
+            # Filter out the structs imported into the file.
+            # Retain only those explicitly exported with __all__
+            kernstructs = list(
+                filter(lambda nameks: nameks[0] in submod.__all__, kernstructs)
+            )
         # Construct the path for the output header file
         output_path = output_dir.joinpath(
             submodname[len(prefix) + 1 :].replace(".", "/") + ".h"
@@ -89,14 +97,32 @@ def generate_headers(output_dir: pathlib.Path) -> None:
             parents=True, exist_ok=True
         )  # Make directory if it doesn't exist
 
-        # Now order the structs so that the dependencies are first
-        kslist = [ks for _, ks in kernstructs]
-        for i in list(reversed(range(len(kslist)))):
-            ks: KernelStruct = kslist[i]
-            kslist = kslist[:i] + ks.dependent_structs + kslist[i:]
-        # Now remove duplicates, keeping the first-encountered copy of each
-        seen = set()
-        kslist = [ks for ks in kslist if not (ks in seen or seen.add(ks))]
+        # Don't get dependencies recursively. This results in duplicate definitions.
+        # The generated header files will not import their dependencies, however, so is not
+        # really valid C++.
+        if include_dependencies:
+            # Now order the structs so that the dependencies are first
+            kslist = [ks for _, ks in kernstructs]
+            for i in list(reversed(range(len(kslist)))):
+                ks: KernelStruct = kslist[i]
+                kslist = kslist[:i] + ks.dependent_structs + kslist[i:]
+            # Now remove duplicates, keeping the first-encountered copy of each
+            seen = set()
+            kslist = [ks for ks in kslist if not (ks in seen or seen.add(ks))]
+        else:
+            # Order the structs within the one file so that they have correct dependencies
+            kslist = [ks for _, ks in kernstructs]
+            ksset = set(kslist)
+            for i in list(reversed(range(len(kslist)))):
+                ks: KernelStruct = kslist[i]
+                kslist = kslist[:i] + ks.dependent_structs + kslist[i:]
+            # Now remove duplicates, keeping the first-encountered copy of each
+            seen = set()
+            kslist = [
+                ks
+                for ks in kslist
+                if (ks in ksset) and not (ks in seen or seen.add(ks))
+            ]
         # Add the structure code, in order of dependency
         for ks in kslist:
             ks.append_c_struct_to_file(

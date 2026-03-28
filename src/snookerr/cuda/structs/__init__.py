@@ -28,5 +28,7 @@ will generate the .h files in a directory structure that mirrors this
 directory.
 """
 
-from . import config_cb_project as config_cb_project
 from . import test_subdir as test_subdir
+from .base import *
+from .config_cb_project import *
+from .geometry import *

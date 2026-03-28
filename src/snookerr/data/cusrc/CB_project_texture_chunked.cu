@@ -1,6 +1,7 @@
 #include <cuda/atomic>
 
-// Provides config_CB_project, volume_chunk_spec, det_spec, fvec3
+#include "base.h"
+#include "geometry.h"
 #include "config_cb_project.h"
 
 // Define a structure and method to compute line integrals through voxelised volumes

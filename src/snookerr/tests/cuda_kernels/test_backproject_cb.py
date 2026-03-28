@@ -16,7 +16,7 @@
 """Tests for the CB backprojection kernel(s)."""
 
 # ruff: disable[D101,D102,N801,ANN201]
-import itertools
+import itertools  # noqa: I001
 import time  # noqa: F401
 
 import cupy as cp
@@ -25,12 +25,15 @@ import pytest
 
 from ... import imview  # noqa: F401, RUF100
 from ...cuda import header_injection
-from ...cuda.structs.config_cb_project import config_cb_project as ks_config
-from ...cuda.structs.config_cb_project import det_spec as ks_det_spec
-from ...cuda.structs.config_cb_project import fvec3 as ks_fvec3
-from ...cuda.structs.config_cb_project import proj_spec as ks_proj_spec
-from ...cuda.structs.config_cb_project import uivec3 as ks_uivec3
-from ...cuda.structs.config_cb_project import vol_spec as ks_vol_spec
+from ...cuda.structs import (
+    config_cb_project as ks_config,
+    det_spec as ks_det_spec,
+    fvec3 as ks_fvec3,
+    uivec3 as ks_uivec3,
+    proj_spec as ks_proj_spec,
+    vol_spec as ks_vol_spec,
+    # vol_tex_chunk_spec  as ks_vol_tex_chunk_spec,
+)
 
 str_pytest_gen_sources: str = "ks_gen_sources"
 
