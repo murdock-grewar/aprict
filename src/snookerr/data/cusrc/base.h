@@ -1,7 +1,24 @@
+struct fvec2 {
+    float x;
+    float y;
+
+public:
+    // implicit constructor from floats
+    fvec2(float xi, float yi) : x(xi), y(yi) {}
+    // default constructor, used with i.e. 'fvec2 v;'
+    fvec2() = default;
+};
+
 struct uivec3 {
     unsigned int x;
     unsigned int y;
     unsigned int z;
+
+public:
+    // implicit constructor from floats
+    uivec3(unsigned int xi, unsigned int yi, unsigned int zi) : x(xi), y(yi), z(zi) {}
+    // default constructor, used with i.e. 'uivec3 v;'
+    uivec3() = default;
 };
 __device__ uivec3 operator+(
         uivec3 v1,
@@ -78,12 +95,65 @@ __device__ fvec3 operator-(
 }
 
 
+__device__ fvec3 operator*(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    fvec3 v3;
+    v3.x = v1.x * v2.x;
+    v3.y = v1.y * v2.y;
+    v3.z = v1.z * v2.z;
+    return v3;
+}
+
+
+__device__ fvec3 operator/(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    fvec3 v3;
+    v3.x = v1.x / v2.x;
+    v3.y = v1.y / v2.y;
+    v3.z = v1.z / v2.z;
+    return v3;
+}
+
+
 __device__ float dot_prod(
         fvec3 v1,
         fvec3 v2
 )
 {
     return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+}
+
+__device__ fvec3 cross_prod(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    return fvec3(
+        v1.y*v2.z - v1.z*v2.y,
+        v1.z*v2.x - v1.x*v2.z,
+        v1.x*v2.y - v1.y*v2.x
+    );
+}
+
+__device__ float min_of_components(
+        fvec3 v
+)
+{
+    return min(v.x, min(v.y, v.z));
+}
+
+
+__device__ float max_of_components(
+        fvec3 v
+)
+{
+    return max(v.x, max(v.y, v.z));
 }
 
 
@@ -120,4 +190,15 @@ __device__ fvec3 operator/(
     return o;
 }
 
+
+struct uivec2 {
+    unsigned int x;
+    unsigned int y;
+
+public:
+    // implicit constructor from unsigned ints
+    uivec2(unsigned int xi, unsigned int yi) : x(xi), y(yi) {}
+    // default constructor, used with i.e. 'uivec2 v;'
+    uivec2() = default;
+};
 

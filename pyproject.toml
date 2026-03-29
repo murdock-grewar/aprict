@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "cupy>=14.0.1",
     "gpustat>=1.1.1",
+    "imageio>=2.37.3",
     "numexpr>=2.14.1",
     "numpy>=2.4.3",
     "scipy>=1.17.1",
@@ -46,6 +47,7 @@ dev = [
 gui = [
     "imageio>=2.37.3",
     "pyqt6>=6.10.2",
+    "pyqtgraph>=0.14.0",
 ]
 
 [tool.pytest.ini_options]

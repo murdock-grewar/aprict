@@ -19,14 +19,49 @@ import numpy as np
 from .. import kern_structs
 
 __all__ = [
+    "fvec2",
     "fvec3",
+    "uivec2",
     "uivec3",
 ]
+
+uivec2 = kern_structs.KernelStruct(
+    struct_name="uivec2",
+    names=["x", "y"],
+    dtypes=[np.uint32, np.uint32],
+    insert_into_struct="""
+public:
+    // implicit constructor from unsigned ints
+    uivec2(unsigned int xi, unsigned int yi) : x(xi), y(yi) {}
+    // default constructor, used with i.e. 'uivec2 v;'
+    uivec2() = default;
+""",
+)
+
+fvec2 = kern_structs.KernelStruct(
+    struct_name="fvec2",
+    names=["x", "y"],
+    dtypes=[np.float32, np.float32],
+    insert_into_struct="""
+public:
+    // implicit constructor from floats
+    fvec2(float xi, float yi) : x(xi), y(yi) {}
+    // default constructor, used with i.e. 'fvec2 v;'
+    fvec2() = default;
+""",
+)
 
 uivec3 = kern_structs.KernelStruct(
     struct_name="uivec3",
     names=["x", "y", "z"],
     dtypes=[np.uint32, np.uint32, np.uint32],
+    insert_into_struct="""
+public:
+    // implicit constructor from floats
+    uivec3(unsigned int xi, unsigned int yi, unsigned int zi) : x(xi), y(yi), z(zi) {}
+    // default constructor, used with i.e. 'uivec3 v;'
+    uivec3() = default;
+""",
     extra_code="""
 __device__ uivec3 operator+(
         uivec3 v1,
@@ -108,12 +143,65 @@ __device__ fvec3 operator-(
 }
 
 
+__device__ fvec3 operator*(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    fvec3 v3;
+    v3.x = v1.x * v2.x;
+    v3.y = v1.y * v2.y;
+    v3.z = v1.z * v2.z;
+    return v3;
+}
+
+
+__device__ fvec3 operator/(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    fvec3 v3;
+    v3.x = v1.x / v2.x;
+    v3.y = v1.y / v2.y;
+    v3.z = v1.z / v2.z;
+    return v3;
+}
+
+
 __device__ float dot_prod(
         fvec3 v1,
         fvec3 v2
 )
 {
     return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+}
+
+__device__ fvec3 cross_prod(
+        fvec3 v1,
+        fvec3 v2
+)
+{
+    return fvec3(
+        v1.y*v2.z - v1.z*v2.y,
+        v1.z*v2.x - v1.x*v2.z,
+        v1.x*v2.y - v1.y*v2.x
+    );
+}
+
+__device__ float min_of_components(
+        fvec3 v
+)
+{
+    return min(v.x, min(v.y, v.z));
+}
+
+
+__device__ float max_of_components(
+        fvec3 v
+)
+{
+    return max(v.x, max(v.y, v.z));
 }
 
 

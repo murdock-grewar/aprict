@@ -56,8 +56,6 @@ __device__ void exact_line_integral_backproject(
     if ((zstart < minxyz.z) && (zend < minxyz.z)) { return; }
     if ((zstart > maxxyz.z) && (zend > maxxyz.z)) { return; }
 
-    Tp accum_val = 0;
-
     // Initialise the struct
     LineIntegState lis;
     lis.x = xstart;

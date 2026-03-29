@@ -868,6 +868,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cupy" },
     { name = "gpustat" },
+    { name = "imageio" },
     { name = "numexpr" },
     { name = "numpy" },
     { name = "scipy" },
@@ -894,12 +895,14 @@ dev = [
 gui = [
     { name = "imageio" },
     { name = "pyqt6" },
+    { name = "pyqtgraph" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cupy", specifier = ">=14.0.1" },
     { name = "gpustat", specifier = ">=1.1.1" },
+    { name = "imageio", specifier = ">=2.37.3" },
     { name = "matplotlib", marker = "extra == 'gui'", specifier = ">=3.10.8" },
     { name = "numexpr", specifier = ">=2.14.1" },
     { name = "numpy", specifier = ">=2.4.3" },
@@ -923,6 +926,7 @@ dev = [
 gui = [
     { name = "imageio", specifier = ">=2.37.3" },
     { name = "pyqt6", specifier = ">=6.10.2" },
+    { name = "pyqtgraph", specifier = ">=0.14.0" },
 ]
 
 [[package]]
