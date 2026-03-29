@@ -285,7 +285,7 @@ class TestCB_BACKPROJ_texture_randomnoise:
         kernel = request.getfixturevalue(kernel)
         # Set up configuration objects etc
         self.config = np.array((), dtype=ks_config.dtype)
-        num_projs = np.uint32(10)
+        num_projs = np.uint32(100)
         detwid: int = int(4 / 5 * volres * 3)
         dethei: int = int(4 / 5 * volres * 3)
         self.output_projs: cp.ndarray = cp.zeros(

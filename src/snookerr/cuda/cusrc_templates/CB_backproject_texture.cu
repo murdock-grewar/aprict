@@ -132,7 +132,6 @@ __global__ void backproject_CB_texture(
         projspec   = projspecs[proj_idx];
         source_pos = projspec.sourcepos;
 
-
         // Find the intersection with the detector of the ray passing through
         // the center of the voxel
         fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
@@ -191,29 +190,6 @@ __global__ void backproject_CB_texture(
                 accumulator += exact_line_integral_backproject<Tv, Tp>(
                     det_value, source_pos, det_pos, vox_pos);
 
-            }
-        }
-        continue;
-
-        for (unsigned int det_idx_x = 0; det_idx_x < projspec.dspec.nu; det_idx_x++) {
-            for (unsigned int det_idx_y = 0; det_idx_y < projspec.dspec.nv; det_idx_y++) {
-                    // For each detector pixel, share as much work as possible between the threads.
-                    // ...
-
-                    // Get the end point of the projection line
-                    det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
-
-                    // Get the value at the detector pixel
-                    det_idx = (
-                        input_projs_strides.y * det_idx_x +
-                        input_projs_strides.z * det_idx_y +
-                        input_projs_strides.x * proj_idx
-                    )/sizeof(Tp);
-                    det_value = input_projs[det_idx];
-
-                    // Compute the backprojection into this voxel
-                    accumulator += exact_line_integral_backproject<Tv, Tp>(
-                        det_value, source_pos, det_pos, vox_pos);
             }
         }
     }
