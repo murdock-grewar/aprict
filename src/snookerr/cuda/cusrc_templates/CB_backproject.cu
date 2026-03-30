@@ -59,7 +59,7 @@ __device__ Tv exact_line_integral_backproject(
     const float a1 = max(0.f, max_of_components(minstepxyz));
     const float a2 = max(a1,  min_of_components(maxstepxyz));
     const float c = a2 - a1;
-    return c * value * norm_fvec3(dv); // Maybe add an extra quick return if c is zero? Maybe compiler does it automatically?
+    return c * (float)value * norm_fvec3(dv); // Maybe add an extra quick return if c is zero? Maybe compiler does it automatically?
 }
 
 
@@ -261,8 +261,8 @@ __global__ void backproject_CB(
             float dist_to_vox = norm_fvec3(vox_pos - source_pos);
             float mag = dist_to_det/dist_to_vox;
             float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
-            float multiplier = powint(mag,2) / pixel_area;
-            accumulator += det_value * multiplier;
+            Tp multiplier = powint(mag,2) / pixel_area;
+            accumulator += (Tv)(det_value * multiplier);
         }
     }
 
