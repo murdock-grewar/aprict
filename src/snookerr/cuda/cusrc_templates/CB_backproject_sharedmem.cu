@@ -2,7 +2,7 @@
 
 #include "base.h"
 #include "geometry.h"
-#include "config_cb_project.h"
+#include "config_cb_backproject.h"
 
 // Define a structure and method to compute line integrals through voxelised volumes
 typedef struct {
@@ -203,8 +203,9 @@ template<
     unsigned int volchunk_Ysize,  // volume chunk size in Y dimension
     unsigned int volchunk_Zsize>  // volume chunk size in Z dimension
 __global__ void backproject_CB_sharedmem(
-        const config_CB_project   config,          // any miscellaneous config for the CB projection
-        //volume_chunk_spec   vchunk_spec,   // specifies the indices of the volume chunk.
+        // Config has been removed because I'm no longer maintaining this method, and cannot be bothered
+        // implementing a fast cylindrical masking.
+        //const config_CB_backproject   config,          // any miscellaneous config for the CB projection
         const proj_spec*          projspecs,       // contains the source and detector configurations
         const unsigned int        num_projs,       // length of projspecs array
         const vol_spec            volspec,
@@ -348,6 +349,17 @@ __global__ void backproject_CB_sharedmem(
         j -= volidx_y*volchunk_Xsize;
         unsigned int volidx_x = j;
 
+        /* This is where I would apply the cylinder masking.
+         * However, the inefficiency has already taken place... the projections have already been ray-traced!
+         * I'm no longer maintaining this kernel, so I will make it not depend on the config at all, to prevent
+         * there being an incorrect option.
+        // Skip if masking to the cylinder, and out of range
+        if (config.mask_to_cylinder) {
+            if ((vox_pos.x*vox_pos.x + vox_pos.y*vox_pos.y) > config.mask_cyl_rad*config.mask_cyl_rad) {
+                return;
+            }
+        }
+        */
 
         if (
             (volidx_x < volspec.shape.x) &&

@@ -30,5 +30,6 @@ directory.
 
 from . import test_subdir as test_subdir
 from .base import *
+from .config_cb_backproject import *
 from .config_cb_project import *
 from .geometry import *

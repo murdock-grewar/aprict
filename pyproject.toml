@@ -52,7 +52,7 @@ gui = [
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -v --durations=10"
+addopts = "-ra" # -v --durations=10"  # unnecessary with the conftest.py file
 console_output_style = "progress"
 testpaths = [
     "src/snookerr/tests",

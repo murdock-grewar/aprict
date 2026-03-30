@@ -26,17 +26,27 @@ import pytest
 from ... import imview  # noqa: F401, RUF100
 from ...cuda import header_injection
 from ...cuda.structs import (
-    config_cb_project as ks_config,
+    config_cb_backproject as ks_config,
     det_spec as ks_det_spec,
     fvec3 as ks_fvec3,
     uivec3 as ks_uivec3,
     proj_spec as ks_proj_spec,
     vol_spec as ks_vol_spec,
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
+    proj_chunk_spec_maxlen10 as ks_proj_chunk_spec_maxlen10,
+    proj_tex_chunk_spec_maxlen10 as ks_proj_tex_chunk_spec_maxlen10,
 )
-from ...lib import texture_tools
+from ...lib import gpu_tools, texture_tools
 
 str_pytest_gen_sources: str = "ks_gen_sources"
+
+gpu_tools.cupy_cap_default_mem_pool(0)
+
+# import gc
+# @pytest.fixture(autouse=True)
+# def ensure_gc():
+#    gpu_tools.clear_cache()
+#    gc.collect()
 
 
 def create_injected_module_sharedmem_backproject() -> cp.RawModule:  # noqa: D103
@@ -64,7 +74,7 @@ def create_injected_module_texture_backproject() -> cp.RawModule:  # noqa: D103
         "./CB_backproject_texture.cu",
         name_expressions=[
             "backproject_CB_texture<float,float>",
-            "backproject_CB_texture<float,double>",
+            # "backproject_CB_texture<float,double>",
         ],
     )
     module.compile()
@@ -107,16 +117,9 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
     ):
         kernel = request.getfixturevalue(kernel)
         # Set up configuration objects etc
-        self.config = np.array((), dtype=ks_config.dtype)
         num_projs = np.uint32(10)
         detwid: int = int(4 / 5 * volres * 3)
         dethei: int = int(4 / 5 * volres * 3)
-        self.output_projs: cp.ndarray = cp.zeros(
-            (num_projs, detwid, dethei), dtype=cp.float32
-        )
-        self.output_projs_strides_bytes = np.array(
-            self.output_projs.strides, dtype=ks_uivec3.dtype
-        )
         # Prepare the source/detector positions
         projspec_array = []
         ts = np.linspace(0, 2 * np.pi, endpoint=False, num=num_projs)
@@ -184,7 +187,6 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
     # )
     def test_backproject(self) -> None:
         vol = self.vol
-        config = self.config
         projspec_array = self.projspec_array
         input_projs = self.input_projs
         num_projs = self.input_projs.shape[0]
@@ -242,7 +244,6 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
                 dtype=ks_vol_spec.dtype,
             )
             args = (  # input args
-                config,
                 projspec_array,
                 np.uint32(num_projs),
                 vol_spec,
@@ -262,38 +263,55 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
 
 
 @pytest.mark.parametrize(
-    argnames=["volres", "kernel", "blockdims"],
+    argnames=["volres", "numprojs", "kernel", "blockdims"],
     argvalues=[
-        (105, "kern_BP_texture", [10, 10, 10]),
-        (210, "kern_BP_texture", [10, 10, 10]),
-        (420, "kern_BP_texture", [10, 10, 10]),
-        (840, "kern_BP_texture", [10, 10, 10]),
-        # (210, "kern_BP_texture",   [None, None, None]),
-        # [105, "backproject_CB_texture"],
+        (105, 10, "kern_BP_texture", [10, 10, 10]),
+        (210, 10, "kern_BP_texture", [10, 10, 10]),
+        (420, 10, "kern_BP_texture", [10, 10, 10]),
+        (420, 20, "kern_BP_texture", [10, 10, 10]),
+        (420, 40, "kern_BP_texture", [10, 10, 10]),
+        (420, 80, "kern_BP_texture", [10, 10, 10]),
+        (420, 160, "kern_BP_texture", [10, 10, 10]),
+        (840, 10, "kern_BP_texture", [10, 10, 10]),
+        (840, 20, "kern_BP_texture", [10, 10, 10]),
+        (840, 40, "kern_BP_texture", [10, 10, 10]),
+        (840, 41, "kern_BP_texture", [10, 10, 10]),
+        (840, 42, "kern_BP_texture", [10, 10, 10]),
     ],
-    ids=["texture-105", "texture-210", "texture-420", "texture-840"],
+    ids=[
+        "texture-105-10",
+        "texture-210-10",
+        "texture-420-10",
+        "texture-420-20",
+        "texture-420-40",
+        "texture-420-80",
+        "texture-420-160",
+        "texture-840-10",
+        "texture-840-20",
+        "texture-840-40",
+        "texture-840-41",
+        "texture-840-42",
+    ],
+    scope="class",
 )
 class TestCB_BACKPROJ_texture_randomnoise:
     @pytest.fixture(scope="function", autouse=True)
     def setup_and_teardown(
         self,
         volres: int,
+        numprojs: int,
         kernel,  # noqa: ANN001
         blockdims: list[int | None],
         request,  # noqa: ANN001
     ):
         kernel = request.getfixturevalue(kernel)
         # Set up configuration objects etc
-        self.config = np.array((), dtype=ks_config.dtype)
-        num_projs = np.uint32(100)
+        self.config = np.array(
+            (np.bool(True), volres / 2), dtype=ks_config.dtype
+        )
+        num_projs = np.uint32(numprojs)
         detwid: int = int(4 / 5 * volres * 3)
         dethei: int = int(4 / 5 * volres * 3)
-        self.output_projs: cp.ndarray = cp.zeros(
-            (num_projs, detwid, dethei), dtype=cp.float32
-        )
-        self.output_projs_strides_bytes = np.array(
-            self.output_projs.strides, dtype=ks_uivec3.dtype
-        )
         # Prepare the source/detector positions
         projspec_array = []
         ts = np.linspace(0, 2 * np.pi, endpoint=False, num=num_projs)
@@ -332,7 +350,7 @@ class TestCB_BACKPROJ_texture_randomnoise:
             )
             projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
             projspec_array.append(projspec)
-        self.projspec_array = cp.array(projspec_array)
+        self.projspec_array = np.array(projspec_array)
         self.kern = kernel
         self.blockdims = blockdims
 
@@ -352,15 +370,35 @@ class TestCB_BACKPROJ_texture_randomnoise:
             filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
             include_surface=True,
             include_texture=True,
+            layered=False,
+        )
+        self.dtex = texture_tools.Texture(
+            self.input_projs,
+            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+            include_surface=True,
+            include_texture=True,
+            layered=True,
         )
 
         # yield to the timed test
         cp.cuda.get_current_stream().synchronize()
         yield
 
+        # Copy the data out of the texture
         self.vtex.cuda_array.copy_to(self.vol)
+        # Plot, if desired
         # imview.plot_volume(self.vol)
+        # Clean up the used memory. This indeed seems to be necessary, as pytest doesn't do it automatically for some reason
+        del self.input_projs
+        del self.vol
+        del self.vtex
+        del self.dtex
+        del self.projspec_array
+        # Reset the texture memory to 0s
         # self.vol.fill(0)
+        # self.vtex.cuda_array.copy_from(self.vol)
+        # gpu_tools.clear_cache()
 
     # @pytest.mark.parametrize(
     #    "blockdims",
@@ -375,7 +413,7 @@ class TestCB_BACKPROJ_texture_randomnoise:
         num_projs = self.input_projs.shape[0]
         input_projs_strides_bytes = self.input_projs_strides_bytes
         # Prepare the kernel
-        proj_chunk_size: int = num_projs  # I haven't yet coded it up to launch separate kernels to get through all the projections
+        proj_chunk_size: int = 10
         volblockx = (
             vol.shape[0] if self.blockdims[0] is None else self.blockdims[0]
         )
@@ -408,27 +446,87 @@ class TestCB_BACKPROJ_texture_randomnoise:
             ),
             dtype=ks_vol_tex_chunk_spec.dtype,
         )
+        input_projs_data_pointer = np.uint64(input_projs.data.ptr)
         fun = self.kern
         for i in range(int(np.ceil(num_projs / proj_chunk_size))):
-            # Adjust projspec_array here to account for which projections to include...
-            args = (  # input args
-                config,
-                projspec_array,
-                np.uint32(num_projs),
-                texchunkspec,
-                self.vtex.surfobj,
-                input_projs_strides_bytes,
-                np.uint64(input_projs.data.ptr),
+            # Create the projection chunk specification
+            chunk_num_projs = min(
+                proj_chunk_size, num_projs - i * proj_chunk_size
             )
-            fun(
-                (
-                    int(np.ceil(vol.shape[0] / volblockx)),
-                    int(np.ceil(vol.shape[1] / volblocky)),
-                    int(np.ceil(vol.shape[2] / volblockz)),
-                ),  # gridDims:  (x,y,z)
-                (volblockx, volblocky, volblockz),  # blockDims: (x,y,z)
-                args,
+            projspec_array_chunk = list(
+                projspec_array[
+                    i * proj_chunk_size : i * proj_chunk_size + chunk_num_projs
+                ]
             )
+            projspec_array_chunk.extend(
+                [projspec_array_chunk[-1]] * (10 - chunk_num_projs)
+            )  # repeat the last projspec to fill up a whole chunk of 10.
+            if False:
+                input_proj_tex_chunk_spec = np.array(
+                    (
+                        np.array(
+                            projspec_array_chunk, dtype=ks_proj_spec
+                        ),  # projspecs
+                        np.uint8(chunk_num_projs),  # numprojs
+                        np.uint32(i * proj_chunk_size),  # tex start layer
+                        # np.uint64(
+                        #     input_projs_data_pointer +
+                        #     i*proj_chunk_size*input_projs.strides[0]
+                        # ),  # projmemaddr
+                        # input_projs_strides_bytes,  # projmemstrides
+                    ),
+                    dtype=ks_proj_tex_chunk_spec_maxlen10,
+                )
+                args = (  # input args
+                    config,
+                    texchunkspec,
+                    self.vtex.surfobj,
+                    # input_proj_chunk_spec,
+                    input_proj_tex_chunk_spec,
+                    self.dtex.texobj,
+                )
+                fun(
+                    (
+                        int(np.ceil(vol.shape[0] / volblockx)),
+                        int(np.ceil(vol.shape[1] / volblocky)),
+                        int(np.ceil(vol.shape[2] / volblockz)),
+                    ),  # gridDims:  (x,y,z)
+                    (volblockx, volblocky, volblockz),  # blockDims: (x,y,z)
+                    args,
+                )
+            else:
+                input_proj_chunk_spec = np.array(
+                    (
+                        np.array(
+                            projspec_array_chunk, dtype=ks_proj_spec
+                        ),  # projspecs
+                        np.uint8(chunk_num_projs),  # numprojs
+                        # np.uint32(i*proj_chunk_size),  # tex start layer
+                        np.uint64(
+                            input_projs_data_pointer
+                            + i * proj_chunk_size * input_projs.strides[0]
+                        ),  # projmemaddr
+                        input_projs_strides_bytes,  # projmemstrides
+                    ),
+                    dtype=ks_proj_chunk_spec_maxlen10,
+                )
+                args = (  # input args
+                    config,
+                    texchunkspec,
+                    self.vtex.surfobj,
+                    input_proj_chunk_spec,
+                    # input_proj_tex_chunk_spec,
+                    # self.dtex.texobj,
+                )
+                fun(
+                    (
+                        int(np.ceil(vol.shape[0] / volblockx)),
+                        int(np.ceil(vol.shape[1] / volblocky)),
+                        int(np.ceil(vol.shape[2] / volblockz)),
+                    ),  # gridDims:  (x,y,z)
+                    (volblockx, volblocky, volblockz),  # blockDims: (x,y,z)
+                    args,
+                )
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 

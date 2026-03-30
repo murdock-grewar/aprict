@@ -29,6 +29,7 @@ exclude = [
     "githooks",
     # Actual source files
     "src/*/lib/phantoms_FORBILD.py",
+    "conftest.py",
 ]
 
 line-length = 79

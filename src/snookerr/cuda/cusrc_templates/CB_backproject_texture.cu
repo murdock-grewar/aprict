@@ -13,7 +13,7 @@
 
 #include "base.h"
 #include "geometry.h"
-#include "config_cb_project.h"
+#include "config_cb_backproject.h"
 
 template <typename T> float sgn(const T val) {
     return (T(0) < val) - (val < T(0));
@@ -90,14 +90,10 @@ template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
 __global__ void backproject_CB_texture(
-        const config_CB_project   config,          // any miscellaneous config for the CB projection
-        //volume_chunk_spec   vchunk_spec,   // specifies the indices of the volume chunk.
-        const proj_spec*          projspecs,       // contains the source and detector configurations
-        const unsigned int        num_projs,       // length of projspecs array
+        const config_CB_backproject   config,          // any miscellaneous config for the CB projection
         const vol_tex_chunk_spec  texchunkspec,
         cudaSurfaceObject_t       volume_surface,
-        const uivec3              input_projs_strides,
-        const Tp*                 input_projs
+        const proj_chunk_spec_maxlen10 proj_chunk_spec
 )
 {
     // Get the position within the volume surface
@@ -118,18 +114,52 @@ __global__ void backproject_CB_texture(
     // Get the center position of this voxel
     const fvec3 vox_pos = texchunkspec.texpos + vol_surf_idx + fvec3(1./2., 1./2., 1./2.);
 
+    // Skip if masking to the cylinder, and out of range
+    if (config.mask_to_cylinder) {
+        if ((vox_pos.x*vox_pos.x + vox_pos.y*vox_pos.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
+            return;
+        }
+    }
+
+    // Unpack projection metadata
+    const uivec3    input_projs_strides = proj_chunk_spec.projmemstrides;
+    const Tp*       input_projs         = (Tp*)proj_chunk_spec.projmemaddr;
+    const unsigned short num_projs      = proj_chunk_spec.numprojs;
+    /*
+    const unsigned short num_projs          = proj_tex_chunk_spec.numprojs;
+    const unsigned int   tex_start_layer    = proj_tex_chunk_spec.tex_start_layer;
+    */
+
     // Reused structures
-    proj_spec projspec;
+    //proj_spec projspec;
     fvec3     source_pos;
     fvec3     det_pos;
     unsigned long det_idx;
     Tp        det_value;
+    /*
+     * This also kills the performance of the kernel.
+    proj_spec proj_specs[10];
+    for (unsigned int proj_idx = proj_index_start; proj_idx < proj_index_start + num_projs; proj_idx++) {
+        proj_specs[proj_idx - proj_index_start] = projspecs[proj_idx];
+    }
+    projspec = proj_specs[0];*/
 
     // Loop over all detector pixels and add the backprojection
+    const fvec3 _vox_corner_offsets[8] = {
+        fvec3(-1./2., -1./2., -1./2.),
+        fvec3(-1./2., -1./2.,  1./2.),
+        fvec3(-1./2.,  1./2., -1./2.),
+        fvec3(-1./2.,  1./2.,  1./2.),
+        fvec3( 1./2., -1./2., -1./2.),
+        fvec3( 1./2., -1./2.,  1./2.),
+        fvec3( 1./2.,  1./2., -1./2.),
+        fvec3( 1./2.,  1./2.,  1./2.)
+    };
     Tv accumulator = 0.;
     for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
         // Get the start point of the projection line
-        projspec   = projspecs[proj_idx];
+        //proj_spec projspec = proj_tex_chunk_spec.projspecs[proj_idx];
+        proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
         source_pos = projspec.sourcepos;
 
         // Find the intersection with the detector of the ray passing through
@@ -149,17 +179,7 @@ __global__ void backproject_CB_texture(
         fvec2 det_coords;
         fvec2 det_coords_min = det_coords_c;
         fvec2 det_coords_max = det_coords_c;
-        fvec3 offsets[8] = {
-            fvec3(-1./2., -1./2., -1./2.),
-            fvec3(-1./2., -1./2.,  1./2.),
-            fvec3(-1./2.,  1./2., -1./2.),
-            fvec3(-1./2.,  1./2.,  1./2.),
-            fvec3( 1./2., -1./2., -1./2.),
-            fvec3( 1./2., -1./2.,  1./2.),
-            fvec3( 1./2.,  1./2., -1./2.),
-            fvec3( 1./2.,  1./2.,  1./2.)
-        };
-        for (const fvec3 &offset : offsets) {
+        for (const fvec3 &offset : _vox_corner_offsets) {
             vox_pos_offset = vox_pos + offset;
             det_coords = get_projected_detector_coords(vox_pos_offset, projspec);
             det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
@@ -178,13 +198,22 @@ __global__ void backproject_CB_texture(
                 );
 
                 // Find the detector value there
-                //
+
                 det_idx = (
                     input_projs_strides.y * det_idx_x +
                     input_projs_strides.z * det_idx_y +
                     input_projs_strides.x * proj_idx
                 )/sizeof(Tp);
                 det_value = input_projs[det_idx];
+
+                /*
+                float det_value = tex2DLayered<Tp>(
+                    detector_texture,
+                    det_idx_y + 1./2.f,
+                    det_idx_x + 1./2.f,
+                    proj_idx + tex_start_layer
+                );
+                */
 
                 // Compute the backprojection into this voxel
                 accumulator += exact_line_integral_backproject<Tv, Tp>(

@@ -59,9 +59,9 @@ class KernelStruct:
         struct_name: str,
         *,
         names: tuple[str] | list[str],
-        dtypes: tuple[type | KernelStruct]
+        dtypes: tuple[type | KernelStruct | KernelArray]
         | list[
-            type | KernelStruct
+            type | KernelStruct | KernelArray
         ],  # input a list/tuple of np.dtypes and/or KernelStructs.
         force_dependencies: list[KernelStruct] | None = None,
         insert_into_struct: str
@@ -84,7 +84,18 @@ class KernelStruct:
         dtype_to_cname_dict: dict[np.dtype | KernelStruct, str] = dict(
             _np_dtype_to_c_type.items()
         )  # Create copy
-        self.dependent_structs = [t for t in dtypes if type(t) is KernelStruct]
+
+        self.dependent_structs = [  # ty:ignore[invalid-assignment]  # ty is wrong here
+            k if type(k) is KernelStruct else k.member_dtype  # ty:ignore[unresolved-attribute] # ty is wrong here
+            for k in dtypes
+            if (
+                type(k) is KernelStruct
+                or (
+                    type(k) is KernelArray
+                    and type(k.member_dtype) is KernelStruct
+                )
+            )
+        ]
         if force_dependencies is not None:
             self.dependent_structs.extend([t for t in force_dependencies])  # noqa: C416
         # Add the dependents of dependents. Make sure it's ordered, with base dependencies on the left.
@@ -158,10 +169,29 @@ class KernelStruct:
         struct_name: str,
         insert_into_struct: str | None,
         *tuples_type_name: typing.Iterable[
-            tuple[np.dtype | KernelStruct, str]
+            tuple[np.dtype | KernelStruct | KernelArray, str]
         ],
     ) -> str:
         """Produce C++ code for a custom datatype."""
+
+        def cname(dtype: np.dtype | KernelStruct | KernelArray) -> str:
+            if type(dtype) is KernelArray:
+                actual_dtype = dtype.member_dtype
+            else:
+                actual_dtype = dtype
+            if type(actual_dtype) is KernelStruct:
+                return dtype_to_cname_dict[actual_dtype]
+            return dtype_to_cname_dict[np.dtype(actual_dtype)]
+
+        def get_fieldname(
+            dtype: np.dtype | KernelStruct | KernelArray, name: str
+        ) -> str:
+            s = name
+            if type(dtype) is KernelArray:
+                for i in dtype.shape:
+                    s += f"[{i:d}]"
+            return s
+
         if not cls._validate_struct_name(struct_name):
             msg = f"Invalid structure name: '{struct_name:s}'. Use something which is a valid type name in C++."
             raise ValueError(msg)
@@ -171,8 +201,8 @@ class KernelStruct:
                 + "{\n"
                 + "".join(
                     [
-                        f"    {dtype_to_cname_dict[dtype if type(dtype) is KernelStruct else np.dtype(dtype)]} {fieldname:s};\n"
-                        for dtype, fieldname in tuples_type_name
+                        f"    {cname(dtype)} {get_fieldname(dtype, name)};\n"  # ty:ignore[invalid-argument-type]
+                        for dtype, name in tuples_type_name
                     ]
                 )
                 + ("" if insert_into_struct is None else insert_into_struct)
@@ -194,7 +224,9 @@ class KernelStruct:
         struct_name: str,
         force_dependencies: list[KernelStruct] | None,
         insert_into_struct: str | None,
-        *tuples_type_name: typing.Iterable[tuple[np.dtype, str]],
+        *tuples_type_name: typing.Iterable[
+            tuple[np.dtype | KernelStruct | KernelArray, str]
+        ],
     ) -> cp.RawKernel:
         tuples: list = [*tuples_type_name]
         struct_definition: str = cls._struct_definition(
@@ -203,8 +235,17 @@ class KernelStruct:
         names = [n for t, n in tuples]
         struct_layout_code = ""
         # Create an ordered list of dependencies. First are the base dependencies.
+        dtypes = [tup[0] for tup in tuples]
         dependent_ks = [
-            tup[0] for tup in tuples if type(tup[0]) is KernelStruct
+            k if type(k) is KernelStruct else k.member_dtype
+            for k in dtypes
+            if (
+                type(k) is KernelStruct
+                or (
+                    type(k) is KernelArray
+                    and type(k.member_dtype) is KernelStruct
+                )
+            )
         ]
         if force_dependencies is not None:
             dependent_ks.extend(list(force_dependencies))
@@ -281,3 +322,26 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
 
     def __str__(self) -> str:  # noqa: D105
         return f"KernelStruct({self.struct_name})"
+
+
+class KernelArray:
+    """A type to represent an array of a fixed numpy dtype and length."""
+
+    dtype: np.dtype
+    member_dtype: type | KernelStruct | KernelArray
+    shape: tuple[int, ...]
+
+    def __init__(
+        self,
+        *,
+        dtype: type | KernelStruct | KernelArray,
+        shape: tuple[int, ...],
+    ) -> None:
+        self.member_dtype = dtype
+        self.dtype = np.dtype((dtype, shape))
+        self.shape = shape
+
+        # Validate inputs #
+        # Test that the 'dtype' can actually be interpreted by numpy as a dtype.
+        np.dtype(self.dtype)  # May raise a TypeError. This is intentional.
+        ###################
