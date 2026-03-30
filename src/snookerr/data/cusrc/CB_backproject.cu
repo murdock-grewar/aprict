@@ -8,12 +8,28 @@
  * efficient for that case; I'm not sure.)
  */
 
-
 #include <cuda/atomic>
 
 #include "base.h"
 #include "geometry.h"
 #include "config_cb_backproject.h"
+
+template <typename T>
+__device__ T powint(T base, short exponent) {
+    // Protect against negative values
+    T ans = 1.;
+    if (exponent < 0) {
+        for (unsigned short e = 0; e < -exponent; e++) {
+            ans /= base;
+        }
+    } else {
+        for (unsigned short e = 0; e < exponent; e++) {
+            ans *= base;
+        }
+    }
+    return ans;
+}
+
 
 template <typename T> float sgn(const T val) {
     return (T(0) < val) - (val < T(0));
@@ -89,30 +105,29 @@ __device__ fvec3 detpos(
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
-__global__ void backproject_CB_texture(
-        const config_CB_backproject   config,          // any miscellaneous config for the CB projection
-        const vol_tex_chunk_spec  texchunkspec,
-        cudaSurfaceObject_t       volume_surface,
-        const proj_chunk_spec_maxlen10 proj_chunk_spec
+__global__ void backproject_CB(
+        const config_CB_backproject     config,          // any miscellaneous config for the CB projection
+        const vol_spec                  volchunkspec,
+        const proj_chunk_spec_maxlen10  proj_chunk_spec
 )
 {
     // Get the position within the volume surface
-    const uivec3 vol_surf_idx = texchunkspec.offsets + uivec3(
+    const uivec3 vol_idx = uivec3(
         threadIdx.x + blockIdx.x * blockDim.x,
         threadIdx.y + blockIdx.y * blockDim.y,
         threadIdx.z + blockIdx.z * blockDim.z
     );
 
     // Return if block is out of range
-    if ((vol_surf_idx.x >= texchunkspec.offsets.x + texchunkspec.shape.x) ||
-        (vol_surf_idx.y >= texchunkspec.offsets.y + texchunkspec.shape.y) ||
-        (vol_surf_idx.z >= texchunkspec.offsets.z + texchunkspec.shape.z)) {
+    if ((vol_idx.x >= volchunkspec.shape.x) ||
+        (vol_idx.y >= volchunkspec.shape.y) ||
+        (vol_idx.z >= volchunkspec.shape.z)) {
         return;
     }
 
 
     // Get the center position of this voxel
-    const fvec3 vox_pos = texchunkspec.texpos + vol_surf_idx + fvec3(1./2., 1./2., 1./2.);
+    const fvec3 vox_pos = volchunkspec.pos_000 + vol_idx;
 
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
@@ -144,6 +159,8 @@ __global__ void backproject_CB_texture(
     }
     projspec = proj_specs[0];*/
 
+    const bool exact = config.exact_line_integ_backproj;
+
     // Loop over all detector pixels and add the backprojection
     const fvec3 _vox_corner_offsets[8] = {
         fvec3(-1./2., -1./2., -1./2.),
@@ -172,70 +189,93 @@ __global__ void backproject_CB_texture(
         );
         */
 
-        // Find the intersection with the detector of the ray passing through
-        // each of the eight corners of the voxel. These will define the range
-        // of pixels that are in range and need to be considered for backprojection.
-        fvec3 vox_pos_offset;
-        fvec2 det_coords;
-        fvec2 det_coords_min = det_coords_c;
-        fvec2 det_coords_max = det_coords_c;
-        for (const fvec3 &offset : _vox_corner_offsets) {
-            vox_pos_offset = vox_pos + offset;
-            det_coords = get_projected_detector_coords(vox_pos_offset, projspec);
-            det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
-            det_coords_max = {max(det_coords_max.x, det_coords.x), max(det_coords_max.y, det_coords.y)};
-        }
-        int det_idx_x_min = max(0.f, floor(det_coords_min.x + projspec.dspec.nu/2.f));
-        int det_idx_y_min = max(0.f, floor(det_coords_min.y + projspec.dspec.nv/2.f));
-        int det_idx_x_max = min(projspec.dspec.nu-1.f, ceil(det_coords_max.x + projspec.dspec.nu/2.f));
-        int det_idx_y_max = min(projspec.dspec.nv-1.f, ceil(det_coords_max.y + projspec.dspec.nv/2.f));
-        for (int det_idx_x = det_idx_x_min; det_idx_x < det_idx_x_max+1; det_idx_x++) {
-            for (int det_idx_y = det_idx_y_min; det_idx_y < det_idx_y_max+1; det_idx_y++) {
-
-                fvec3 det_pos      = projspec.dspec.pos + (
-                    projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
-                    projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
-                );
-
-                // Find the detector value there
-
-                det_idx = (
-                    input_projs_strides.y * det_idx_x +
-                    input_projs_strides.z * det_idx_y +
-                    input_projs_strides.x * proj_idx
-                )/sizeof(Tp);
-                det_value = input_projs[det_idx];
-
-                /*
-                float det_value = tex2DLayered<Tp>(
-                    detector_texture,
-                    det_idx_y + 1./2.f,
-                    det_idx_x + 1./2.f,
-                    proj_idx + tex_start_layer
-                );
-                */
-
-                // Compute the backprojection into this voxel
-                accumulator += exact_line_integral_backproject<Tv, Tp>(
-                    det_value, source_pos, det_pos, vox_pos);
-
+        if (exact) {
+            // Find the intersection with the detector of the ray passing through
+            // each of the eight corners of the voxel. These will define the range
+            // of pixels that are in range and need to be considered for backprojection.
+            fvec3 vox_pos_offset;
+            fvec2 det_coords;
+            fvec2 det_coords_min = det_coords_c;
+            fvec2 det_coords_max = det_coords_c;
+            for (const fvec3 &offset : _vox_corner_offsets) {
+                vox_pos_offset = vox_pos + offset;
+                det_coords = get_projected_detector_coords(vox_pos_offset, projspec);
+                det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
+                det_coords_max = {max(det_coords_max.x, det_coords.x), max(det_coords_max.y, det_coords.y)};
             }
+            int det_idx_x_min = max(0.f, floor(det_coords_min.x + projspec.dspec.nu/2.f));
+            int det_idx_y_min = max(0.f, floor(det_coords_min.y + projspec.dspec.nv/2.f));
+            int det_idx_x_max = min(projspec.dspec.nu-1.f, ceil(det_coords_max.x + projspec.dspec.nu/2.f));
+            int det_idx_y_max = min(projspec.dspec.nv-1.f, ceil(det_coords_max.y + projspec.dspec.nv/2.f));
+            for (int det_idx_x = det_idx_x_min; det_idx_x < det_idx_x_max+1; det_idx_x++) {
+                for (int det_idx_y = det_idx_y_min; det_idx_y < det_idx_y_max+1; det_idx_y++) {
+
+                    fvec3 det_pos      = projspec.dspec.pos + (
+                        projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
+                        projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
+                    );
+
+                    // Find the detector value there
+
+                    det_idx = (
+                        input_projs_strides.y * det_idx_x +
+                        input_projs_strides.z * det_idx_y +
+                        input_projs_strides.x * proj_idx
+                    )/sizeof(Tp);
+                    det_value = input_projs[det_idx];
+
+                    /*
+                    float det_value = tex2DLayered<Tp>(
+                        detector_texture,
+                        det_idx_y + 1./2.f,
+                        det_idx_x + 1./2.f,
+                        proj_idx + tex_start_layer
+                    );
+                    */
+
+                    // Compute the backprojection into this voxel
+                    accumulator += exact_line_integral_backproject<Tv, Tp>(
+                        det_value, source_pos, det_pos, vox_pos);
+
+                }
+            }
+        } else {
+            // config.exact is FALSE
+            int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
+            if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
+            int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));
+            if ((det_idx_y < 0) || (det_idx_y >= projspec.dspec.nv)) { continue; }
+            // Find the detector value there
+            det_idx = (
+                input_projs_strides.y * det_idx_x +
+                input_projs_strides.z * det_idx_y +
+                input_projs_strides.x * proj_idx
+            )/sizeof(Tp);
+            det_value = input_projs[det_idx];
+            // Compute the physical distance to the source
+            fvec3 det_pos      = projspec.dspec.pos + (
+                projspec.dspec.u * det_coords_c.x +
+                projspec.dspec.v * det_coords_c.y
+            );
+            float dist_to_det = norm_fvec3(det_pos - source_pos);
+            float dist_to_vox = norm_fvec3(vox_pos - source_pos);
+            float mag = dist_to_det/dist_to_vox;
+            float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
+            float multiplier = powint(mag,2) / pixel_area;
+            accumulator += det_value * multiplier;
         }
     }
 
     // Write the value to the surface memory and leave
     if (accumulator == 0) { return; }
-    Tv old_val = surf3Dread<Tv>(
-        volume_surface,
-        vol_surf_idx.z * sizeof(Tv),
-        vol_surf_idx.y,
-        vol_surf_idx.x
-    );
-    surf3Dwrite(
-        old_val + accumulator,
-        volume_surface,
-        vol_surf_idx.z * sizeof(Tv),
-        vol_surf_idx.y,
-        vol_surf_idx.x
+    Tv* volume = (Tv*)volchunkspec.ptr_000;
+    unsigned long vol_idx_addr = (
+        volchunkspec.strides_bytes.x * (vol_idx.x) +
+        volchunkspec.strides_bytes.y * (vol_idx.y) +
+        volchunkspec.strides_bytes.z * (vol_idx.z)
+    )/sizeof(Tv);
+    atomicAdd(
+        &volume[vol_idx_addr],
+        accumulator
     );
 }

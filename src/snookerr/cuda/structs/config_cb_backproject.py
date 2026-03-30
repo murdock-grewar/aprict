@@ -24,6 +24,6 @@ __all__ = [
 
 config_cb_backproject = kern_structs.KernelStruct(
     struct_name="config_CB_backproject",
-    names=["mask_to_cylinder", "mask_to_cyl_rad"],
-    dtypes=[np.bool, np.float32],
+    names=["exact_line_integ_backproj", "mask_to_cylinder", "mask_to_cyl_rad"],
+    dtypes=[np.bool, np.bool, np.float32],
 )

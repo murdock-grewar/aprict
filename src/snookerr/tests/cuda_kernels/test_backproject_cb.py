@@ -15,7 +15,7 @@
 
 """Tests for the CB backprojection kernel(s)."""
 
-# ruff: disable[D101,D102,N801,ANN201]
+# ruff: disable[D101,D102,D103,N801,ANN201]
 import itertools  # noqa: I001
 import time  # noqa: F401
 
@@ -49,7 +49,7 @@ gpu_tools.cupy_cap_default_mem_pool(0)
 #    gc.collect()
 
 
-def create_injected_module_sharedmem_backproject() -> cp.RawModule:  # noqa: D103
+def create_injected_module_sharedmem_backproject() -> cp.RawModule:
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_backproject_sharedmem.cu",
@@ -68,13 +68,13 @@ def create_injected_module_sharedmem_backproject() -> cp.RawModule:  # noqa: D10
     return module
 
 
-def create_injected_module_texture_backproject() -> cp.RawModule:  # noqa: D103
+def create_injected_module_backproject() -> cp.RawModule:
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
-        "./CB_backproject_texture.cu",
+        "./CB_backproject.cu",
         name_expressions=[
-            "backproject_CB_texture<float,float>",
-            # "backproject_CB_texture<float,double>",
+            "backproject_CB<float,float>",
+            # "backproject_CB<float,double>",
         ],
     )
     module.compile()
@@ -82,7 +82,7 @@ def create_injected_module_texture_backproject() -> cp.RawModule:  # noqa: D103
 
 
 @pytest.fixture()
-def kern_BP_sharedmem():  # noqa: D103, N802
+def kern_BP_sharedmem():  # noqa: N802
     module = create_injected_module_sharedmem_backproject()
     return module.get_function(
         "backproject_CB_sharedmem<float,float,18,18,18>"
@@ -90,9 +90,9 @@ def kern_BP_sharedmem():  # noqa: D103, N802
 
 
 @pytest.fixture()
-def kern_BP_texture():  # noqa: D103, N802
-    module = create_injected_module_texture_backproject()
-    return module.get_function("backproject_CB_texture<float,float>")
+def kern_BP():  # noqa: N802
+    module = create_injected_module_backproject()
+    return module.get_function("backproject_CB<float,float>")
 
 
 @pytest.mark.parametrize(
@@ -263,38 +263,44 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
 
 
 @pytest.mark.parametrize(
-    argnames=["volres", "numprojs", "kernel", "blockdims"],
+    argnames=["volres", "numprojs", "kernel", "blockdims", "exact"],
     argvalues=[
-        (105, 10, "kern_BP_texture", [10, 10, 10]),
-        (210, 10, "kern_BP_texture", [10, 10, 10]),
-        (420, 10, "kern_BP_texture", [10, 10, 10]),
-        (420, 20, "kern_BP_texture", [10, 10, 10]),
-        (420, 40, "kern_BP_texture", [10, 10, 10]),
-        (420, 80, "kern_BP_texture", [10, 10, 10]),
-        (420, 160, "kern_BP_texture", [10, 10, 10]),
-        (840, 10, "kern_BP_texture", [10, 10, 10]),
-        (840, 20, "kern_BP_texture", [10, 10, 10]),
-        (840, 40, "kern_BP_texture", [10, 10, 10]),
-        (840, 41, "kern_BP_texture", [10, 10, 10]),
-        (840, 42, "kern_BP_texture", [10, 10, 10]),
+        # (105, 1, "kern_BP", [10, 10, 10]),
+        # (105, 10, "kern_BP", [10, 10, 10]),
+        # (210, 10, "kern_BP", [10, 10, 10]),
+        # (420, 10, "kern_BP", [10, 10, 10]),
+        # (420, 20, "kern_BP", [10, 10, 10]),
+        # (420, 40, "kern_BP", [10, 10, 10]),
+        # (420, 80, "kern_BP", [10, 10, 10]),
+        # (420, 160, "kern_BP", [10, 10, 10]),
+        (840, 10, "kern_BP", [10, 10, 10], True),
+        # (840, 20, "kern_BP", [10, 10, 10]),
+        # (840, 40, "kern_BP", [10, 10, 10], True),
+        (840, 40, "kern_BP", [10, 10, 10], False),
+        (840, 80, "kern_BP", [10, 10, 10], False),
+        # (840, 160, "kern_BP", [10, 10, 10], False),
+        # (840, 320, "kern_BP", [10, 10, 10], False),
     ],
     ids=[
-        "texture-105-10",
-        "texture-210-10",
-        "texture-420-10",
-        "texture-420-20",
-        "texture-420-40",
-        "texture-420-80",
-        "texture-420-160",
-        "texture-840-10",
-        "texture-840-20",
-        "texture-840-40",
-        "texture-840-41",
-        "texture-840-42",
+        # "texture-105-1",
+        # "texture-105-10",
+        # "texture-210-10",
+        # "texture-420-10",
+        # "texture-420-20",
+        # "texture-420-40",
+        # "texture-420-80",
+        # "texture-420-160",
+        "BP_840-10",
+        # "texture-840-20",
+        # "texture-840-40",
+        "BP_840-40-fast",
+        "BP_840-80-fast",
+        # "BP_840-160-fast",
+        # "BP_840-320-fast",
     ],
     scope="class",
 )
-class TestCB_BACKPROJ_texture_randomnoise:
+class TestCB_BACKPROJ_randomnoise:
     @pytest.fixture(scope="function", autouse=True)
     def setup_and_teardown(
         self,
@@ -302,12 +308,13 @@ class TestCB_BACKPROJ_texture_randomnoise:
         numprojs: int,
         kernel,  # noqa: ANN001
         blockdims: list[int | None],
+        exact: bool,
         request,  # noqa: ANN001
     ):
         kernel = request.getfixturevalue(kernel)
         # Set up configuration objects etc
         self.config = np.array(
-            (np.bool(True), volres / 2), dtype=ks_config.dtype
+            (np.bool(exact), np.bool(True), volres / 2), dtype=ks_config.dtype
         )
         num_projs = np.uint32(numprojs)
         detwid: int = int(4 / 5 * volres * 3)
@@ -364,29 +371,33 @@ class TestCB_BACKPROJ_texture_randomnoise:
         self.vol: cp.ndarray = cp.zeros(
             (volres, volres, volres), dtype=cp.float32
         )
-        self.vtex = texture_tools.Texture(
-            self.vol,
-            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
-            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
-            include_surface=True,
-            include_texture=True,
-            layered=False,
-        )
-        self.dtex = texture_tools.Texture(
-            self.input_projs,
-            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
-            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
-            include_surface=True,
-            include_texture=True,
-            layered=True,
-        )
+        if False:
+            self.vtex = texture_tools.Texture(
+                self.vol,
+                address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+                filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+                include_surface=True,
+                include_texture=True,
+                layered=False,
+            )
+            self.dtex = texture_tools.Texture(
+                self.input_projs,
+                address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+                filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+                include_surface=True,
+                include_texture=True,
+                layered=True,
+            )
+        else:
+            self.vtex = None
+            self.dtex = None
 
         # yield to the timed test
         cp.cuda.get_current_stream().synchronize()
         yield
 
         # Copy the data out of the texture
-        self.vtex.cuda_array.copy_to(self.vol)
+        # self.vtex.cuda_array.copy_to(self.vol)
         # Plot, if desired
         # imview.plot_volume(self.vol)
         # Clean up the used memory. This indeed seems to be necessary, as pytest doesn't do it automatically for some reason
@@ -446,6 +457,21 @@ class TestCB_BACKPROJ_texture_randomnoise:
             ),
             dtype=ks_vol_tex_chunk_spec.dtype,
         )
+        vol_chunk_spec = np.array(
+            (
+                np.uint64(self.vol.data.ptr),  # ptr_000
+                np.array(
+                    self.vol.strides, dtype=ks_uivec3.dtype
+                ),  # strides_bytes
+                np.array(vol.shape, dtype=ks_uivec3.dtype),  # shape
+                np.array(
+                    tuple((-np.array(vol.shape, dtype=np.float32) + 1) / 2),
+                    dtype=ks_fvec3.dtype,
+                ),  # pos_000 -- position of the CENTER of the 0,0,0 voxel
+            ),
+            dtype=ks_vol_spec.dtype,
+        )
+
         input_projs_data_pointer = np.uint64(input_projs.data.ptr)
         fun = self.kern
         for i in range(int(np.ceil(num_projs / proj_chunk_size))):
@@ -512,8 +538,9 @@ class TestCB_BACKPROJ_texture_randomnoise:
                 )
                 args = (  # input args
                     config,
-                    texchunkspec,
-                    self.vtex.surfobj,
+                    # texchunkspec,
+                    # self.vtex.surfobj,
+                    vol_chunk_spec,
                     input_proj_chunk_spec,
                     # input_proj_tex_chunk_spec,
                     # self.dtex.texobj,
@@ -530,4 +557,4 @@ class TestCB_BACKPROJ_texture_randomnoise:
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
-# ruff: enable[D101,D102,N801,ANN201]
+# ruff: enable[D101,D102,D103,N801,ANN201]

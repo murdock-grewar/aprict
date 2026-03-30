@@ -116,6 +116,8 @@ proj_tex_chunk_spec_maxlen10 = kern_structs.KernelStruct(
     ],
 )
 
+# Note: this now used by the projection only.
+# For the thing used by the backprojection, see 'vol_spec'. (This can also be used for chunks.)
 volume_chunk_spec = kern_structs.KernelStruct(
     struct_name="volume_chunk_spec",
     names=[
