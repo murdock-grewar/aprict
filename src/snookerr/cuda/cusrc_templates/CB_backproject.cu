@@ -105,29 +105,24 @@ __device__ fvec3 detpos(
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
-__global__ void backproject_CB(
+__device__ Tv _backproject_CB_getval(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
-        const vol_spec                  volchunkspec,
-        const proj_chunk_spec_maxlen10  proj_chunk_spec
+        const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
+        const uivec3                    vol_chunk_shape,
+        const proj_chunk_spec_maxlen10  proj_chunk_spec,
+        const uivec3                    vol_idx          // index of the voxel within the chunk, beginning from 0,0,0
 )
 {
-    // Get the position within the volume surface
-    const uivec3 vol_idx = uivec3(
-        threadIdx.x + blockIdx.x * blockDim.x,
-        threadIdx.y + blockIdx.y * blockDim.y,
-        threadIdx.z + blockIdx.z * blockDim.z
-    );
 
-    // Return if block is out of range
-    if ((vol_idx.x >= volchunkspec.shape.x) ||
-        (vol_idx.y >= volchunkspec.shape.y) ||
-        (vol_idx.z >= volchunkspec.shape.z)) {
-        return;
+    // Return 0 if block is out of range
+    if ((vol_idx.x >= vol_chunk_shape.x) ||
+        (vol_idx.y >= vol_chunk_shape.y) ||
+        (vol_idx.z >= vol_chunk_shape.z)) {
+        return 0.;
     }
 
-
     // Get the center position of this voxel
-    const fvec3 vox_pos = volchunkspec.pos_000 + vol_idx;
+    const fvec3 vox_pos = pos_000_c + vol_idx;
 
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
@@ -140,24 +135,11 @@ __global__ void backproject_CB(
     const uivec3    input_projs_strides = proj_chunk_spec.projmemstrides;
     const Tp*       input_projs         = (Tp*)proj_chunk_spec.projmemaddr;
     const unsigned short num_projs      = proj_chunk_spec.numprojs;
-    /*
-    const unsigned short num_projs          = proj_tex_chunk_spec.numprojs;
-    const unsigned int   tex_start_layer    = proj_tex_chunk_spec.tex_start_layer;
-    */
 
     // Reused structures
-    //proj_spec projspec;
     fvec3     source_pos;
     fvec3     det_pos;
     unsigned long det_idx;
-    Tp        det_value;
-    /*
-     * This also kills the performance of the kernel.
-    proj_spec proj_specs[10];
-    for (unsigned int proj_idx = proj_index_start; proj_idx < proj_index_start + num_projs; proj_idx++) {
-        proj_specs[proj_idx - proj_index_start] = projspecs[proj_idx];
-    }
-    projspec = proj_specs[0];*/
 
     const bool exact = config.exact_line_integ_backproj;
 
@@ -182,12 +164,6 @@ __global__ void backproject_CB(
         // Find the intersection with the detector of the ray passing through
         // the center of the voxel
         fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
-        /*
-        fvec3 det_pos_c    = projspec.dspec.pos + (
-            projspec.dspec.u * det_coords_c.x +
-            projspec.dspec.v * det_coords_c.y
-        );
-        */
 
         if (exact) {
             // Find the intersection with the detector of the ray passing through
@@ -222,7 +198,7 @@ __global__ void backproject_CB(
                         input_projs_strides.z * det_idx_y +
                         input_projs_strides.x * proj_idx
                     )/sizeof(Tp);
-                    det_value = input_projs[det_idx];
+                    Tp det_value = input_projs[det_idx];
 
                     /*
                     float det_value = tex2DLayered<Tp>(
@@ -251,7 +227,7 @@ __global__ void backproject_CB(
                 input_projs_strides.z * det_idx_y +
                 input_projs_strides.x * proj_idx
             )/sizeof(Tp);
-            det_value = input_projs[det_idx];
+            Tp det_value = input_projs[det_idx];
             // Compute the physical distance to the source
             fvec3 det_pos      = projspec.dspec.pos + (
                 projspec.dspec.u * det_coords_c.x +
@@ -266,8 +242,38 @@ __global__ void backproject_CB(
         }
     }
 
+    return accumulator;
+}
+
+
+template<
+    typename Tv,  // type of volume data. e.g. float or double.
+    typename Tp>  // type of projection data. e.g. float or double
+__global__ void backproject_CB_volmem(
+        const config_CB_backproject     config,          // any miscellaneous config for the CB projection
+        const vol_spec                  volchunkspec,    // note: NOT of type volume_chunk_spec
+        const proj_chunk_spec_maxlen10  proj_chunk_spec
+)
+{
+    // Get the position within the chunk
+    const uivec3 vol_idx = uivec3(
+        threadIdx.x + blockIdx.x * blockDim.x,
+        threadIdx.y + blockIdx.y * blockDim.y,
+        threadIdx.z + blockIdx.z * blockDim.z
+    );
+    const uivec3 vol_chunk_shape = volchunkspec.shape;
+    const fvec3  pos_000_c       = volchunkspec.pos_000;
+
+    const Tv value = _backproject_CB_getval<Tv,Tp>(
+        config,
+        pos_000_c,
+        vol_chunk_shape,
+        proj_chunk_spec,
+        vol_idx
+    );
+
     // Write the value to the surface memory and leave
-    if (accumulator == 0) { return; }
+    if (value == 0) { return; }
     Tv* volume = (Tv*)volchunkspec.ptr_000;
     unsigned long vol_idx_addr = (
         volchunkspec.strides_bytes.x * (vol_idx.x) +
@@ -276,6 +282,51 @@ __global__ void backproject_CB(
     )/sizeof(Tv);
     atomicAdd(
         &volume[vol_idx_addr],
-        accumulator
+        value
+    );
+}
+
+
+template<
+    typename Tv,  // type of volume data. e.g. float or double.
+    typename Tp>  // type of projection data. e.g. float or double
+__global__ void backproject_CB_voltex(
+        const config_CB_backproject     config,          // any miscellaneous config for the CB projection
+        const vol_tex_chunk_spec        voltexchunkspec,
+        const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
+        const proj_chunk_spec_maxlen10  proj_chunk_spec
+)
+{
+    // Get the position within the chunk
+    const uivec3 vol_idx = uivec3(
+        threadIdx.x + blockIdx.x * blockDim.x,
+        threadIdx.y + blockIdx.y * blockDim.y,
+        threadIdx.z + blockIdx.z * blockDim.z
+    );
+    const uivec3 vol_chunk_shape = voltexchunkspec.shape;
+    const fvec3  pos_000_c       = voltexchunkspec.texpos + fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets;
+
+    Tv value = _backproject_CB_getval<Tv,Tp>(
+        config,
+        pos_000_c,
+        vol_chunk_shape,
+        proj_chunk_spec,
+        vol_idx
+    );
+
+    // Write the value to the surface memory and leave
+    if (value == 0) { return; }
+    value += surf3Dread<Tv>(
+        volume_surface,
+        (vol_idx.z + voltexchunkspec.offsets.z) * sizeof(Tv),
+        vol_idx.y + voltexchunkspec.offsets.y,
+        vol_idx.x + voltexchunkspec.offsets.x
+    );
+    surf3Dwrite(
+        value,
+        volume_surface,
+        (vol_idx.z + voltexchunkspec.offsets.z) * sizeof(Tv),
+        vol_idx.y + voltexchunkspec.offsets.y,
+        vol_idx.x + voltexchunkspec.offsets.x
     );
 }

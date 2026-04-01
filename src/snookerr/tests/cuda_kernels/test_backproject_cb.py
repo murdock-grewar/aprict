@@ -34,7 +34,6 @@ from ...cuda.structs import (
     vol_spec as ks_vol_spec,
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
     proj_chunk_spec_maxlen10 as ks_proj_chunk_spec_maxlen10,
-    proj_tex_chunk_spec_maxlen10 as ks_proj_tex_chunk_spec_maxlen10,
 )
 from ...lib import gpu_tools, texture_tools
 
@@ -73,9 +72,12 @@ def create_injected_module_backproject() -> cp.RawModule:
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_backproject.cu",
         name_expressions=[
-            "backproject_CB<float,float>",
-            "backproject_CB<float,half>",
-            "backproject_CB<float,double>",
+            "backproject_CB_volmem<float,float>",
+            "backproject_CB_volmem<float,half>",
+            "backproject_CB_volmem<float,double>",
+            "backproject_CB_voltex<float,float>",
+            "backproject_CB_voltex<float,half>",
+            "backproject_CB_voltex<float,double>",
         ],
     )
     module.compile()
@@ -91,9 +93,15 @@ def kern_BP_sharedmem():  # noqa: N802
 
 
 @pytest.fixture()
-def kern_BP():  # noqa: N802
+def kern_BP_volmem():  # noqa: N802
     module = create_injected_module_backproject()
-    return module.get_function("backproject_CB<float,float>")
+    return module.get_function("backproject_CB_volmem<float,float>")
+
+
+@pytest.fixture()
+def kern_BP_voltex():  # noqa: N802
+    module = create_injected_module_backproject()
+    return module.get_function("backproject_CB_voltex<float,float>")
 
 
 @pytest.mark.parametrize(
@@ -264,40 +272,22 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
 
 
 @pytest.mark.parametrize(
-    argnames=["volres", "numprojs", "kernel", "blockdims", "exact"],
+    argnames=["volres", "numprojs", "use_voltex", "blockdims", "exact"],
     argvalues=[
-        # (105, 1, "kern_BP", [10, 10, 10]),
-        # (105, 10, "kern_BP", [10, 10, 10]),
-        # (210, 10, "kern_BP", [10, 10, 10]),
-        # (420, 10, "kern_BP", [10, 10, 10]),
-        # (420, 20, "kern_BP", [10, 10, 10]),
-        (420, 40, "kern_BP", [10, 10, 10], True),
-        # (420, 80, "kern_BP", [10, 10, 10]),
-        # (420, 160, "kern_BP", [10, 10, 10]),
-        # (840, 10, "kern_BP", [10, 10, 10], True),
-        # (840, 20, "kern_BP", [10, 10, 10]),
-        # (840, 40, "kern_BP", [10, 10, 10], True),
-        (840, 40, "kern_BP", [10, 10, 10], False),
-        (840, 80, "kern_BP", [10, 10, 10], False),
-        # (840, 160, "kern_BP", [10, 10, 10], False),
-        # (840, 320, "kern_BP", [10, 10, 10], False),
+        (420, 20, False, [10, 10, 10], True),
+        (840, 20, False, [10, 10, 10], False),
+        (840, 40, False, [10, 10, 10], False),
+        (420, 20, True, [10, 10, 10], True),
+        (840, 20, True, [10, 10, 10], False),
+        (840, 40, True, [10, 10, 10], False),
     ],
     ids=[
-        # "texture-105-1",
-        # "texture-105-10",
-        # "texture-210-10",
-        # "texture-420-10",
-        # "texture-420-20",
-        "BP_420-40",
-        # "texture-420-80",
-        # "texture-420-160",
-        # "BP_840-10",
-        # "texture-840-20",
-        # "texture-840-40",
-        "BP_840-40-fast",
-        "BP_840-80-fast",
-        # "BP_840-160-fast",
-        # "BP_840-320-fast",
+        "BP_mem_420-20",
+        "BP_mem_840-20-fast",
+        "BP_mem_840-40-fast",
+        "BP_tex_420-20",
+        "BP_tex_840-20-fast",
+        "BP_tex_840-40-fast",
     ],
     scope="class",
 )
@@ -307,12 +297,17 @@ class TestCB_BACKPROJ_randomnoise:
         self,
         volres: int,
         numprojs: int,
-        kernel,  # noqa: ANN001
+        use_voltex: bool,
         blockdims: list[int | None],
         exact: bool,
         request,  # noqa: ANN001
     ):
-        kernel = request.getfixturevalue(kernel)
+        if use_voltex:
+            self.usevoltex: bool = True
+            kernel = request.getfixturevalue("kern_BP_voltex")
+        else:
+            self.usevoltex: bool = False
+            kernel = request.getfixturevalue("kern_BP_volmem")
         # Set up configuration objects etc
         self.config = np.array(
             (np.bool(exact), np.bool(True), volres / 2), dtype=ks_config.dtype
@@ -372,7 +367,7 @@ class TestCB_BACKPROJ_randomnoise:
         self.vol: cp.ndarray = cp.zeros(
             (volres, volres, volres), dtype=cp.float32
         )
-        if False:
+        if self.usevoltex:
             self.vtex = texture_tools.Texture(
                 self.vol,
                 address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
@@ -398,7 +393,8 @@ class TestCB_BACKPROJ_randomnoise:
         yield
 
         # Copy the data out of the texture
-        # self.vtex.cuda_array.copy_to(self.vol)
+        if self.usevoltex:
+            self.vtex.cuda_array.copy_to(self.vol)  # ty:ignore[unresolved-attribute]
         # Plot, if desired
         # imview.plot_volume(self.vol)
         # Clean up the used memory. This indeed seems to be necessary, as pytest doesn't do it automatically for some reason
@@ -441,7 +437,6 @@ class TestCB_BACKPROJ_randomnoise:
                     (0, 0, 0),
                     dtype=ks_uivec3.dtype,
                 ),  # offsets
-                # I don't think I really need the shape after all...
                 # the texture fetching will return 0 if out of bounds of the texture.
                 np.array(
                     (
@@ -474,7 +469,12 @@ class TestCB_BACKPROJ_randomnoise:
         )
 
         input_projs_data_pointer = np.uint64(input_projs.data.ptr)
-        fun = self.kern
+        grid_dims = (
+            int(np.ceil(vol.shape[0] / volblockx)),
+            int(np.ceil(vol.shape[1] / volblocky)),
+            int(np.ceil(vol.shape[2] / volblockz)),
+        )  # gridDims:  (x,y,z)
+        block_dims = (volblockx, volblocky, volblockz)
         for i in range(int(np.ceil(num_projs / proj_chunk_size))):
             # Create the projection chunk specification
             chunk_num_projs = min(
@@ -488,73 +488,35 @@ class TestCB_BACKPROJ_randomnoise:
             projspec_array_chunk.extend(
                 [projspec_array_chunk[-1]] * (10 - chunk_num_projs)
             )  # repeat the last projspec to fill up a whole chunk of 10.
-            if False:
-                input_proj_tex_chunk_spec = np.array(
-                    (
-                        np.array(
-                            projspec_array_chunk, dtype=ks_proj_spec
-                        ),  # projspecs
-                        np.uint8(chunk_num_projs),  # numprojs
-                        np.uint32(i * proj_chunk_size),  # tex start layer
-                        # np.uint64(
-                        #     input_projs_data_pointer +
-                        #     i*proj_chunk_size*input_projs.strides[0]
-                        # ),  # projmemaddr
-                        # input_projs_strides_bytes,  # projmemstrides
-                    ),
-                    dtype=ks_proj_tex_chunk_spec_maxlen10,
-                )
+            input_proj_chunk_spec = np.array(
+                (
+                    np.array(
+                        projspec_array_chunk, dtype=ks_proj_spec
+                    ),  # projspecs
+                    np.uint8(chunk_num_projs),  # numprojs
+                    # np.uint32(i*proj_chunk_size),  # tex start layer
+                    np.uint64(
+                        input_projs_data_pointer
+                        + i * proj_chunk_size * input_projs.strides[0]
+                    ),  # projmemaddr
+                    input_projs_strides_bytes,  # projmemstrides
+                ),
+                dtype=ks_proj_chunk_spec_maxlen10,
+            )
+            if self.usevoltex:
                 args = (  # input args
                     config,
                     texchunkspec,
-                    self.vtex.surfobj,
-                    # input_proj_chunk_spec,
-                    input_proj_tex_chunk_spec,
-                    self.dtex.texobj,
-                )
-                fun(
-                    (
-                        int(np.ceil(vol.shape[0] / volblockx)),
-                        int(np.ceil(vol.shape[1] / volblocky)),
-                        int(np.ceil(vol.shape[2] / volblockz)),
-                    ),  # gridDims:  (x,y,z)
-                    (volblockx, volblocky, volblockz),  # blockDims: (x,y,z)
-                    args,
+                    self.vtex.surfobj,  # ty:ignore[unresolved-attribute]
+                    input_proj_chunk_spec,
                 )
             else:
-                input_proj_chunk_spec = np.array(
-                    (
-                        np.array(
-                            projspec_array_chunk, dtype=ks_proj_spec
-                        ),  # projspecs
-                        np.uint8(chunk_num_projs),  # numprojs
-                        # np.uint32(i*proj_chunk_size),  # tex start layer
-                        np.uint64(
-                            input_projs_data_pointer
-                            + i * proj_chunk_size * input_projs.strides[0]
-                        ),  # projmemaddr
-                        input_projs_strides_bytes,  # projmemstrides
-                    ),
-                    dtype=ks_proj_chunk_spec_maxlen10,
-                )
                 args = (  # input args
                     config,
-                    # texchunkspec,
-                    # self.vtex.surfobj,
                     vol_chunk_spec,
                     input_proj_chunk_spec,
-                    # input_proj_tex_chunk_spec,
-                    # self.dtex.texobj,
                 )
-                fun(
-                    (
-                        int(np.ceil(vol.shape[0] / volblockx)),
-                        int(np.ceil(vol.shape[1] / volblocky)),
-                        int(np.ceil(vol.shape[2] / volblockz)),
-                    ),  # gridDims:  (x,y,z)
-                    (volblockx, volblocky, volblockz),  # blockDims: (x,y,z)
-                    args,
-                )
+            self.kern(grid_dims, block_dims, args)
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
