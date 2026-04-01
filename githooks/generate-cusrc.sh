@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-python -m snookerr.cuda._generate_cusrc
+SNOOKERR_BUILDMODE=1 python -m snookerr.cuda._generate_cusrc

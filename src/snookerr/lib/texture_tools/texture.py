@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Tools to interact with CUDA textures/surfaces."""
+"""Texture type to encapsulate CUDA textures and surfaces."""
 
 import enum
 import itertools
@@ -21,6 +21,12 @@ import math
 
 import cupy as cp
 import numpy as np
+
+__all__ = [
+    "AddressMode",
+    "FilterMode",
+    "Texture",
+]
 
 # CUDA doesn't seem to support 64-bit floats in channel descriptors. See https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__HIGHLEVEL.html#group__CUDART__HIGHLEVEL_1g655725c27d8ffe75accb9b531ecf2d15 where it says "The template function specializes for the following scalar types: char, signed char, unsigned char, short, unsigned short, int, unsigned int, long, unsigned long, and float." Note that double isn't listed. When I try a double, I get 'cudaErrorInvalidChannelDescriptor'.
 # Despite the documentation saying that long and unsigned long should be supported, that doesn't seem to be the case, as I get the same error. I'm not sure why that is.
@@ -88,6 +94,7 @@ class Texture:
     cuda_array: cp.cuda.texture.CUDAarray
     shape: tuple[int, int] | tuple[int, int, int]
     nbytes: int
+    dtype: np.dtype
 
     @property
     def is_flagset_layered(self) -> bool:
@@ -321,3 +328,4 @@ class Texture:
         self.nbytes = nbytes
         self.cuda_array = cuda_arr
         self.shape = shape
+        self.dtype = dtype

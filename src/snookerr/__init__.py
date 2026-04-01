@@ -15,4 +15,19 @@
 
 """Main module."""
 
-from . import image_view as imview  # noqa: F401
+# If we are just running the build script, then I don't want to initialise anything,
+# because the imports fail because it hasn't built yet.
+
+import os as _os
+
+if _os.environ.get("SNOOKERR_BUILDMODE", ""):  # noqa: RUF067
+    pass
+else:
+    del _os
+    from . import image_view as imview
+    from .volume import Volume
+
+    __all__ = [
+        "Volume",
+        "imview",
+    ]

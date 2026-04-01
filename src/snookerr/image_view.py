@@ -1,4 +1,4 @@
-# ImageView.py
+# image_view.py
 # Copyright (C) 2024-2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify

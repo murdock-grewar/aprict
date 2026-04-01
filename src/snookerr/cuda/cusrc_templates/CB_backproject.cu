@@ -316,6 +316,7 @@ __global__ void backproject_CB_voltex(
 
     // Write the value to the surface memory and leave
     if (value == 0) { return; }
+    // Fetch the number of bytes per element. This is needed to write to the correct location.
     value += surf3Dread<Tv>(
         volume_surface,
         (vol_idx.z + voltexchunkspec.offsets.z) * sizeof(Tv),
