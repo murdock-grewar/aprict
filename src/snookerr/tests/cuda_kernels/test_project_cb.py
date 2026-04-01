@@ -70,8 +70,10 @@ def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_texture_chunked.cu",
         name_expressions=[
-            "project_CB_texture_chunked<float,float>",
-            "project_CB_texture_chunked<float,double>",
+            f"project_CB_texture_chunked<{t1:s},{t2:s}>"
+            for t1, t2 in itertools.product(
+                ["half", "float"], ["float", "double"]
+            )
         ],
     )
     module.compile()
@@ -415,6 +417,7 @@ class TestCB_texture_randomnoise:
         self.detwid = detwid
 
     def teardown_method(self) -> None:
+        # imview.plot_projections(self.output_projs)
         self.output_projs.fill(0)
 
     @pytest.mark.parametrize(
@@ -487,7 +490,7 @@ class TestCB_texture_randomnoise:
                     projspec_array,
                     np.uint32(num_projs),
                     texchunkspec,
-                    vtex.texobj,
+                    vtex.surfobj,
                     output_projs_strides_bytes,
                     np.uint64(output_projs.data.ptr),
                 ),
@@ -508,16 +511,35 @@ class TestCB_texture_randomnoise:
         cp.testing.assert_array_almost_equal(output_projs[:, :, -1], 0)
 
 
-@pytest.mark.parametrize("volres", [156, 312])  # , 625])  # , 1250])
+@pytest.mark.parametrize(
+    argnames=["volres", "dtype_vol"],
+    argvalues=[
+        (156, np.float32),
+        (312, np.float32),
+        # (625, np.float32),
+        (156, np.float16),
+        (312, np.float16),
+        # (625, np.float16),
+    ],  # , 625])  # , 1250])
+    ids=[
+        "project-FORBILD-156-fp32",
+        "project-FORBILD-312-fp32",
+        # "project-FORBILD-625-fp32",
+        "project-FORBILD-156-fp16",
+        "project-FORBILD-312-fp16",
+        # "project-FORBILD-625-fp16",
+    ],
+)
 class TestCB_texture_FORBILD:
     @pytest.fixture(scope="function", autouse=True)
-    def setup_and_teardown(self, volres: int):
+    def setup_and_teardown(self, volres: int, dtype_vol: np.dtype, request):  # noqa: ANN001
+        test_id: str = request.node.callspec.id  # noqa: F841
         # Setup phase
         # Get the FORBILD phantom.
         v, voxwid_mm = phantoms_FORBILD.FORBILD_HU(volres)  # noqa: RUF059
         # Convert from Hounsfield units to attenuation coefficient
         # v = v[:,:,v.shape[2]//4:-(v.shape[2]//4)]
-        self.vol = np.empty(v.shape, dtype=np.float32)
+        self.vol = np.empty(v.shape, dtype=dtype_vol)
         ne.evaluate("(v/1000 + 1)*0.02*voxwid_mm", out=self.vol)
         # Create a texture
         self.vtex = texture_tools.Texture(
@@ -544,7 +566,7 @@ class TestCB_texture_FORBILD:
                 (
                     1750 * volres / 2501 * np.cos(theta),
                     1750 * volres / 2501 * np.sin(theta),
-                    0,
+                    (theta - np.pi) * volres,
                 ),
                 dtype=ks_fvec3.dtype,
             )
@@ -572,8 +594,11 @@ class TestCB_texture_FORBILD:
             projspec_array.append(projspec)
         self.projspec_array = cp.array(projspec_array)
         self.module = injected_module_texture_chunked()
+        tdict = {np.dtype(np.float32): "float", np.dtype(np.float16): "half"}
         self.kern = self.module.get_function(
-            "project_CB_texture_chunked<float,float>"
+            "project_CB_texture_chunked<"
+            + tdict[np.dtype(dtype_vol)]
+            + ",float>"
         )
 
         # yield to the timed test
@@ -581,7 +606,7 @@ class TestCB_texture_FORBILD:
         yield
 
         # Teardown phase
-        # imview.plot_projections(self.output_projs)
+        # imview.plot_projections(self.output_projs, title=test_id)
         self.output_projs.fill(0)
 
     def test_project(self, volres: int) -> None:  # noqa: ARG002
@@ -613,7 +638,7 @@ class TestCB_texture_FORBILD:
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
                 texchunkspec,
-                self.vtex.texobj,
+                self.vtex.surfobj,
                 self.output_projs_strides_bytes,
                 np.uint64(self.output_projs.data.ptr),
             ),

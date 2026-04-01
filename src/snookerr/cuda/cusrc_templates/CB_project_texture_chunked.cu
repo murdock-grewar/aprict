@@ -1,4 +1,5 @@
 #include <cuda/atomic>
+#include <cuda_fp16.h>
 
 #include "base.h"
 #include "geometry.h"
@@ -16,6 +17,80 @@ typedef struct {
 } LineIntegState;
 
 
+/* Note on the 'half' type, used for 16-bit floating point precision:
+ * The texture writing function, 'surf3Dwrite' or 'surf2Dwrite', doesn't support
+ * input values of type 'half'. So, I wrote the function below which has a template
+ * specialisation to the 'half' type. It allows us to write halfs to the texture
+ * by temporarily converting them to unsigned shorts, using CUDA's fp16 API included
+ * with #include <cuda_fp16.h>.
+ */
+// See https://en.cppreference.com/w/cpp/language/partial_specialization.html for partial
+// template specialisation
+template<typename T, typename V>
+__device__ void write_to_surf3D(
+    T                       value,
+    cudaSurfaceObject_t     surface,
+    V                       idx
+)
+{ surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x); }
+
+template<typename V>
+__device__ void write_to_surf3D<half, V>(
+    half                    value,
+    cudaSurfaceObject_t     surface,
+    V                       idx
+)
+{ write_to_surf3D<unsigned short, V>(__half_as_ushort(value), surface, idx); }
+
+// I don't know why this template partial specialisation fails.
+/*
+template<typename T, typename V>
+__device__ T read_from_surf3D(
+    cudaSurfaceObject_t     surface,
+    V                       idx
+)
+{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+
+template<typename V>
+__device__ half read_from_surf3D<half, V>(
+    cudaSurfaceObject_t     surface,
+    V                       idx
+)
+{ return __ushort_as_half(read_from_surf3D<unsigned short, V>(surface, idx)); }
+*/
+// Using this as a hotfix
+template<typename T>
+__device__ T read_from_surf3D(
+    cudaSurfaceObject_t     surface,
+    int3                    idx
+)
+{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+
+template<>
+__device__ half read_from_surf3D<half>(
+    cudaSurfaceObject_t     surface,
+    int3                    idx
+)
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+
+
+// WARNING on reading from a texture: I believe the texture is internally converted to a 32-bit float type before interpolation... something like that... be wary of potential issues reading from a texture in the fp16/half format.
+/* I have not tested this code
+template<typename T, V>
+__device__ T read_from_tex3D(
+    cudaTextureObject_t     tex,
+    V                       coords
+)
+{ return tex3D<T>(tex, coords.z, coords.y, coords.x); }
+
+template<>
+__device__ half read_from_tex3D<half>(
+    cudaTextureObject_t     tex,
+    V                       coords
+)
+{ return __ushort_as_half(read_from_tex3D<unsigned short>(surface, coords)); }
+*/
+
 template<
     typename Tv,
     typename Tp>  // type of projection data. e.g. float or double
@@ -23,7 +98,7 @@ __device__ Tp exact_line_integral(
         const fvec3                 v1,
         const fvec3                 v2,
         const vol_tex_chunk_spec    texchunkspec,
-        cudaTextureObject_t         volume_texture,
+        cudaSurfaceObject_t         volume_surface,
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
         const bool                  return_false_steps = false)
 {
@@ -73,7 +148,7 @@ __device__ Tp exact_line_integral(
     float steps_to_end = 1.f; // By definition of lis.dx,dy,dz, a single step goes from start to end.
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
-    int idx_x, idx_y, idx_z;
+    int3  vol_idx;
     //// Skip to the first intersection with the volume (plus an extra voxel for safety)
     float advance_steps = 0;
     if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 1./2. - lis.x)/lis.dx); }
@@ -148,25 +223,20 @@ __device__ Tp exact_line_integral(
             lis.z = nextzbound;
         }
 
-        idx_x = ((int)nextxbound - ((1+xdir)/2)); // x index in surface
-        idx_y = ((int)nextybound - ((1+ydir)/2)); // y index in surface
-        idx_z = ((int)nextzbound - ((1+zdir)/2)); // z index in surface
+        vol_idx.x = ((int)nextxbound - ((1+xdir)/2)); // x index in surface
+        vol_idx.y = ((int)nextybound - ((1+ydir)/2)); // y index in surface
+        vol_idx.z = ((int)nextzbound - ((1+zdir)/2)); // z index in surface
 
         if ( // Don't integrate the volume outside the bounds of the chunk!
-            (idx_x >= texchunkspec.offsets.x) && (idx_x < texchunkspec.offsets.x + texchunkspec.shape.x) &&
-            (idx_y >= texchunkspec.offsets.y) && (idx_y < texchunkspec.offsets.y + texchunkspec.shape.y) &&
-            (idx_z >= texchunkspec.offsets.z) && (idx_z < texchunkspec.offsets.z + texchunkspec.shape.z)
+            (vol_idx.x >= texchunkspec.offsets.x) && (vol_idx.x < texchunkspec.offsets.x + texchunkspec.shape.x) &&
+            (vol_idx.y >= texchunkspec.offsets.y) && (vol_idx.y < texchunkspec.offsets.y + texchunkspec.shape.y) &&
+            (vol_idx.z >= texchunkspec.offsets.z) && (vol_idx.z < texchunkspec.offsets.z + texchunkspec.shape.z)
         ) {
             if (!return_false_steps) {
                 if (steps_to_take < 0) {
                     printf("Negative value encountered! %.3f\n", steps_to_take);
                 }
-                accum_val += steps_to_take * tex3D<Tv>(
-                    volume_texture,
-                    1.f/2.f + idx_z,  // z index in texture
-                    1.f/2.f + idx_y,  // y index in texture
-                    1.f/2.f + idx_x   // x index in surface
-                );
+                accum_val += steps_to_take * (Tp)read_from_surf3D<Tv>(volume_surface, vol_idx);
             }
         } else {
             if (return_false_steps) {
@@ -210,7 +280,7 @@ __global__ void project_CB_texture_chunked(
         const proj_spec*          projspecs,       // contains the source and detector configurations
         const unsigned int        num_projs,       // length of projspecs array
         const vol_tex_chunk_spec  texchunkspec,
-        cudaTextureObject_t       volume_texture,
+        cudaSurfaceObject_t       volume_surface,
         const uivec3              output_projs_strides,
         Tp*                       output_projs
 )
@@ -253,7 +323,7 @@ __global__ void project_CB_texture_chunked(
     // ...
     Tp val = 0;
     val = exact_line_integral<Tv, Tp>(
-            source_pos, det_pos, texchunkspec, volume_texture);
+        source_pos, det_pos, texchunkspec, volume_surface);
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

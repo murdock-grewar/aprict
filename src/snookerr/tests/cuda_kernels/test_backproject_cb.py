@@ -75,9 +75,12 @@ def create_injected_module_backproject() -> cp.RawModule:
             "backproject_CB_volmem<float,float>",
             "backproject_CB_volmem<float,half>",
             "backproject_CB_volmem<float,double>",
-            "backproject_CB_voltex<float,float>",
-            "backproject_CB_voltex<float,half>",
-            "backproject_CB_voltex<float,double>",
+        ]
+        + [
+            f"backproject_CB_voltex<{t1:s},{t2:s}>"
+            for t1, t2 in itertools.product(
+                ["half", "float"], ["half", "float", "double"]
+            )
         ],
     )
     module.compile()
@@ -125,6 +128,7 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
         request,  # noqa: ANN001
     ):
         kernel = request.getfixturevalue(kernel)
+        test_id: str = request.node.callspec.id  # noqa: F841
         # Set up configuration objects etc
         num_projs = np.uint32(10)
         detwid: int = int(4 / 5 * volres * 3)
@@ -186,7 +190,7 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
         cp.cuda.get_current_stream().synchronize()
         yield
 
-        # imview.plot_volume(self.vol)
+        # imview.plot_volume(self.vol, title=test_id)
         # self.vol.fill(0)
 
     # @pytest.mark.parametrize(
@@ -302,6 +306,7 @@ class TestCB_BACKPROJ_randomnoise:
         exact: bool,
         request,  # noqa: ANN001
     ):
+        test_id: str = request.node.callspec.id  # noqa: F841
         if use_voltex:
             self.usevoltex: bool = True
             kernel = request.getfixturevalue("kern_BP_voltex")
@@ -396,7 +401,7 @@ class TestCB_BACKPROJ_randomnoise:
         if self.usevoltex:
             self.vtex.cuda_array.copy_to(self.vol)  # ty:ignore[unresolved-attribute]
         # Plot, if desired
-        # imview.plot_volume(self.vol)
+        # imview.plot_volume(self.vol, title=test_id)
         # Clean up the used memory. This indeed seems to be necessary, as pytest doesn't do it automatically for some reason
         del self.input_projs
         del self.vol

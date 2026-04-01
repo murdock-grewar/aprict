@@ -9,6 +9,7 @@
  */
 
 #include <cuda/atomic>
+#include <cuda_fp16.h>
 
 #include "base.h"
 #include "geometry.h"
@@ -34,6 +35,41 @@ __device__ T powint(T base, short exponent) {
 template <typename T> float sgn(const T val) {
     return (T(0) < val) - (val < T(0));
 }
+
+/* Note on the 'half' type, used for 16-bit floating point precision:
+ * The texture writing function, 'surf3Dwrite' or 'surf2Dwrite', doesn't support
+ * input values of type 'half'. So, I wrote the function below which has a template
+ * specialisation to the 'half' type. It allows us to write halfs to the texture
+ * by temporarily converting them to unsigned shorts, using CUDA's fp16 API included
+ * with #include <cuda_fp16.h>.
+ */
+template<typename T>
+__device__ void write_to_surf3D(
+    T                       value,
+    cudaSurfaceObject_t     surface,
+    uivec3                  idx
+)
+{ surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x); }
+template<>
+__device__ void write_to_surf3D<half>(
+    half                    value,
+    cudaSurfaceObject_t     surface,
+    uivec3                  idx
+)
+{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx); }
+template<typename T>
+__device__ T read_from_surf3D(
+    cudaSurfaceObject_t     surface,
+    uivec3                  idx
+)
+{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+template<>
+__device__ half read_from_surf3D<half>(
+    cudaSurfaceObject_t     surface,
+    uivec3                  idx
+)
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+
 
 template<
     typename Tv,  // type of volume data. e.g. float or double.
@@ -127,7 +163,7 @@ __device__ Tv _backproject_CB_getval(
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
         if ((vox_pos.x*vox_pos.x + vox_pos.y*vox_pos.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
-            return;
+            return 0;
         }
     }
 
@@ -138,7 +174,6 @@ __device__ Tv _backproject_CB_getval(
 
     // Reused structures
     fvec3     source_pos;
-    fvec3     det_pos;
     unsigned long det_idx;
 
     const bool exact = config.exact_line_integ_backproj;
@@ -273,7 +308,7 @@ __global__ void backproject_CB_volmem(
     );
 
     // Write the value to the surface memory and leave
-    if (value == 0) { return; }
+    if (value == (Tv)0) { return; }  // Generally not safe to typecast a number to the half type, but OK when 0.
     Tv* volume = (Tv*)volchunkspec.ptr_000;
     unsigned long vol_idx_addr = (
         volchunkspec.strides_bytes.x * (vol_idx.x) +
@@ -315,19 +350,7 @@ __global__ void backproject_CB_voltex(
     );
 
     // Write the value to the surface memory and leave
-    if (value == 0) { return; }
-    // Fetch the number of bytes per element. This is needed to write to the correct location.
-    value += surf3Dread<Tv>(
-        volume_surface,
-        (vol_idx.z + voltexchunkspec.offsets.z) * sizeof(Tv),
-        vol_idx.y + voltexchunkspec.offsets.y,
-        vol_idx.x + voltexchunkspec.offsets.x
-    );
-    surf3Dwrite(
-        value,
-        volume_surface,
-        (vol_idx.z + voltexchunkspec.offsets.z) * sizeof(Tv),
-        vol_idx.y + voltexchunkspec.offsets.y,
-        vol_idx.x + voltexchunkspec.offsets.x
-    );
+    if (value == (Tv)0) { return; }  // Generally not safe to typecast a number to the half type, but OK when 0.
+    value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
+    write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
 }
