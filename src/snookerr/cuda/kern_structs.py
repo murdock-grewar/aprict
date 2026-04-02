@@ -17,12 +17,15 @@
 
 from __future__ import annotations
 
+import abc
+import inspect
 import pathlib
 import re
 import typing
 
 import cupy as cp
 import numpy as np
+import numpy.typing as npt
 
 _valid_C_identifier_regex = re.compile(r"[_a-zA-Z]+\w*")  # noqa: N816
 
@@ -46,121 +49,15 @@ _np_dtype_to_c_type = {
 # fmt: on
 
 
-class KernelStruct:
+class KernelStruct(
+    abc.ABC
+):  # , np.generic):  # adding 'np.generic' here helps with dtyping with ty, but it breaks the creation of the data structures, for some reason.
     """A custom numpy dtype with a corresponding C structure."""
 
     struct_name: str
     dtype: np.dtype
     struct_definition_c: str
     dependent_structs: list[KernelStruct]
-
-    def __init__(
-        self,
-        struct_name: str,
-        *,
-        names: tuple[str] | list[str],
-        dtypes: tuple[type | KernelStruct | KernelArray]
-        | list[
-            type | KernelStruct | KernelArray
-        ],  # input a list/tuple of np.dtypes and/or KernelStructs.
-        force_dependencies: list[KernelStruct] | None = None,
-        insert_into_struct: str
-        | None = None,  # extra code to put INSIDE the struct. Useful for defining implicit constuctors and the like
-        extra_code: str
-        | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
-    ) -> None:
-
-        # Validate inputs #
-        if len(names) != len(dtypes):
-            msg = f"Mismatch in length of `names` and `dtypes`. Names: {names}. dtypes: {dtypes}"
-            raise ValueError(msg)
-        # Test that all 'dtypes' can actually be interpreted by numpy as dtypes
-        for dtype in dtypes:
-            np.dtype(dtype)  # May raise a TypeError. This is intentional.
-        ###################
-
-        tuples_type_name = list(zip(dtypes, names))
-
-        dtype_to_cname_dict: dict[np.dtype | KernelStruct, str] = dict(
-            _np_dtype_to_c_type.items()
-        )  # Create copy
-
-        self.dependent_structs = [  # ty:ignore[invalid-assignment]  # ty is wrong here
-            k if type(k) is KernelStruct else k.member_dtype  # ty:ignore[unresolved-attribute] # ty is wrong here
-            for k in dtypes
-            if (
-                type(k) is KernelStruct
-                or (
-                    type(k) is KernelArray
-                    and type(k.member_dtype) is KernelStruct
-                )
-            )
-        ]
-        if force_dependencies is not None:
-            self.dependent_structs.extend([t for t in force_dependencies])  # noqa: C416
-        # Add the dependents of dependents. Make sure it's ordered, with base dependencies on the left.
-        for i in list(reversed(range(len(self.dependent_structs)))):
-            ks: KernelStruct = self.dependent_structs[i]
-            self.dependent_structs = (
-                self.dependent_structs[:i]
-                + ks.dependent_structs
-                + self.dependent_structs[i:]
-            )
-        # Now remove duplicates, keeping the first-encountered copy of each
-        seen = set()
-        self.dependent_structs = [
-            ks
-            for ks in self.dependent_structs
-            if not (ks in seen or seen.add(ks))
-        ]
-
-        dtype_to_cname_dict.update(
-            {ks: ks.struct_name for ks in self.dependent_structs}
-        )
-
-        self.struct_name = struct_name
-        self.struct_definition_c = self._struct_definition(
-            dtype_to_cname_dict,
-            struct_name,
-            insert_into_struct,
-            *tuples_type_name,
-        ) + ("" if extra_code is None else extra_code)
-
-        # Run a CUDA kernel with the appropriate set of arguments, and find out
-        # how CUDA arranges the offsets in memory of the various members. We'll
-        # need this to define the custom np.dtype.
-        #  itemsize -> overall struct size
-        #  sizes    -> individual struct member sizes, determined with sizeof
-        #  offsets  -> individual struct member offsets, determined with offsetof
-        num_members = len(tuples_type_name)
-        # fmt: off
-        itemsize = cp.ndarray(shape=(1,),           dtype=np.uint64)
-        sizes    = cp.ndarray(shape=(num_members,), dtype=np.uint64)
-        offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
-        # fmt: on
-        kernel = self._kernel_get_struct_layout(
-            dtype_to_cname_dict,
-            struct_name,
-            force_dependencies,
-            insert_into_struct,
-            *tuples_type_name,
-        )
-        kernel((1,), (1,), (itemsize, sizes, offsets))
-        (itemsize, sizes, offsets) = map(
-            cp.asnumpy, (itemsize, sizes, offsets)
-        )
-        itemsize = itemsize.item()
-        names = [name for t, name in tuples_type_name]
-        formats = [t for t, name in tuples_type_name]
-
-        self.dtype = np.dtype(
-            {
-                "names": names,
-                "formats": formats,
-                "offsets": offsets,
-                "itemsize": itemsize,
-            }
-        )
 
     @classmethod
     def _struct_definition(
@@ -179,8 +76,8 @@ class KernelStruct:
                 actual_dtype = dtype.member_dtype
             else:
                 actual_dtype = dtype
-            if type(actual_dtype) is KernelStruct:
-                return dtype_to_cname_dict[actual_dtype]
+            if issubclass(actual_dtype, KernelStruct):  # ty:ignore[invalid-argument-type]
+                return dtype_to_cname_dict[actual_dtype]  # ty:ignore[invalid-argument-type]
             return dtype_to_cname_dict[np.dtype(actual_dtype)]
 
         def get_fieldname(
@@ -209,13 +106,17 @@ class KernelStruct:
                 + "};"
             )
         except KeyError as e:
-            msg = f"Invalid choice of np.dtype. The implemented choices are: {[str(k) for k in dtype_to_cname_dict.keys()]}."
+            msg = f"Invalid choice of np.dtype. The implemented choices are: {[str(k) for k in dtype_to_cname_dict.keys()]}. The provided types were was {[dtype for dtype, name in tuples_type_name]}."
             raise ValueError(msg) from e
 
     @classmethod
     def _validate_struct_name(cls, struct_name: str) -> bool:
         """Return True if the proposed struct_name is OK to use as a class name in C++."""
         return re.fullmatch(_valid_C_identifier_regex, struct_name) is not None
+
+    @classmethod
+    def _issubclass(cls, obj: object) -> bool:
+        return inspect.isclass(obj) and issubclass(obj, KernelStruct)
 
     @classmethod
     def _kernel_get_struct_layout(
@@ -237,13 +138,13 @@ class KernelStruct:
         # Create an ordered list of dependencies. First are the base dependencies.
         dtypes = [tup[0] for tup in tuples]
         dependent_ks = [
-            k if type(k) is KernelStruct else k.member_dtype
+            k if KernelStruct._issubclass(k) else k.member_dtype
             for k in dtypes
             if (
-                type(k) is KernelStruct
+                KernelStruct._issubclass(k)
                 or (
                     type(k) is KernelArray
-                    and type(k.member_dtype) is KernelStruct
+                    and KernelStruct._issubclass(k.member_dtype)
                 )
             )
         ]
@@ -293,8 +194,9 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             struct_layout_code, f"get_struct_layout_{struct_name}"
         )
 
+    @classmethod
     def save_c_struct_to_file(
-        self, path: pathlib.Path | str, overwrite: bool = False
+        cls, path: pathlib.Path | str, overwrite: bool = False
     ) -> None:
         """Save the C structure definition to a file."""
         p: pathlib.Path = pathlib.Path(path)
@@ -302,10 +204,11 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             msg = f"The file '{p.resolve()!s}' already exists. You may use the overwrite=True option to overwrite it."
             raise FileExistsError(msg)
         with open(path, "w+", encoding="utf-8") as f:
-            f.write(self.struct_definition_c)
+            f.write(cls.struct_definition_c)
 
+    @classmethod
     def append_c_struct_to_file(
-        self, path: pathlib.Path | str, create_ok: bool = True, end: str = ""
+        cls, path: pathlib.Path | str, create_ok: bool = True, end: str = ""
     ) -> None:
         """Append the C structure definition to a file."""
         p: pathlib.Path = pathlib.Path(path)
@@ -317,11 +220,116 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
                 msg = f"The file '{p.resolve()!s}' does not exist. You may use the option create_ok=True to create it."
                 raise FileNotFoundError(msg)
         with open(path, mode=mode, encoding="utf-8") as f:
-            f.write(self.struct_definition_c)
+            f.write(cls.struct_definition_c)
             f.write(end)
 
-    def __str__(self) -> str:  # noqa: D105
-        return f"KernelStruct({self.struct_name})"
+    def __init_subclass__(  # noqa: D105
+        cls,
+        struct_name: str,
+        *,
+        names: tuple[str] | list[str],
+        dtypes: tuple[npt.DTypeLike | KernelStruct | KernelArray]
+        | list[
+            npt.DTypeLike | KernelStruct | KernelArray
+        ],  # input a list/tuple of np.dtypes and/or KernelStructs.
+        force_dependencies: list[KernelStruct] | None = None,
+        insert_into_struct: str
+        | None = None,  # extra code to put INSIDE the struct. Useful for defining implicit constuctors and the like
+        extra_code: str
+        | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
+    ) -> None:
+
+        # Validate inputs #
+        if len(names) != len(dtypes):
+            msg = f"Mismatch in length of `names` and `dtypes`. Names: {names}. dtypes: {dtypes}"
+            raise ValueError(msg)
+        # Test that all 'dtypes' can actually be interpreted by numpy as dtypes
+        for dtype in dtypes:
+            np.dtype(dtype)  # May raise a TypeError. This is intentional.
+        ###################
+
+        tuples_type_name = list(zip(dtypes, names))
+
+        dtype_to_cname_dict: dict[np.dtype | KernelStruct, str] = dict(
+            _np_dtype_to_c_type.items()
+        )  # Create copy
+
+        cls.dependent_structs = [  # ty:ignore[invalid-assignment]
+            k if KernelStruct._issubclass(k) else k.member_dtype  # ty:ignore[unresolved-attribute] # ty is wrong here
+            for k in dtypes
+            if (
+                KernelStruct._issubclass(k)
+                or (
+                    type(k) is KernelArray
+                    and KernelStruct._issubclass(k.member_dtype)
+                )
+            )
+        ]
+        if force_dependencies is not None:
+            cls.dependent_structs.extend([t for t in force_dependencies])  # noqa: C416
+        # Add the dependents of dependents. Make sure it's ordered, with base dependencies on the left.
+        for i in list(reversed(range(len(cls.dependent_structs)))):
+            ks: KernelStruct = cls.dependent_structs[i]
+            cls.dependent_structs = (
+                cls.dependent_structs[:i]
+                + ks.dependent_structs
+                + cls.dependent_structs[i:]
+            )
+        # Now remove duplicates, keeping the first-encountered copy of each
+        seen = set()
+        cls.dependent_structs = [
+            ks
+            for ks in cls.dependent_structs
+            if not (ks in seen or seen.add(ks))
+        ]
+
+        dtype_to_cname_dict.update(
+            {ks: ks.struct_name for ks in cls.dependent_structs}
+        )
+
+        cls.struct_name = struct_name
+        cls.struct_definition_c = cls._struct_definition(
+            dtype_to_cname_dict,
+            struct_name,
+            insert_into_struct,
+            *tuples_type_name,
+        ) + ("" if extra_code is None else extra_code)
+
+        # Run a CUDA kernel with the appropriate set of arguments, and find out
+        # how CUDA arranges the offsets in memory of the various members. We'll
+        # need this to define the custom np.dtype.
+        #  itemsize -> overall struct size
+        #  sizes    -> individual struct member sizes, determined with sizeof
+        #  offsets  -> individual struct member offsets, determined with offsetof
+        num_members = len(tuples_type_name)
+        # fmt: off
+        itemsize = cp.ndarray(shape=(1,),           dtype=np.uint64)
+        sizes    = cp.ndarray(shape=(num_members,), dtype=np.uint64)
+        offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
+        # fmt: on
+        kernel = cls._kernel_get_struct_layout(
+            dtype_to_cname_dict,
+            struct_name,
+            force_dependencies,
+            insert_into_struct,
+            *tuples_type_name,
+        )
+        kernel((1,), (1,), (itemsize, sizes, offsets))
+        (itemsize, sizes, offsets) = map(
+            cp.asnumpy, (itemsize, sizes, offsets)
+        )
+        itemsize = itemsize.item()
+        names = [name for t, name in tuples_type_name]
+        formats = [t for t, name in tuples_type_name]
+
+        cls.dtype = np.dtype(
+            {
+                "names": names,
+                "formats": formats,
+                "offsets": offsets,
+                "itemsize": itemsize,
+            }
+        )
 
 
 class KernelArray:

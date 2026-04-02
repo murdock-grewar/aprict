@@ -22,8 +22,15 @@ __all__ = [
     "Test_Config_Sum",
 ]
 
-Test_Config_Sum = kern_structs.KernelStruct(
+
+# ruff: disable[D101,N801]
+class Test_Config_Sum(
+    kern_structs.KernelStruct,
     struct_name="Test_Config_Sum",
     names=["alternate_sign", "multiply_first_term"],
     dtypes=[np.bool, np.int8],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+# ruff: enable[D101,N801]

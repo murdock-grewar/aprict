@@ -22,8 +22,15 @@ __all__ = [
     "config_cb_backproject",
 ]
 
-config_cb_backproject = kern_structs.KernelStruct(
+
+# ruff: disable[D101,N801]
+class config_cb_backproject(
+    kern_structs.KernelStruct,
     struct_name="config_CB_backproject",
     names=["exact_line_integ_backproj", "mask_to_cylinder", "mask_to_cyl_rad"],
     dtypes=[np.bool, np.bool, np.float32],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+# ruff: enable[D101,N801]

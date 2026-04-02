@@ -81,7 +81,7 @@ def generate_headers(
             continue
         # Get the KernelStruct objects from the file
         kernstructs: list[tuple[str, KernelStruct]] = list(
-            inspect.getmembers(submod, lambda x: type(x) is KernelStruct)
+            inspect.getmembers(submod, KernelStruct._issubclass)  # noqa: SLF001
         )
         if not include_dependencies:
             # Filter out the structs imported into the file.

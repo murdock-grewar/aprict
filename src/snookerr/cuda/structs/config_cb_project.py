@@ -20,8 +20,15 @@ __all__ = [
     "config_cb_project",
 ]
 
-config_cb_project = kern_structs.KernelStruct(
+
+# ruff: disable[D101,N801]
+class config_cb_project(
+    kern_structs.KernelStruct,
     struct_name="config_CB_project",
     names=[],
     dtypes=[],
-)
+):
+    pass
+
+
+# ruff: enable[D101,N801]

@@ -27,13 +27,18 @@ from . import test_cusrc
 
 
 @pytest.fixture
-def ks() -> kern_structs.KernelStruct:
+def ks() -> type[kern_structs.KernelStruct]:
     """Create a custom numpy dtype."""
-    return kern_structs.KernelStruct(
+
+    class Config_Sum(  # noqa: N801
+        kern_structs.KernelStruct,
         struct_name="Config_Sum",
         names=["alternate_sign", "multiply_first_term"],
         dtypes=[np.bool, np.int8],
-    )
+    ):
+        pass  # ty:ignore[invalid-argument-type]
+
+    return Config_Sum
 
 
 @pytest.fixture
@@ -150,9 +155,7 @@ def test_generate_cusrc_data_directory() -> None:
 )
 def test_a_simple_generated_kernel() -> None:
     """Test a kernel which is generated dynamically then loaded."""
-    ks: kern_structs.KernelStruct = (
-        kstructs.test_subdir.test_config.Test_Config_Sum
-    )
+    ks = kstructs.test_subdir.test_config.Test_Config_Sum
     injected_module: cp.RawModule = header_injection.load_injected_module(
         "./test_kernel.cu",
         name_expressions=["sumsqs<float>", "sumsqs<double>"],

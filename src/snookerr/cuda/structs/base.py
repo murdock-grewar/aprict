@@ -25,7 +25,10 @@ __all__ = [
     "uivec3",
 ]
 
-uivec2 = kern_structs.KernelStruct(
+
+# ruff: disable[D101,N801]
+class uivec2(
+    kern_structs.KernelStruct,
     struct_name="uivec2",
     names=["x", "y"],
     dtypes=[np.uint32, np.uint32],
@@ -36,9 +39,12 @@ public:
     // default constructor, used with i.e. 'uivec2 v;'
     uivec2() = default;
 """,
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-fvec2 = kern_structs.KernelStruct(
+
+class fvec2(
+    kern_structs.KernelStruct,
     struct_name="fvec2",
     names=["x", "y"],
     dtypes=[np.float32, np.float32],
@@ -49,9 +55,12 @@ public:
     // default constructor, used with i.e. 'fvec2 v;'
     fvec2() = default;
 """,
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-uivec3 = kern_structs.KernelStruct(
+
+class uivec3(
+    kern_structs.KernelStruct,
     struct_name="uivec3",
     names=["x", "y", "z"],
     dtypes=[np.uint32, np.uint32, np.uint32],
@@ -98,9 +107,12 @@ __device__ float dot_prod(
 }
 
 """,
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-fvec3 = kern_structs.KernelStruct(
+
+class fvec3(
+    kern_structs.KernelStruct,
     struct_name="fvec3",
     names=["x", "y", "z"],
     dtypes=[np.float32, np.float32, np.float32],
@@ -238,4 +250,8 @@ __device__ fvec3 operator/(
     return o;
 }
 """,
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+# ruff: enable[D101,N801]

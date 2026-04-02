@@ -29,7 +29,10 @@ __all__ = [
     "volume_chunk_spec",
 ]
 
-det_spec = kern_structs.KernelStruct(
+
+# ruff: disable[D101,N801]
+class det_spec(
+    kern_structs.KernelStruct,
     struct_name="det_spec",
     names=[
         "pos",  # position of detector (nominally, the middle of it)
@@ -40,9 +43,12 @@ det_spec = kern_structs.KernelStruct(
         "type",  # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
     ],
     dtypes=[fvec3, fvec3, fvec3, np.uint16, np.uint16, np.uint8],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-proj_spec = kern_structs.KernelStruct(
+
+class proj_spec(
+    kern_structs.KernelStruct,
     struct_name="proj_spec",
     names=["sourcepos", "dspec"],
     dtypes=[fvec3, det_spec],
@@ -93,9 +99,12 @@ __device__ fvec2 get_projected_detector_coords(
         return fvec2(0.f, 0.f);
     }
 }""",
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-proj_chunk_spec_maxlen10 = kern_structs.KernelStruct(
+
+class proj_chunk_spec_maxlen10(
+    kern_structs.KernelStruct,
     struct_name="proj_chunk_spec_maxlen10",
     names=["projspecs", "numprojs", "projmemaddr", "projmemstrides"],
     dtypes=[
@@ -104,9 +113,12 @@ proj_chunk_spec_maxlen10 = kern_structs.KernelStruct(
         np.uint64,
         uivec3,
     ],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-proj_tex_chunk_spec_maxlen10 = kern_structs.KernelStruct(
+
+class proj_tex_chunk_spec_maxlen10(
+    kern_structs.KernelStruct,
     struct_name="proj_tex_chunk_spec_maxlen10",
     names=["projspecs", "numprojs", "tex_start_layer"],
     dtypes=[
@@ -114,11 +126,14 @@ proj_tex_chunk_spec_maxlen10 = kern_structs.KernelStruct(
         np.uint8,
         np.uint32,
     ],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
+
 
 # Note: this now used by the projection only.
 # For the thing used by the backprojection, see 'vol_spec'. (This can also be used for chunks.)
-volume_chunk_spec = kern_structs.KernelStruct(
+class volume_chunk_spec(
+    kern_structs.KernelStruct,
     struct_name="volume_chunk_spec",
     names=[
         "idx_xstart",
@@ -129,9 +144,12 @@ volume_chunk_spec = kern_structs.KernelStruct(
         "idx_zstop",
     ],
     dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-vol_spec = kern_structs.KernelStruct(
+
+class vol_spec(
+    kern_structs.KernelStruct,
     struct_name="vol_spec",
     names=[
         "ptr_000",  # pointer to the volume array, like cp.array(...).data.ptr
@@ -144,9 +162,12 @@ vol_spec = kern_structs.KernelStruct(
         "pos_000",  # x,y,z position of the center of the 0,0,0 voxel.
     ],
     dtypes=[np.uint64, uivec3, uivec3, fvec3],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
 
-vol_tex_chunk_spec = kern_structs.KernelStruct(
+
+class vol_tex_chunk_spec(
+    kern_structs.KernelStruct,
     struct_name="vol_tex_chunk_spec",
     names=[
         "offsets",  # unsigned integer offsets from the 0,0,0 base of the texture
@@ -154,4 +175,8 @@ vol_tex_chunk_spec = kern_structs.KernelStruct(
         "texpos",  # The 0,0,0 corner of the texture of which chunk is a part. NOTE: this is NOT the position of the center of the 0,0,0 voxel! It is the position of the corner of that voxel.
     ],
     dtypes=[uivec3, uivec3, fvec3],
-)
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+# ruff: enable[D101,N801]
