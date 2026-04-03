@@ -26,6 +26,10 @@ import numexpr as ne
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+__all__ = [
+    "FORBILD_head_HU",
+]
+
 
 class GeomObjectType(enum.Enum):
     ELLIPSOID     = 0
@@ -300,16 +304,16 @@ class CompositeGeomObject:
                 self.addObject(f, 0, 10.0*np.array([x, y, z]), 10.0*np.array([0.15, 0.15, 0.15]), 0.0, None, None, oversampling)
         #'''
 
-def FORBILD_HU_voxwid(n: int) -> float:
+def FORBILD_head_HU_voxwid(n: int) -> float:
     # Need 250mm across
     # Coordinates are measured in millimeters
     # Most convenient to round n down to an even number, so that e.g. n=2400 and n=2401 give the same attenuation per voxel-length, but with different centering.
     voxel_wid_mm: float = 250/(2*(n//2))
     return voxel_wid_mm
 
-def FORBILD_HU(n: int) -> typing.Tuple[np.ndarray, float]:
+def FORBILD_head_HU(n: int) -> typing.Tuple[np.ndarray, float]:
     """Returns the FORBILD phantom and the voxel width in millimeters."""
-    voxel_wid_mm = FORBILD_HU_voxwid(n)
+    voxel_wid_mm = FORBILD_head_HU_voxwid(n)
 
     cgo = CompositeGeomObject()
     cgo.set_FORBILD()
@@ -322,4 +326,3 @@ def FORBILD_HU(n: int) -> typing.Tuple[np.ndarray, float]:
     # Convert to HU
     out = ne.evaluate('(atten_water_is_0p02/0.02 - 1)*1000', out=atten_water_is_0p02)
     return out, voxel_wid_mm
-

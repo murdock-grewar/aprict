@@ -36,7 +36,7 @@ from ...cuda.structs import (
     vol_spec as ks_vol_spec,
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
 )
-from ...lib import phantoms_FORBILD, texture_tools
+from ...lib import phantoms, texture_tools
 
 str_pytest_gen_sources: str = "ks_gen_sources"
 
@@ -536,7 +536,7 @@ class TestCB_texture_FORBILD:
         test_id: str = request.node.callspec.id  # noqa: F841
         # Setup phase
         # Get the FORBILD phantom.
-        v, voxwid_mm = phantoms_FORBILD.FORBILD_HU(volres)  # noqa: RUF059
+        v, voxwid_mm = phantoms.FORBILD_head_HU(volres)  # noqa: RUF059
         # Convert from Hounsfield units to attenuation coefficient
         # v = v[:,:,v.shape[2]//4:-(v.shape[2]//4)]
         self.vol = np.empty(v.shape, dtype=dtype_vol)

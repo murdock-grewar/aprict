@@ -24,10 +24,16 @@ if _os.environ.get("SNOOKERR_BUILDMODE", ""):  # noqa: RUF067
     pass
 else:
     del _os
+    from . import cb as cb
     from . import image_view as imview
+    from . import lib
+    from .cuda import structs as dtypes
     from .volume import Volume
 
     __all__ = [
         "Volume",
+        "cb",
+        "dtypes",
         "imview",
+        "lib",
     ]

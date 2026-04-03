@@ -49,15 +49,43 @@ _np_dtype_to_c_type = {
 # fmt: on
 
 
-class KernelStruct(
+class KernelStruct[T: np.dtype[typing.Any]](
     abc.ABC
 ):  # , np.generic):  # adding 'np.generic' here helps with dtyping with ty, but it breaks the creation of the data structures, for some reason.
     """A custom numpy dtype with a corresponding C structure."""
 
+    # class fields
     struct_name: str
-    dtype: np.dtype
+    dtype: type[
+        T
+    ]  # this might be incorrect... ty does not know how to check these kinds of things at the moment
     struct_definition_c: str
     dependent_structs: list[KernelStruct]
+
+    # instance fields
+    ndarray: np.ndarray[tuple[()], T]
+
+    # Note this useful way of creating arrays of these objects:
+    # np.array([[(1,2,3), (7,8,9)]], ndmax=2, dtype=fvec3)
+    # That will preserve the tuples in the last dimension and create a (1,2)-shaped array of fvec3 objects.
+
+    # COMMENTED THIS OUT. MAY BE USEFUL LATER. I WILL TRY TO AVOID IT CURRENTLY.
+    # # This will be inherited by the subclasses. It's a shortcut, enabling us to call
+    # # fv3 = fvec3((1.0, 2, 3))
+    # # to create an object with a backing ndarray like
+    # # fv3.ndarray == np.array((1.0, 2, 3), dtype=fvec3.dtype)
+    # def __init__(self, input: tuple | T) -> None:
+    #     # Try to create the array directly from the input
+    #     a = np.array(input, dtype=self.dtype)
+    #     # Check that the created object is valid.
+    #     if not a.shape == ():
+    #         msg = "Invalid object passed as input parameter."
+    #         raise ValueError(msg)
+    #     if not a.dtype == self.dtype:
+    #         msg = "Invalid object passed as input parameter."
+    #         raise ValueError(msg)
+    #     # Assign the validated object to the underlying data array
+    #     self.ndarray = a  # ty:ignore[invalid-assignment, unused-ignore-comment]
 
     @classmethod
     def _struct_definition(
@@ -322,7 +350,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
         names = [name for t, name in tuples_type_name]
         formats = [t for t, name in tuples_type_name]
 
-        cls.dtype = np.dtype(
+        cls.dtype = np.dtype(  # ty:ignore[invalid-assignment]
             {
                 "names": names,
                 "formats": formats,
