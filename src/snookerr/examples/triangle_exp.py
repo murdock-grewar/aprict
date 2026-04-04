@@ -18,6 +18,7 @@
 import itertools
 import time
 
+import cupy as cp
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -25,11 +26,17 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import snookerr
 
 ### Configurable parameters ###
-voxwid_mm: float = 0.25  # the voxel width of the head phantom
-D_mm: float = 600  # shortest distance from center to the edge of the equilateral triangle
+voxwid_mm: float = 1  # the voxel width of the head phantom
+scale_phantom_size: float = (
+    2  # make the phantom bigger, without reducing its attenutaion coefficient
+)
+D_mm: float = 652.5  # shortest distance from center to the edge of the equilateral triangle
 flattened_corner_width_mm: float = 430  # also the detector width and height
-num_sources_per_side: int = 15
+num_sources_per_side: int = 17
 pixwid_mm: float = 0.5
+curved_source_edges: bool = True
+superscale_volume_factor: int = 3  # factor by which to upscale the volume resolution, for the purpose of generating data.
+total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
 ###############################
 
 # Equilateral triangle
@@ -75,9 +82,10 @@ e32 = v1 - fcw * np.array(
 rdet: float = float(np.linalg.norm((e12 + e21) / 2))
 detwid: float = flattened_corner_width
 dethei: float = detwid
-source_z_spread: float = detwid * 2 / 3
+source_z_spread: float = detwid * 0
 
 # Print some information about the geometry
+print("Distance from center to detector (mm): ", rdet * voxwid_mm)
 print("Detector width (mm):     ", detwid * voxwid_mm)
 print(
     "Source strip width (mm): ", voxwid_mm * float(np.linalg.norm(e12 - e11))
@@ -85,26 +93,76 @@ print(
 
 # Generate source positions
 # These are scattered along the three edges, and staggered at high/low positions.
-sps = np.array(
-    [
+if curved_source_edges:
+    c2 = rdet * np.array(
+        [np.cos(np.deg2rad(90)), np.sin(np.deg2rad(90)), 0], dtype=np.float32
+    )
+    ang_start2 = np.arctan2((e21 - c2)[1], (e21 - c2)[0])
+    ang_end2 = np.arctan2((e22 - c2)[1], (e22 - c2)[0])
+    c3 = rdet * np.array(
+        [np.cos(np.deg2rad(210)), np.sin(np.deg2rad(210)), 0], dtype=np.float32
+    )
+    ang_start3 = np.arctan2((e31 - c3)[1], (e31 - c3)[0])
+    ang_end3 = np.arctan2((e32 - c3)[1], (e32 - c3)[0])
+    c1 = rdet * np.array(
+        [np.cos(np.deg2rad(330)), np.sin(np.deg2rad(330)), 0], dtype=np.float32
+    )
+    ang_start1 = np.arctan2((e11 - c1)[1], (e11 - c1)[0])
+    ang_end1 = np.arctan2((e12 - c1)[1], (e12 - c1)[0])
+    sps = np.array(
         [
-            tuple(
-                v + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2])
+            [
+                tuple(
+                    (
+                        c
+                        + 2
+                        * rdet
+                        * np.array(
+                            [np.cos(ang), np.sin(ang), 0], dtype=np.float32
+                        )
+                    )
+                    + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2])
+                )
+                for i, ang in enumerate(
+                    np.linspace(
+                        ang_start,
+                        ang_end,
+                        endpoint=True,
+                        num=(num_sources_per_side + 2),
+                    )[1:-1]
+                )
+            ]
+            for c, ang_start, ang_end in zip(
+                (c1, c2, c3),
+                (ang_start1, ang_start2, ang_start3),
+                (ang_end1, ang_end2, ang_end3),
             )
-            for i, v in enumerate(
-                np.linspace(
-                    endpoint1,
-                    endpoint2,
-                    endpoint=True,
-                    num=(num_sources_per_side + 2),
-                )[1:-1]
-            )
-        ]
-        for endpoint1, endpoint2 in zip((e11, e21, e31), (e12, e22, e32))
-    ],
-    ndmax=2,
-    dtype=snookerr.dtypes.fvec3,
-)
+        ],
+        ndmax=2,
+        dtype=snookerr.dtypes.fvec3,
+    )
+else:
+    sps = np.array(
+        [
+            [
+                tuple(
+                    v
+                    + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2])
+                )
+                for i, v in enumerate(
+                    np.linspace(
+                        endpoint1,
+                        endpoint2,
+                        endpoint=True,
+                        num=(num_sources_per_side + 2),
+                    )[1:-1]
+                )
+            ]
+            for endpoint1, endpoint2 in zip((e11, e21, e31), (e12, e22, e32))
+        ],
+        ndmax=2,
+        dtype=snookerr.dtypes.fvec3,
+    )
 assert sps.dtype == snookerr.dtypes.fvec3
 
 
@@ -135,6 +193,11 @@ v1, v2, v3 = np.array(
 nu = np.uint16(int(detwid / pixwid))  # pixel width  of detectors
 nv = np.uint16(int(detwid / pixwid))  # pixel height of detectors
 print("Detector resolution:     ", (int(nu), int(nv)))
+
+photons_per_pixel: float = (
+    total_clearfield_photons / nu / nv / num_sources_per_side / 3
+)
+print("Photons (clearfield) per pixel: ", photons_per_pixel)
 
 # Construct the 'detector specification' objects.
 # One is required for every cone-beam projection. So there's one for each source position,
@@ -198,14 +261,25 @@ assert np.all(nvs == nvs[0])
 
 
 # Create the volume to be projected
-volwid: int = int(np.ceil(250 / voxwid_mm))
+volwid: int = int(np.ceil(250 / voxwid_mm * scale_phantom_size))
 print("Volume   resolution:     ", (int(volwid), int(volwid), int(volwid)))
+print(
+    "Volume   resolution (superscaled):     ",
+    (
+        superscale_volume_factor * int(volwid),
+        superscale_volume_factor * int(volwid),
+        superscale_volume_factor * int(volwid),
+    ),
+)
+print()
 print("Generating FORBILD head phantom... ", end="", flush=True)
 vnp, voxwid_mm = snookerr.lib.phantoms.FORBILD_head_HU(
-    volwid
+    volwid * superscale_volume_factor
 )  # intentionally overwriting voxwid_mm
 print("done.")
-volwid_mm: float = volwid * voxwid_mm
+print()
+voxwid_mm *= scale_phantom_size
+volwid_mm: float = superscale_volume_factor * volwid * voxwid_mm
 print("Voxel width (mm):        ", voxwid_mm)
 # Remove negative offset from the HU
 vnp += 1000
@@ -214,6 +288,8 @@ vnp *= 0.0184 * voxwid_mm / 1000
 # Convert volume to 16-bit to save on VRAM...
 vnp = vnp.astype(np.float16)
 # The volume should now be encoded so that the value in a voxel is the attenuation through one voxel-width.
+# adjust the voxwid_mm to represent the voxel width of the non-supersampled volume
+voxwid_mm *= superscale_volume_factor
 
 ### Do plotting of the imaging geometry
 # Prepare the 3D plot
@@ -282,12 +358,42 @@ plt.show()
 
 
 ## Call the projection code on the prepared geometry ##
-config = np.array((), dtype=snookerr.dtypes.config_cb_project)
+config_project = np.array(
+    (superscale_volume_factor,), dtype=snookerr.dtypes.config_cb_project
+)
 vol = snookerr.Volume(vnp)
 output_array = None
+print("Generating the linearised projection data... ", end="", flush=True)
 t1 = time.time()
-out = snookerr.cb.project_flatpanel(config, vol, pss, output_array, block=True)  # ty:ignore[invalid-argument-type]
+out = snookerr.cb.project_flatpanel(
+    config_project,  # ty:ignore[invalid-argument-type]
+    vol,
+    pss,
+    output_array,
+    block=True,
+)
 t2 = time.time()
 elapsed_milliseconds: float = (t2 - t1) * 1000
-print(f"Projection time (ms):     {elapsed_milliseconds:.1f}")
-snookerr.imview.plot_projections(out.reshape(-1, *out.shape[-2:]))
+print(f"done. Projection time (ms): {elapsed_milliseconds:.1f}", flush=True)
+print("Applying Poisson noise... ", end="", flush=True)
+print()
+out_ = out.copy()
+cp.exp(-out_, out=out_)
+cp.multiply(out_, photons_per_pixel, out=out_)
+out_ = cp.random.poisson(lam=out_).astype(
+    cp.float32
+)  # no option to run this in-place with cupy...
+cp.true_divide(out_, cp.float32(photons_per_pixel), out=out_)
+out_noised_transmission = out_.copy()
+cp.log(out_, out=out_)
+cp.multiply(out_, -1, out=out_)
+print("done.", flush=True)
+cap_max_atten = cp.log(photons_per_pixel)
+out_noised_attenuation = out_
+# snookerr.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
+snookerr.imview.plot_projections(
+    cp.nan_to_num(out_noised_attenuation, posinf=cap_max_atten).reshape(
+        -1, *out_noised_attenuation.shape[-2:]
+    ),
+    title="max attenuation capped for plotting purposes",
+)

@@ -220,7 +220,7 @@ __global__ void project_CB_sharedmem(
         Tp*                       output_projs
 )
 {
-
+    const float svf = config.shrink_volume_factor;  // E.g. if equal to 2, the the volume is interpreted as being a higher-resolution description of a space of 1/2 the length in each axis.
     const uivec3 vol_strides    = volspec.strides_bytes;
     const Tv*    volume         = (Tv*)volspec.ptr_000;
     // This kernel should be used with a blockDim.z of 1.
@@ -313,7 +313,7 @@ __global__ void project_CB_sharedmem(
     // Calculate projection
     // ...
     Tp val = exact_line_integral<Tv, Tp, volchunk_Xsize, volchunk_Ysize, volchunk_Zsize>(
-            source_pos, det_pos, volspec, &vchunk_shm);
+            source_pos*svf, det_pos*svf, volspec, &vchunk_shm);
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

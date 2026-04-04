@@ -88,7 +88,7 @@ def test_cb_project_single_voxel_offset_detector(
 ) -> None:
     """Test a kernel which is generated dynamically then loaded."""
     # Config
-    config = np.array((), dtype=ks_config.dtype)
+    config = np.array((1.0,), dtype=ks_config.dtype)
     # projspecs
     # The source is here in the center of the volume
     # The detector pixel is one quarter-voxel away from the center
@@ -212,7 +212,7 @@ def test_cb_project_single_voxel_offset_detector(
 class TestCB_sharedmem_randomnoise:
     def setup_method(self) -> None:
         # Config
-        config = np.array((), dtype=ks_config.dtype)
+        config = np.array((1.0,), dtype=ks_config.dtype)
         # projspecs
         # Imagine a top-down view with the source on the right-hand side.
         # The x coordinate points to the right.
@@ -362,7 +362,7 @@ class TestCB_sharedmem_randomnoise:
 class TestCB_texture_randomnoise:
     def setup_method(self) -> None:
         # Config
-        config = np.array((), dtype=ks_config.dtype)
+        config = np.array((1.0,), dtype=ks_config.dtype)
         # projspecs
         # Imagine a top-down view with the source on the right-hand side.
         # The x coordinate points to the right.
@@ -548,7 +548,7 @@ class TestCB_texture_FORBILD:
             filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
         )
         # Set up configuration objects etc
-        self.config = np.array((), dtype=ks_config.dtype)
+        self.config = np.array((1.0,), dtype=ks_config.dtype)
         num_projs = np.uint32(1000)
         detwid: int = int(4 / 5 * volres)
         dethei: int = int(4 / 5 * volres)

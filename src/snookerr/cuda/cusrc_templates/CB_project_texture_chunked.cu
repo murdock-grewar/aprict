@@ -294,6 +294,7 @@ __global__ void project_CB_texture_chunked(
     );
     const unsigned long vol_chunk_size = volchunk_Xsize*volchunk_Ysize*volchunk_Zsize;
     */
+    const float svf = config.shrink_volume_factor;  // E.g. if equal to 2, the the volume is interpreted as being a higher-resolution description of a space of 1/2 the length in each axis.
     unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
     unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
@@ -323,7 +324,7 @@ __global__ void project_CB_texture_chunked(
     // ...
     Tp val = 0;
     val = exact_line_integral<Tv, Tp>(
-        source_pos, det_pos, texchunkspec, volume_surface);
+        source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

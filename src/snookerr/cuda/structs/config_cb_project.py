@@ -14,6 +14,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """A struct used to configure the CB projection kernel."""
 
+import numpy as np
+
 from .. import kern_structs
 
 __all__ = [
@@ -25,10 +27,12 @@ __all__ = [
 class config_cb_project(
     kern_structs.KernelStruct,
     struct_name="config_CB_project",
-    names=[],
-    dtypes=[],
+    names=[
+        "shrink_volume_factor"  # causes the whole volume to be shrunk by this factor, *with respect to the coordinate origin*, after being specified by whatever volume chunk spec object is relevant.
+    ],
+    dtypes=[np.float32],
 ):
-    pass
+    pass  # ty:ignore[invalid-argument-type]
 
 
 # ruff: enable[D101,N801]
