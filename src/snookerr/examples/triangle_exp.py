@@ -24,11 +24,14 @@ import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 import snookerr
+from snookerr.cb import flatpanel as cbfp
+
+cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
 ### Configurable parameters ###
 voxwid_mm: float = 1  # the voxel width of the head phantom
 scale_phantom_size: float = (
-    2  # make the phantom bigger, without reducing its attenutaion coefficient
+    2  # make the phantom bigger, without reducing its attenuation coefficient
 )
 D_mm: float = 652.5  # shortest distance from center to the edge of the equilateral triangle
 flattened_corner_width_mm: float = 430  # also the detector width and height
@@ -358,24 +361,25 @@ plt.show()
 
 
 ## Call the projection code on the prepared geometry ##
-config_project = np.array(
-    (superscale_volume_factor,), dtype=snookerr.dtypes.config_cb_project
+config_project = cbfp.ConfigProject(
+    shrink_volume_factor=superscale_volume_factor
 )
+projs = cbfp.ProjectionSet(pss, data=None)
 vol = snookerr.Volume(vnp)
 print("Generating the linearised projection data... ", end="", flush=True)
 t1 = time.time()
-out = snookerr.cb.project_flatpanel(
-    config_project,  # ty:ignore[invalid-argument-type]
+out = cbfp.project(
+    config_project,
     vol,
-    pss,
-    None,  # output_array; set to None to create one
+    projs,
     block=True,
 )
+assert projs.data is not None  # helpful assertion for type-checking
 t2 = time.time()
 elapsed_milliseconds: float = (t2 - t1) * 1000
 print(f"done. Projection time (ms): {elapsed_milliseconds:.1f}", flush=True)
 print("Applying Poisson noise... ", end="", flush=True)
-out_ = out.copy()
+out_ = projs.data.copy()
 cp.exp(-out_, out=out_)
 cp.multiply(out_, photons_per_pixel, out=out_)
 out_ = cp.random.poisson(lam=out_).astype(
@@ -415,23 +419,15 @@ working_vol = snookerr.Volume.zeros(
 
 
 # Backproject into the working volume
-config_backproject = np.array(
-    (
-        np.bool(False),  # whether to compute the backprojection exactly
-        np.bool(
-            True
-        ),  # whether to apply a circular mask to the backprojection
-        max(working_vol.shape[:2])
-        / 2,  # the radius of the circular mask, in voxels
-    ),
-    dtype=snookerr.dtypes.config_cb_backproject,
+config_backproject = cbfp.ConfigBackproject(
+    fast_approx=True, cyl_mask_rad_vox=working_vol.shape[0] / 2
 )
+projs = cbfp.ProjectionSet(pss, data=out_noised_attenuation_capped)
 t1 = time.time()
-working_vol = snookerr.cb.backproject_flatpanel(
-    config_backproject,  # ty:ignore[invalid-argument-type]
+working_vol = cbfp.backproject(
+    config_backproject,
     working_vol,
-    pss,
-    projs=out_noised_attenuation_capped,
+    projs,
     block=True,
 )
 t2 = time.time()

@@ -23,6 +23,39 @@ __device__ void write_to_surf3D<half>(
 )
 { write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx); }
 
+template<typename T>
+__device__ T read_from_surf3D(
+    cudaSurfaceObject_t     surface,
+    uint3                   idx
+)
+{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+
+template<>
+__device__ half read_from_surf3D<half>(
+    cudaSurfaceObject_t     surface,
+    uint3                   idx
+)
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+
+
+// General math functions
+#define PI 3.1415926535898f
+
+template <typename T>
+__device__ T powint(T base, short exponent) {
+    // Protect against negative values
+    T ans = 1.;
+    if (exponent < 0) {
+        for (unsigned short e = 0; e < -exponent; e++) {
+            ans /= base;
+        }
+    } else {
+        for (unsigned short e = 0; e < exponent; e++) {
+            ans *= base;
+        }
+    }
+    return ans;
+}
 
 // Utility functions used repeatedly
 __device__ uint3 get_vol_idx()
@@ -49,7 +82,7 @@ __device__ bool out_of_minmax_bounds(uint3 idx, uint3 start_idx, uint3 stop_idx)
     return false;
 }
 
-//// SINGLE-TEXTURE/SURFACE ARITHMETIC ////
+//// SINGLE-TEXTURE/SURFACE OPERATIONS ////
 template <typename T>
 __global__ void fill_surface(
     const T                     value,
@@ -59,6 +92,30 @@ __global__ void fill_surface(
 {
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    write_to_surf3D(value, surface, idx);
+}
+
+template <typename T> // type of the volumed data. E.g. half or float.
+__global__ void softmask_surface_to_cylinder_xy(
+    const float                 relrad_start,
+    cudaSurfaceObject_t         surface,
+    uint3                       surfaceDimensions
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    // Compute radius of cylinder, relative to 1 being the maximum
+    float rrel = sqrt((float)(powint(idx.x, 2) + powint(idx.y, 2)))
+        / (float)(min(surfaceDimensions.x, surfaceDimensions.y));
+    // Return early if inside the unsoftened region of the cylinder
+    if (rrel < relrad_start) { return; }
+    // Scale rrel: [relrad_start, 1] --> [0, 1]
+    rrel = min((rrel-relrad_start)/(1.f-relrad_start), 1.f);
+    // Get the multiplier
+    multiplier = min(1.f, max(0.f, (1+cos(rrel * PI/2.f))/2.f));
+    // Read the existing value, apply the multiplier and write it back
+    T value = read_from_surf3D<T>(surface, idx);
+    value *= (T)multiplier;
     write_to_surf3D(value, surface, idx);
 }
 

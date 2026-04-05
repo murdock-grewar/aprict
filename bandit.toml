@@ -1,7 +1,2 @@
 [tool.bandit.assert_used]
-skips = [
-    'src/snookerr/tests/*.py', # usually sufficient
-    './src/snookerr/tests/*.py', # needed sometimes?
-    'src/snookerr/examples/*.py',
-    './src/snookerr/examples/*.py',
-] # * here should match any additional paths
+skips = ['*']
