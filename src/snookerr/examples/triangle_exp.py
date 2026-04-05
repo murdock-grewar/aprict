@@ -35,7 +35,7 @@ flattened_corner_width_mm: float = 430  # also the detector width and height
 num_sources_per_side: int = 17
 pixwid_mm: float = 0.5
 curved_source_edges: bool = True
-superscale_volume_factor: int = 3  # factor by which to upscale the volume resolution, for the purpose of generating data.
+superscale_volume_factor: int = 1  # factor by which to upscale the volume resolution, for the purpose of generating data.
 total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
 ###############################
 
@@ -362,21 +362,19 @@ config_project = np.array(
     (superscale_volume_factor,), dtype=snookerr.dtypes.config_cb_project
 )
 vol = snookerr.Volume(vnp)
-output_array = None
 print("Generating the linearised projection data... ", end="", flush=True)
 t1 = time.time()
 out = snookerr.cb.project_flatpanel(
     config_project,  # ty:ignore[invalid-argument-type]
     vol,
     pss,
-    output_array,
+    None,  # output_array; set to None to create one
     block=True,
 )
 t2 = time.time()
 elapsed_milliseconds: float = (t2 - t1) * 1000
 print(f"done. Projection time (ms): {elapsed_milliseconds:.1f}", flush=True)
 print("Applying Poisson noise... ", end="", flush=True)
-print()
 out_ = out.copy()
 cp.exp(-out_, out=out_)
 cp.multiply(out_, photons_per_pixel, out=out_)
@@ -388,12 +386,55 @@ out_noised_transmission = out_.copy()
 cp.log(out_, out=out_)
 cp.multiply(out_, -1, out=out_)
 print("done.", flush=True)
-cap_max_atten = cp.log(photons_per_pixel)
+print()
+cap_max_atten = cp.log(
+    photons_per_pixel
+)  # make the minimum photon count 1 here
 out_noised_attenuation = out_
+out_noised_attenuation_capped = cp.nan_to_num(
+    out_noised_attenuation, posinf=cap_max_atten
+)
 # snookerr.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
 snookerr.imview.plot_projections(
-    cp.nan_to_num(out_noised_attenuation, posinf=cap_max_atten).reshape(
-        -1, *out_noised_attenuation.shape[-2:]
+    out_noised_attenuation_capped.reshape(
+        -1, *out_noised_attenuation_capped.shape[-2:]
     ),
     title="max attenuation capped for plotting purposes",
 )
+
+
+# Set up the working volume
+working_vol = snookerr.Volume.zeros(
+    (
+        vol.shape[0] // superscale_volume_factor,
+        vol.shape[1] // superscale_volume_factor,
+        vol.shape[2] // superscale_volume_factor,
+    ),
+    dtype=np.float16,  # ty:ignore[invalid-argument-type]
+)
+
+
+# Backproject into the working volume
+config_backproject = np.array(
+    (
+        np.bool(False),  # whether to compute the backprojection exactly
+        np.bool(
+            True
+        ),  # whether to apply a circular mask to the backprojection
+        max(working_vol.shape[:2])
+        / 2,  # the radius of the circular mask, in voxels
+    ),
+    dtype=snookerr.dtypes.config_cb_backproject,
+)
+t1 = time.time()
+working_vol = snookerr.cb.backproject_flatpanel(
+    config_backproject,  # ty:ignore[invalid-argument-type]
+    working_vol,
+    pss,
+    projs=out_noised_attenuation_capped,
+    block=True,
+)
+t2 = time.time()
+elapsed_milliseconds: float = (t2 - t1) * 1000
+print(f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True)
+snookerr.imview.plot_volume(working_vol.as_numpy())

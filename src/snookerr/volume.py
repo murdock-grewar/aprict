@@ -25,7 +25,11 @@ from .lib import gpu_tools, texture_tools
 from .lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
-_DType = np.dtype[np.float16] | np.dtype[np.float32] | np.dtype[np.float64]
+_DType_base = np.float16 | np.float32
+_DType = np.dtype[np.float16] | np.dtype[np.float32]
+
+
+# TODO fix up the typing of the shape and dtype once astral-sh implements the relevant features into ty  # noqa: FIX002
 
 
 class Volume[
@@ -68,6 +72,16 @@ class Volume[
         """Object cleanup."""
         gpu_tools.clear_cache()  # Ensure that CuPy cleans up the used memory.
 
+    def as_numpy(self, out: np.ndarray | None = None) -> np.ndarray:
+        """Copy this volume's data into a numpy array."""
+        x = (
+            out
+            if out is not None
+            else np.empty(self._shape, dtype=self._dtype)
+        )
+        self._texture.cuda_array.copy_to(x)
+        return x
+
     @classmethod
     def _new_texture(cls, shape: Shape, dtype: DType) -> texture_tools.Texture:
         return texture_tools.Texture(
@@ -82,14 +96,16 @@ class Volume[
 
     @classmethod
     def zeros(
-        cls, shape: _ShapeType, dtype: _DType = np.dtype(np.float32)
+        cls,
+        shape: _ShapeType,
+        dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
     ) -> Volume:
         """Initialise a new volume, filled with zeros."""
         if type(shape) is not tuple or len(shape) != 3:
             msg = "Invalid shape provided. It should be a tuple of three positive integers."
             raise ValueError(msg)
         self: Volume = cls.__new__(cls)
-        self._dtype = dtype
+        self._dtype = np.dtype(dtype)
         self._shape = shape
         self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
         self.fill(0)
