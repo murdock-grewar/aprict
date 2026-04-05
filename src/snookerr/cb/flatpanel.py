@@ -270,7 +270,9 @@ def project(
             np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
             np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
             np.array(
-                tuple(-np.array(volume.shape, dtype=np.float32) / 2),
+                tuple(
+                    volume.pos_c - np.array(volume.shape, dtype=np.float32) / 2
+                ),
                 dtype=structs.fvec3.dtype,
             ),  # texpos
         ),
@@ -340,7 +342,9 @@ def backproject(
             np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
             np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
             np.array(
-                tuple(-np.array(volume.shape, dtype=np.float32) / 2),
+                tuple(
+                    volume.pos_c - np.array(volume.shape, dtype=np.float32) / 2
+                ),
                 dtype=structs.fvec3.dtype,
             ),  # texpos
         ),

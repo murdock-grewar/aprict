@@ -19,6 +19,8 @@
 # to the volume data. The user should not have to interact with internal
 # classes like texture_tools.Texture, and the like.
 
+import typing
+
 import numpy as np
 
 from .lib import gpu_tools, texture_tools
@@ -44,6 +46,9 @@ class Volume[
 
     # Other fields
     _texture: texture_tools.Texture
+    _pos_c: np.ndarray[
+        tuple[typing.Literal[3],], np.dtype[np.float32]
+    ]  # location of the centre of the volume, in space
 
     @property
     def shape(self) -> _ShapeType:
@@ -55,17 +60,28 @@ class Volume[
         """Return the dtype of the volume array."""
         return self._dtype
 
+    @property
+    def pos_c(
+        self,
+    ) -> np.ndarray[tuple[typing.Literal[3],], np.dtype[np.float32]]:
+        """Return the position of the centre of the volume."""
+        return self._pos_c.copy()
+
     def __init__(
         self,
         arr: np.ndarray[
             Shape, DType
         ],  # this typing ensures the correct dimensions (3) and a supported numpy dtype
+        pos_c: np.ndarray[
+            tuple[typing.Literal[3]], np.dtype[np.float32]
+        ] = np.array((0, 0, 0), dtype=np.float32),
     ) -> None:
         # Essentially, we are storing the resolved types of the TypeVars
         self._dtype = arr.dtype
         self._shape = arr.shape
         # Create the texture and load the data
         self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
+        self._pos_c = pos_c
         self.copy_from(arr)
 
     def __del__(self) -> None:
@@ -99,6 +115,10 @@ class Volume[
         cls,
         shape: _ShapeType,
         dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
+        *,
+        pos_c: np.ndarray[
+            tuple[typing.Literal[3]], np.dtype[np.float32]
+        ] = np.array((0, 0, 0), dtype=np.float32),
     ) -> Volume:
         """Initialise a new volume, filled with zeros."""
         if type(shape) is not tuple or len(shape) != 3:
@@ -107,6 +127,7 @@ class Volume[
         self: Volume = cls.__new__(cls)
         self._dtype = np.dtype(dtype)
         self._shape = shape
+        self._pos_c = pos_c
         self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
         self.fill(0)
         return self

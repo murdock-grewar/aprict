@@ -29,7 +29,7 @@ from snookerr.cb import flatpanel as cbfp
 cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
 ### Configurable parameters ###
-voxwid_mm: float = 1  # the voxel width of the head phantom
+voxwid_mm: float = 2  # the voxel width of the head phantom
 scale_phantom_size: float = (
     2  # make the phantom bigger, without reducing its attenuation coefficient
 )
@@ -38,7 +38,10 @@ flattened_corner_width_mm: float = 430  # also the detector width and height
 num_sources_per_side: int = 17
 pixwid_mm: float = 0.5
 curved_source_edges: bool = True
-superscale_volume_factor: int = 1  # factor by which to upscale the volume resolution, for the purpose of generating data.
+superscale_volume_factor: int = 2  # factor by which to upscale the volume resolution, for the purpose of generating data.
+translate_phantom_mm = (
+    0  # scale_phantom_size*np.array([0, 0, 125], dtype=np.float32)
+)
 total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
 ###############################
 
@@ -292,6 +295,7 @@ vnp *= 0.0184 * voxwid_mm / 1000
 vnp = vnp.astype(np.float16)
 # The volume should now be encoded so that the value in a voxel is the attenuation through one voxel-width.
 # adjust the voxwid_mm to represent the voxel width of the non-supersampled volume
+voxwid_mm_supersamp = voxwid_mm
 voxwid_mm *= superscale_volume_factor
 
 ### Do plotting of the imaging geometry
@@ -365,7 +369,12 @@ config_project = cbfp.ConfigProject(
     shrink_volume_factor=superscale_volume_factor
 )
 projs = cbfp.ProjectionSet(pss, data=None)
-vol = snookerr.Volume(vnp)
+vol = snookerr.Volume(
+    vnp,
+    pos_c=np.array(
+        translate_phantom_mm / voxwid_mm_supersamp, dtype=np.float32
+    ),
+)
 print("Generating the linearised projection data... ", end="", flush=True)
 t1 = time.time()
 out = cbfp.project(
