@@ -314,6 +314,7 @@ __global__ void project_CB_sharedmem(
     // ...
     Tp val = exact_line_integral<Tv, Tp, volchunk_Xsize, volchunk_Ysize, volchunk_Zsize>(
             source_pos*svf, det_pos*svf, volspec, &vchunk_shm);
+    val *= config.multiply_before_adding;
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

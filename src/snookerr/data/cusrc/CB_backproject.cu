@@ -227,13 +227,17 @@ __device__ Tv _backproject_CB_getval(
                     );
 
                     // Find the detector value there
-
-                    det_idx = (
-                        input_projs_strides.y * det_idx_x +
-                        input_projs_strides.z * det_idx_y +
-                        input_projs_strides.x * proj_idx
-                    )/sizeof(Tp);
-                    Tp det_value = input_projs[det_idx];
+                    Tp det_value;
+                    if (config.backproject_all_1s) {
+                        det_value = (Tp)1.;
+                    } else {
+                        det_idx = (
+                            input_projs_strides.y * det_idx_x +
+                            input_projs_strides.z * det_idx_y +
+                            input_projs_strides.x * proj_idx
+                        )/sizeof(Tp);
+                        det_value = input_projs[det_idx];
+                    }
 
                     /*
                     float det_value = tex2DLayered<Tp>(

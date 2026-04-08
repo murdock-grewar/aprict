@@ -61,6 +61,11 @@ class Volume[
         return self._dtype
 
     @property
+    def texture(self) -> texture_tools.Texture:
+        """Return the underlying Texture object."""
+        return self._texture
+
+    @property
     def pos_c(
         self,
     ) -> np.ndarray[tuple[typing.Literal[3],], np.dtype[np.float32]]:
@@ -132,6 +137,10 @@ class Volume[
         self.fill(0)
         return self
 
+    def zeroed_copy(self) -> Volume:
+        """Return a copy of this volume, but filled with zeros."""
+        return Volume.zeros(self._shape, self._dtype, pos_c=self.pos_c)
+
     def fill(self, value: int | float) -> None:
         """Fill the volume with a constant value."""
         tops.fill(self._texture, value)
@@ -143,3 +152,10 @@ class Volume[
     def copy_to(self, arr: np.ndarray[Shape, DType]) -> None:
         """Copy this Volume into a numpy/cupy array."""
         self._texture.cuda_array.copy_to(arr)
+
+    def soften_to_xy_cylinder(
+        self,
+        relrad_start: float,
+    ) -> None:
+        """Softmask the volume to a cylinder coaxial with the z axis."""
+        tops.softmask_to_cylinder_xy(self._texture, relrad_start)

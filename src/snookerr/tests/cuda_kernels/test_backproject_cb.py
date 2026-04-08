@@ -315,7 +315,8 @@ class TestCB_BACKPROJ_randomnoise:
             kernel = request.getfixturevalue("kern_BP_volmem")
         # Set up configuration objects etc
         self.config = np.array(
-            (np.bool(exact), np.bool(True), volres / 2), dtype=ks_config.dtype
+            (np.bool(exact), np.bool(False), np.bool(True), volres / 2),
+            dtype=ks_config.dtype,
         )
         num_projs = np.uint32(numprojs)
         detwid: int = int(4 / 5 * volres * 3)

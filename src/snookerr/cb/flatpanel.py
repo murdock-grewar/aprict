@@ -13,6 +13,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# copyright (c) 2026  murdock grewar
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 # flatpanel.py
 
 """End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code."""
@@ -142,6 +157,48 @@ def assert_flatpanel_geometry_consistency(
     return data_shape
 
 
+def create_proj_spec_array(
+    source_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+    det_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+    det_uvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+    det_vvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+    nu: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+    nv: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
+    """Create a proj_spec array for use in creating a ProjectionSet object."""
+    convert_to_fvec3 = lambda a: np.apply_along_axis(  # noqa: E731
+        lambda arr: np.array(tuple(arr), dtype=structs.fvec3),
+        axis=-1,
+        arr=a,
+    )
+
+    sps = convert_to_fvec3(source_pos)
+    dps = convert_to_fvec3(det_pos)
+    us = convert_to_fvec3(det_uvec)
+    vs = convert_to_fvec3(det_vvec)
+    nus = np.array(nu, dtype=np.uint16)
+    nvs = np.array(nv, dtype=np.uint16)
+    tps = np.array(np.uint(0), dtype=np.uint8)
+
+    def func_det(*args):  # noqa: ANN002, ANN202
+        return np.array(tuple(args), dtype=structs.det_spec)
+
+    func_det_broadcastable = np.frompyfunc(func_det, nin=6, nout=1)
+
+    # func_det_broadcastable = np.vectorize(func_det)
+    def func_proj(*args):  # noqa: ANN002, ANN202
+        return np.array(tuple(args), dtype=structs.proj_spec)
+
+    func_proj_broadcastable = np.frompyfunc(func_proj, nin=2, nout=1)
+    # func_proj_broadcastable = np.vectorize(func_proj)
+    return np.array(
+        func_proj_broadcastable(
+            sps, func_det_broadcastable(dps, us, vs, nus, nvs, tps)
+        ),
+        dtype=structs.proj_spec,
+    )
+
+
 class ProjectionSet:
     """A class to represent a projection geometry, and optionally the associated detector data."""
 
@@ -183,7 +240,7 @@ class ProjectionSet:
     ) -> None:
         """Create an underlying data buffer with the specified dtype."""
         # Handle the case where the data buffer already exists
-        if self._data:
+        if self._data is not None:
             if existing_ok:
                 return
             msg = "Data buffer already exists. Pass 'existing_ok=True' to allow this to occur without raising an exception."
@@ -193,6 +250,23 @@ class ProjectionSet:
             self._proj_specs, self._data
         )
         self._data = cp.zeros(shape, dtype=dtype)
+
+    def zeroed_copy(
+        self, dtype: type[np.float32 | np.float64] | None = None
+    ) -> ProjectionSet:
+        """Return a copy of this object, except with a buffer filled with zeroes."""
+        if self._data is None and dtype is None:
+            msg = "Cannot create a zeroed copy without an explicit 'dtype' argument, because the object you are trying to copy does not yet have a determined dtype."
+            raise ValueError(msg)
+        if self._data is None:
+            data_shape = assert_flatpanel_geometry_consistency(
+                self._proj_specs, self._data
+            )
+            return ProjectionSet(
+                self._proj_specs,
+                data=cp.zeros(data_shape, dtype=dtype),  # ty:ignore[invalid-argument-type]
+            )
+        return ProjectionSet(self._proj_specs, data=cp.zeros_like(self._data))
 
 
 class ConfigProject:
@@ -206,11 +280,15 @@ class ConfigProject:
         return self._contents.copy()  # ty:ignore[unresolved-attribute]
 
     def __init__(
-        self, *, shrink_volume_factor: int | float | None = None
+        self,
+        *,
+        shrink_volume_factor: int | float | None = None,
+        multiply_before_adding: int | float | None = None,
     ) -> None:
         svf = shrink_volume_factor or 1  # coerce 'None' into 1
+        mba = multiply_before_adding or 1
         self._contents = np.array(  # ty:ignore[invalid-assignment]
-            (np.float32(svf),), dtype=structs.config_cb_project
+            (np.float32(svf), np.float32(mba)), dtype=structs.config_cb_project
         )
 
 
@@ -229,6 +307,7 @@ class ConfigBackproject:
         *,
         fast_approx: bool = True,
         cyl_mask_rad_vox: float | int | None = None,
+        backproject_1s: bool = False,
     ) -> None:
         r = cyl_mask_rad_vox or 0  # coerce 'None' to 0
         self._contents = np.array(  # ty:ignore[invalid-assignment]
@@ -236,6 +315,7 @@ class ConfigBackproject:
                 np.bool(
                     not fast_approx
                 ),  # whether to compute the backprojection exactly
+                np.bool(backproject_1s),
                 np.bool(
                     r
                 ),  # whether to apply a circular mask to the backprojection

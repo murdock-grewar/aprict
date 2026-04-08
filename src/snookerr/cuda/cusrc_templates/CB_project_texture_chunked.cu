@@ -325,6 +325,7 @@ __global__ void project_CB_texture_chunked(
     Tp val = 0;
     val = exact_line_integral<Tv, Tp>(
         source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
+    val *= config.multiply_before_adding;
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 

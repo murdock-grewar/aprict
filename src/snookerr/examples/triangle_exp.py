@@ -15,7 +15,6 @@
 
 """Simulate an example experiment with a triangular scanning apparatus."""
 
-import itertools
 import time
 
 import cupy as cp
@@ -29,16 +28,18 @@ from snookerr.cb import flatpanel as cbfp
 cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
 ### Configurable parameters ###
-voxwid_mm: float = 2  # the voxel width of the head phantom
+voxwid_mm: float = 1  # the voxel width of the head phantom
 scale_phantom_size: float = (
-    2  # make the phantom bigger, without reducing its attenuation coefficient
+    # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
+    1
 )
-D_mm: float = 652.5  # shortest distance from center to the edge of the equilateral triangle
-flattened_corner_width_mm: float = 430  # also the detector width and height
+D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle
+flattened_corner_width_mm: float = 440  # also the detector width
+det_aspect_ratio: float = 1  # how many times taller than wide
 num_sources_per_side: int = 17
-pixwid_mm: float = 0.5
+pixwid_mm: float = 0.3
 curved_source_edges: bool = True
-superscale_volume_factor: int = 2  # factor by which to upscale the volume resolution, for the purpose of generating data.
+superscale_volume_factor: int = 4  # factor by which to upscale the volume resolution, for the purpose of generating data.
 translate_phantom_mm = (
     0  # scale_phantom_size*np.array([0, 0, 125], dtype=np.float32)
 )
@@ -87,7 +88,7 @@ e32 = v1 - fcw * np.array(
 # Source and detector parameters
 rdet: float = float(np.linalg.norm((e12 + e21) / 2))
 detwid: float = flattened_corner_width
-dethei: float = detwid
+dethei: float = detwid * det_aspect_ratio
 source_z_spread: float = detwid * 0
 
 # Print some information about the geometry
@@ -98,31 +99,34 @@ print(
 )
 
 # Generate source positions
-# These are scattered along the three edges, and staggered at high/low positions.
+# These are scattered along the three edges.
 if curved_source_edges:
     c2 = rdet * np.array(
         [np.cos(np.deg2rad(90)), np.sin(np.deg2rad(90)), 0], dtype=np.float32
     )
     ang_start2 = np.arctan2((e21 - c2)[1], (e21 - c2)[0])
     ang_end2 = np.arctan2((e22 - c2)[1], (e22 - c2)[0])
+    rad2 = np.linalg.norm(e22 - c2)
     c3 = rdet * np.array(
         [np.cos(np.deg2rad(210)), np.sin(np.deg2rad(210)), 0], dtype=np.float32
     )
     ang_start3 = np.arctan2((e31 - c3)[1], (e31 - c3)[0])
     ang_end3 = np.arctan2((e32 - c3)[1], (e32 - c3)[0])
+    rad3 = np.linalg.norm(e32 - c3)
     c1 = rdet * np.array(
         [np.cos(np.deg2rad(330)), np.sin(np.deg2rad(330)), 0], dtype=np.float32
     )
     ang_start1 = np.arctan2((e11 - c1)[1], (e11 - c1)[0])
     ang_end1 = np.arctan2((e12 - c1)[1], (e12 - c1)[0])
+    rad1 = np.linalg.norm(e12 - c1)
     sps = np.array(
         [
             [
-                tuple(
+                (
                     (
                         c
-                        + 2
-                        * rdet
+                        + 1
+                        * rad
                         * np.array(
                             [np.cos(ang), np.sin(ang), 0], dtype=np.float32
                         )
@@ -138,23 +142,20 @@ if curved_source_edges:
                     )[1:-1]
                 )
             ]
-            for c, ang_start, ang_end in zip(
+            for c, ang_start, ang_end, rad in zip(
                 (c1, c2, c3),
                 (ang_start1, ang_start2, ang_start3),
                 (ang_end1, ang_end2, ang_end3),
+                (rad1, rad2, rad3),
             )
         ],
-        ndmax=2,
-        dtype=snookerr.dtypes.fvec3,
+        dtype=np.float32,
     )
 else:
     sps = np.array(
         [
             [
-                tuple(
-                    v
-                    + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2])
-                )
+                (v + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2]))
                 for i, v in enumerate(
                     np.linspace(
                         endpoint1,
@@ -166,38 +167,33 @@ else:
             ]
             for endpoint1, endpoint2 in zip((e11, e21, e31), (e12, e22, e32))
         ],
-        ndmax=2,
-        dtype=snookerr.dtypes.fvec3,
+        dtype=np.float32,
     )
-assert sps.dtype == snookerr.dtypes.fvec3
 
 
 # Define center coordinates of the three flat-panel detectors
 p1, p2, p3 = np.array(
     [
-        (rdet * np.cos(ang), rdet * np.sin(ang), 0)
+        [rdet * np.cos(ang), rdet * np.sin(ang), 0]
         for ang in [np.deg2rad(angdeg) for angdeg in (330, 90, 210)]
     ],
-    ndmax=1,
-    dtype=snookerr.dtypes.fvec3,
+    dtype=np.float32,
 )
 # Define the horizontal vector pointing from one pixel to the next along the same row
 u1, u2, u3 = np.array(
     [
-        (pixwid * np.cos(ang - np.pi / 2), pixwid * np.sin(ang - np.pi / 2), 0)
+        [pixwid * np.cos(ang - np.pi / 2), pixwid * np.sin(ang - np.pi / 2), 0]
         for ang in [np.deg2rad(angdeg) for angdeg in (330, 90, 210)]
     ],
-    ndmax=1,
-    dtype=snookerr.dtypes.fvec3,
+    dtype=np.float32,
 )
 # Define the vertical vector pointing from one pixel to the next along the same column
 v1, v2, v3 = np.array(
-    [(0, 0, pixwid) for _ in range(3)],
-    ndmax=1,
-    dtype=snookerr.dtypes.fvec3,
+    [[0, 0, pixwid] for _ in range(3)],
+    dtype=np.float32,
 )
 nu = np.uint16(int(detwid / pixwid))  # pixel width  of detectors
-nv = np.uint16(int(detwid / pixwid))  # pixel height of detectors
+nv = np.uint16(int(dethei / pixwid))  # pixel height of detectors
 print("Detector resolution:     ", (int(nu), int(nv)))
 
 photons_per_pixel: float = (
@@ -205,65 +201,22 @@ photons_per_pixel: float = (
 )
 print("Photons (clearfield) per pixel: ", photons_per_pixel)
 
-# Construct the 'detector specification' objects.
-# One is required for every cone-beam projection. So there's one for each source position,
-# and detector combination. Here, I've chosen to arrange them in an array as follows:
-# [
-#   [det_1_source_00, det_1_source_01, ...],
-#   [det_2_source_10, det_1_source_11, ...],
-#   [det_3_source_20, det_1_source_21, ...],
-# ]
-# Each detector is exposed to different source points, but each is exposed to exactly 15 sources,
-# so this type of arrangement is possible. They could all be arranged in a flattened array if desired.
-# The exact layout doesn't matter, as long as it's an array with dtype 'det_spec'.
-dss = np.array(
-    [
-        [
-            (
-                p,
-                u,
-                v,
-                nu,
-                nv,
-                np.uint8(
-                    0
-                ),  # a developer-reserved number. Leave at 0 for a flat-panel detector.
-            )
-            for _ in range(num_sources_per_side)
-        ]
-        for p, u, v in zip(
-            (p1, p2, p3),
-            (u1, u2, u3),
-            (v1, v2, v3),
-        )
-    ],
-    ndmax=2,
-    dtype=snookerr.dtypes.det_spec,
+# Construct the 'projection specification' array.
+pss = cbfp.create_proj_spec_array(
+    source_pos=sps,  # shape (3, N, 3) -- last axis is x,y,z
+    det_pos=np.array(
+        [[p1], [p2], [p3]]
+    ),  # shape (3, 1, 3). Last axis is x,y,z. axis 1 will be broadcast
+    det_uvec=np.array(
+        [[u1], [u2], [u3]]
+    ),  # shape (3, 1, 3). Last axis is x,y,z. axis 1 will be broadcast
+    det_vvec=np.array(
+        [[v1], [v2], [v3]]
+    ),  # shape (3, 1, 3). Last axis is x,y,z. axis 1 will be broadcast
+    nu=nu,  # integer. Will be broadcast.
+    nv=nv,  # integer. Will be broadcast.
 )
-assert dss.dtype == snookerr.dtypes.det_spec.dtype
-print("Number of cone-beam projections: ", dss.size)
-
-
-# Construct an array of 'projection specification' objects.
-# These are pairings of `detector specification' objects with corresponding 'source_pos' objects.
-def convert_to_projspec(sourcepos, det_spec):  # noqa: ANN001, ANN201, D103
-    return np.array(
-        (sourcepos, det_spec), dtype=snookerr.dtypes.proj_spec.dtype
-    )
-
-
-pss = np.empty(sps.shape, dtype=snookerr.dtypes.proj_spec.dtype)
-for index_tuple in itertools.product(*map(range, sps.shape)):
-    pss[index_tuple] = convert_to_projspec(sps[index_tuple], dss[index_tuple])
-assert pss.dtype == snookerr.dtypes.proj_spec.dtype
-# Check that all have the type set to flat panel
-dspecs = np.array(pss["dspec"], dtype=snookerr.dtypes.det_spec.dtype)
-assert np.all(0 == dspecs["type"])
-# Check that all detector dimensions are the same
-nus = dspecs["nu"]
-nvs = dspecs["nv"]
-assert np.all(nus == nus[0])
-assert np.all(nvs == nvs[0])
+print("Number of cone-beam projections: ", pss.size)
 
 
 # Create the volume to be projected
@@ -286,7 +239,6 @@ print("done.")
 print()
 voxwid_mm *= scale_phantom_size
 volwid_mm: float = superscale_volume_factor * volwid * voxwid_mm
-print("Voxel width (mm):        ", voxwid_mm)
 # Remove negative offset from the HU
 vnp += 1000
 # Convert to (very approximate) attenuation coefficient of 0.0184 per mm
@@ -297,6 +249,8 @@ vnp = vnp.astype(np.float16)
 # adjust the voxwid_mm to represent the voxel width of the non-supersampled volume
 voxwid_mm_supersamp = voxwid_mm
 voxwid_mm *= superscale_volume_factor
+print("Voxel width (mm):        ", voxwid_mm)
+print("Voxel width supersampled (mm): ", voxwid_mm_supersamp)
 
 ### Do plotting of the imaging geometry
 # Prepare the 3D plot
@@ -311,18 +265,14 @@ ax.view_init(elev=20.0, azim=-35, roll=0)
 ax.set_aspect("equal")
 # Plot X-ray sources
 ax.scatter(
-    voxwid_mm * sps["x"],
-    voxwid_mm * sps["y"],
-    zs=voxwid_mm * sps["z"],
+    voxwid_mm * sps[..., 0],
+    voxwid_mm * sps[..., 1],
+    zs=voxwid_mm * sps[..., 2],
     marker="x",
     label="X-ray source",
 )
 # Plot detectors
 # Convert the data back to plain np.float32 format so that we can do plotting with matplotlib
-p1, p2, p3, u1, u2, u3, v1, v2, v3 = [
-    np.array([v["x"], v["y"], v["z"]], dtype=np.float32)
-    for v in [p1, p2, p3, u1, u2, u3, v1, v2, v3]
-]
 verts1_mm = voxwid_mm * np.array(
     [
         p1 + nu * u1 / 2 + nv * v1 / 2,
@@ -414,17 +364,14 @@ snookerr.imview.plot_projections(
     ),
     title="max attenuation capped for plotting purposes",
 )
-
+vol_shape_supersampled: tuple[int, int, int] = vol.shape
+del vol  # allow the GPU memory holding the ground truth to be released
 
 # Set up the working volume
-working_vol = snookerr.Volume.zeros(
-    (
-        vol.shape[0] // superscale_volume_factor,
-        vol.shape[1] // superscale_volume_factor,
-        vol.shape[2] // superscale_volume_factor,
-    ),
-    dtype=np.float16,  # ty:ignore[invalid-argument-type]
-)
+vol_shape: tuple[int, int, int] = tuple(
+    s // superscale_volume_factor for s in vol_shape_supersampled
+)  # ty:ignore[invalid-assignment]  # ty is bugged here
+working_vol = snookerr.Volume.zeros(vol_shape, dtype=np.float16)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
 
 # Backproject into the working volume
@@ -443,3 +390,22 @@ t2 = time.time()
 elapsed_milliseconds: float = (t2 - t1) * 1000
 print(f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True)
 snookerr.imview.plot_volume(working_vol.as_numpy())
+
+
+# Make a SIRT object
+working_vol = snookerr.Volume.zeros(vol_shape, dtype=np.float16)  # ty:ignore[invalid-argument-type]
+working_vol.fill(0)
+recon = snookerr.iterators.SIRT_flatpanel(
+    config=snookerr.iterators.SIRT_flatpanel.Config(
+        fast_backproject=True,
+        soft_from_cylinder_relrad=0.95,
+    ),
+    volume=working_vol,
+    projs=projs,
+)
+numits: int = 100
+for i in range(numits + 1):
+    s = f"Iteration {i:04d}/{numits:04d}"
+    print(s + "   -- UNIX time: ", time.time(), flush=True)
+    recon.iterate()
+snookerr.imview.plot_volume(recon.volume.as_numpy(), title=s)

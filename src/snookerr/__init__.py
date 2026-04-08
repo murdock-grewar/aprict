@@ -26,7 +26,7 @@ else:
     del _os
     from . import cb as cb
     from . import image_view as imview
-    from . import lib
+    from . import iterators, lib
     from .cuda import structs as dtypes
     from .volume import Volume
 
@@ -35,5 +35,6 @@ else:
         "cb",
         "dtypes",
         "imview",
+        "iterators",
         "lib",
     ]

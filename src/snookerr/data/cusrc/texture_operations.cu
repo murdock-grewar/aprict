@@ -105,17 +105,83 @@ __global__ void softmask_surface_to_cylinder_xy(
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
     // Compute radius of cylinder, relative to 1 being the maximum
-    float rrel = sqrt((float)(powint(idx.x, 2) + powint(idx.y, 2)))
-        / (float)(min(surfaceDimensions.x, surfaceDimensions.y));
+    float rrel = sqrt(
+            (powint((float)idx.x - (surfaceDimensions.x-1)/2.f, 2) +
+             powint((float)idx.y - (surfaceDimensions.y-1)/2.f, 2)))
+        / (float)(min(surfaceDimensions.x, surfaceDimensions.y)) * 2.f;
     // Return early if inside the unsoftened region of the cylinder
     if (rrel < relrad_start) { return; }
     // Scale rrel: [relrad_start, 1] --> [0, 1]
     rrel = min((rrel-relrad_start)/(1.f-relrad_start), 1.f);
     // Get the multiplier
-    multiplier = min(1.f, max(0.f, (1+cos(rrel * PI/2.f))/2.f));
+    T multiplier = min(1.f, max(0.f, (1+cos(rrel * PI/2.f))/2.f));
     // Read the existing value, apply the multiplier and write it back
     T value = read_from_surf3D<T>(surface, idx);
-    value *= (T)multiplier;
+    value *= multiplier;
     write_to_surf3D(value, surface, idx);
 }
 
+template <typename T> // type of the volumed data. E.g. half or float.
+__global__ void multiplicatively_invert_surface(
+    cudaSurfaceObject_t         surface,
+    uint3                       surfaceDimensions,
+    const bool                  ignore_zeros,
+    const float                 eps  // used to replace zeros with small positive values.
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    // Read the existing value
+    T value = read_from_surf3D<T>(surface, idx);
+    if (ignore_zeros && (value == (T)0)) { return; }
+    if (eps > 0.f) {
+        value = value + (T)(eps * exp(-(float)value/eps));
+    }
+    value = powint(value, -1);
+    write_to_surf3D(value, surface, idx);
+}
+
+template <typename T>
+__global__ void multiply_surface(
+    const T                     value,
+    cudaSurfaceObject_t         surface,
+    uint3                       surfaceDimensions
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    T existing_value = read_from_surf3D<T>(surface, idx);
+    write_to_surf3D(value * existing_value, surface, idx);
+}
+
+
+// Multi-surface operations
+template <typename T1, typename T2, typename TO>
+__global__ void multiply_surfaces(
+    cudaSurfaceObject_t         surface1,
+    cudaSurfaceObject_t         surface2,
+    cudaSurfaceObject_t         surfaceOut,
+    uint3                       surfaceDimensions
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    TO val = read_from_surf3D<T1>(surface1, idx);
+    val *= (TO)read_from_surf3D<T2>(surface2, idx);
+    write_to_surf3D(val, surfaceOut, idx);
+}
+
+template <typename T1, typename T2, typename TO>
+__global__ void add_surfaces(
+    cudaSurfaceObject_t         surface1,
+    cudaSurfaceObject_t         surface2,
+    cudaSurfaceObject_t         surfaceOut,
+    uint3                       surfaceDimensions
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    TO val = read_from_surf3D<T1>(surface1, idx);
+    val += (TO)read_from_surf3D<T2>(surface2, idx);
+    write_to_surf3D(val, surfaceOut, idx);
+}
