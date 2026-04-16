@@ -66,7 +66,7 @@ class SIRT_flatpanel:  # noqa: N801
         self._meas = projs
         self._config_fp = cbfp.ConfigProject()
         self._config_bp = cbfp.ConfigBackproject(
-            fast_approx=not self._config.fast_backproject,
+            fast_approx=self._config.fast_backproject,
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
         )
         # The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1
