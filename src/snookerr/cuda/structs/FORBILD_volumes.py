@@ -499,7 +499,7 @@ class Ellipsoid(
         "x",
         "y",
         "z",
-        "dx",
+        "dx",  # half-axis length along x axis
         "dy",
         "dz",
     ],
@@ -512,14 +512,19 @@ class Ellipsoid(
         np.float32,
         np.float32,
     ],
+    force_dependencies=[Sphere, fvec2, fvec3],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipsoid ellipsoid
 )
 {
-    // TODO
-    return false;
+    const fvec3 pos = fvec3(ellipsoid.x, ellipsoid.y, ellipsoid.z);
+    fvec3 v_rel = v - pos;
+    v_rel.x /= ellipsoid.dx;
+    v_rel.y /= ellipsoid.dy;
+    v_rel.z /= ellipsoid.dz;
+    return (norm_fvec3(v_rel) <= 1);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -529,8 +534,21 @@ __device__ fvec2 FORBILD_clip_line_segment(
     FORBILD_Ellipsoid ellipsoid
 )
 {
-    // TODO
-    return fvec2(0.f, 0.f);
+    const fvec3 pos = fvec3(ellipsoid.x, ellipsoid.y, ellipsoid.z);
+    fvec3 v1_rel = v1 - pos;
+    v1_rel.x /= ellipsoid.dx;
+    v1_rel.y /= ellipsoid.dy;
+    v1_rel.z /= ellipsoid.dz;
+    fvec3 v2_rel = v2 - pos;
+    v2_rel.x /= ellipsoid.dx;
+    v2_rel.y /= ellipsoid.dy;
+    v2_rel.z /= ellipsoid.dz;
+    FORBILD_Sphere sphere;
+    sphere.x = 0.f;
+    sphere.y = 0.f;
+    sphere.z = 0.f;
+    sphere.r = 1.f;
+    return FORBILD_clip_line_segment(v1_rel, v2_rel, sphere);
 }
 """,
 ):
@@ -548,7 +566,7 @@ class Ellipsoid_free(
         "dx",
         "dy",
         "dz",
-        "a_x",
+        "a_x",  # these are meant to be three orthogonal vectors. There's no enforcement of it, though.
         "a_y",
         "a_z",
     ],
@@ -564,25 +582,58 @@ class Ellipsoid_free(
         fvec3,
         fvec3,
     ],
+    force_dependencies=[Sphere, fvec2, fvec3],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
-    FORBILD_Ellipsoid_free ellipsoid_free
+    FORBILD_Ellipsoid_free ef
 )
 {
-    // TODO
-    return false;
+    const fvec3 pos = fvec3(ef.x, ef.y, ef.z);
+    fvec3 v_rel = v - pos;
+    fvec3 ax_normalised = ef.a_x / norm_fvec3(ef.a_x);
+    float vx = dot_prod(v_rel, ax_normalised);
+    fvec3 ay_normalised = ef.a_y / norm_fvec3(ef.a_y);
+    float vy = dot_prod(v_rel, ay_normalised);
+    fvec3 az_normalised = ef.a_z / norm_fvec3(ef.a_z);
+    float vz = dot_prod(v_rel, az_normalised);
+    vx /= ef.dx;
+    vy /= ef.dy;
+    vz /= ef.dz;
+    return (vx*vx + vy*vy + vz*vz <= 1);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
     // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
     fvec3 v1,
     fvec3 v2,
-    FORBILD_Ellipsoid_free ellipsoid_free
+    FORBILD_Ellipsoid_free ef
 )
 {
-    // TODO
-    return fvec2(0.f, 0.f);
+    const fvec3 pos = fvec3(ef.x, ef.y, ef.z);
+    fvec3 v1_rel = v1 - pos;
+    fvec3 v2_rel = v2 - pos;
+    fvec3 ax_normalised = ef.a_x / norm_fvec3(ef.a_x);
+    fvec3 ay_normalised = ef.a_y / norm_fvec3(ef.a_y);
+    fvec3 az_normalised = ef.a_z / norm_fvec3(ef.a_z);
+    float v1x = dot_prod(v1_rel, ax_normalised);
+    float v1y = dot_prod(v1_rel, ay_normalised);
+    float v1z = dot_prod(v1_rel, az_normalised);
+    float v2x = dot_prod(v2_rel, ax_normalised);
+    float v2y = dot_prod(v2_rel, ay_normalised);
+    float v2z = dot_prod(v2_rel, az_normalised);
+    v1x /= ef.dx;
+    v1y /= ef.dy;
+    v1z /= ef.dz;
+    v2x /= ef.dx;
+    v2y /= ef.dy;
+    v2z /= ef.dz;
+    FORBILD_Sphere sphere;
+    sphere.x = 0.f;
+    sphere.y = 0.f;
+    sphere.z = 0.f;
+    sphere.r = 1.f;
+    return FORBILD_clip_line_segment(fvec3(v1x, v1y, v1z), fvec3(v2x, v2y, v2z), sphere);
 }
 """,
 ):
@@ -618,6 +669,7 @@ class Ellipt_Cyl(  # Cylinder with an elliptical cross-section
         fvec3,
         fvec3,
     ],
+    force_dependencies=[Cylinder, fvec2, fvec3],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
