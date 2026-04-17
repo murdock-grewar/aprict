@@ -13,21 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# copyright (c) 2026  murdock grewar
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 # flatpanel.py
 
 """End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code."""
@@ -305,9 +290,10 @@ class ConfigBackproject:
     def __init__(
         self,
         *,
-        fast_approx: bool = True,
+        fast_approx: bool = False,
         cyl_mask_rad_vox: float | int | None = None,
         backproject_1s: bool = False,
+        apply_summand_multiplier: bool = False,
     ) -> None:
         r = cyl_mask_rad_vox or 0  # coerce 'None' to 0
         self._contents = np.array(  # ty:ignore[invalid-assignment]
@@ -320,6 +306,9 @@ class ConfigBackproject:
                     r
                 ),  # whether to apply a circular mask to the backprojection
                 np.float32(r),  # the radius of the circular mask, in voxels
+                np.bool(
+                    apply_summand_multiplier
+                ),  # whether the kernel should use the summand_multiplier argument to multiply the backprojection before adding it to the volume
             ),
             dtype=structs.config_cb_backproject,
         )
@@ -400,11 +389,28 @@ def backproject(
     volume: Volume,
     projs: ProjectionSet,
     block: bool = False,
+    summand_multiplier: Volume | None = None,
 ) -> Volume:
     """Add the backprojection of the projection array to the input volume."""
     # Assert that the projection data is supplied
     if projs.data is None:
         msg = "You must provide projection data to this method."
+        raise ValueError(msg)
+    # Check that the multiplier mask has a matching shape and dtype.
+    # Note that aspects of the multiplier may be ignored. It will just
+    # multiply element-wise.
+    if summand_multiplier is not None:
+        if summand_multiplier.shape != volume.shape:
+            msg = f"Shape mismatch between volume and multiplier. Volume shape: {volume.shape}. Multiplier shape: {summand_multiplier.shape}"
+            raise ValueError(msg)
+        if summand_multiplier.dtype != volume.dtype:
+            msg = f"dtype mismatch between summand multiplier and the volume. Volume dtype: {volume.dtype}. Multiplier dtype: {summand_multiplier.dtype}. Technically, this could be supported, but it is not currently implemented."
+            raise NotImplementedError(msg)
+    # Check for consistency between the config and the presence of a summand_multiplier
+    if config.contents["apply_summand_multiplier"] != (
+        summand_multiplier is not None
+    ):
+        msg = "To prevent unintended behaviour, the config 'apply_summand_multiplier' must be true if and only if a summand_multiplier is included."
         raise ValueError(msg)
     # Prepare the kernel and the static kernel args
     blockx = min(10, volume.shape[0])
@@ -475,6 +481,9 @@ def backproject(
                 config.contents,
                 texchunkspec,
                 volume._texture.surfobj,  # noqa: SLF001
+                None
+                if summand_multiplier is None
+                else summand_multiplier._texture.surfobj,  # noqa: SLF001
                 input_proj_chunk_spec,
             )
             kern(grid_dims, block_dims, args)

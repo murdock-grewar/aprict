@@ -365,7 +365,9 @@ snookerr.imview.plot_projections(
     title="max attenuation capped for plotting purposes",
 )
 vol_shape_supersampled: tuple[int, int, int] = vol.shape
-del vol  # allow the GPU memory holding the ground truth to be released
+
+# Free up memory by deleting various unneeded variables
+del vol, out_noised_attenuation, out_noised_transmission, out_, projs
 
 # Set up the working volume
 vol_shape: tuple[int, int, int] = tuple(

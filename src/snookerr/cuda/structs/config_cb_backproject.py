@@ -32,8 +32,9 @@ class config_cb_backproject(
         "backproject_all_1s",
         "mask_to_cylinder",
         "mask_to_cyl_rad",
+        "apply_summand_multiplier",
     ],
-    dtypes=[np.bool, np.bool, np.bool, np.float32],
+    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool],
 ):
     pass  # ty:ignore[invalid-argument-type]
 

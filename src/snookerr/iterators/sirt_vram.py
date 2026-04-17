@@ -38,7 +38,6 @@ class SIRT_flatpanel:  # noqa: N801
 
     _preconditioner_volume: Volume
     _proj_scratch_space: cbfp.ProjectionSet
-    _vol_scratch_space: Volume  # unecessary once optimised
 
     _config_bp: cbfp.ConfigBackproject
     _config_fp: cbfp.ConfigProject
@@ -62,12 +61,12 @@ class SIRT_flatpanel:  # noqa: N801
     ) -> None:
         self._config = config
         self._vol = volume
-        self._vol_scratch_space = volume.zeroed_copy()
         self._meas = projs
         self._config_fp = cbfp.ConfigProject()
         self._config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
+            apply_summand_multiplier=True,  # we'll multiply by the preconditioner
         )
         # The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1
         # We will calculate M now.
@@ -87,8 +86,13 @@ class SIRT_flatpanel:  # noqa: N801
         cp.true_divide(p.data, meanval / scale_factor, out=p.data)
         scale_factor /= meanval / scale_factor
         M.fill(0)
+        non_multiply_config_bp = cbfp.ConfigBackproject(
+            fast_approx=self._config.fast_backproject,
+            cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
+            apply_summand_multiplier=False,  # Turn this off while we compute the preconditioner
+        )
         cbfp.backproject(
-            config=self._config_bp, volume=M, projs=p, block=True
+            config=non_multiply_config_bp, volume=M, projs=p, block=True
         )  # diag(A^T A \vec{1})
         tops.invert(
             t=M.texture, ignore_zeros=True, softmax_epsilon=0.1
@@ -119,28 +123,16 @@ class SIRT_flatpanel:  # noqa: N801
             block=True,
         )
         # Add the backprojection of the residual into the volume
-        # TODO: make it add directly to the volume, by allowing an extra argument in the kernel to multiply by the value of another texture. This will save another copy of the volume from being in VRAM  # noqa: FIX002
-        self._vol_scratch_space.fill(0)
+        # Also multiply by the preconditioner before adding
         cbfp.backproject(
             config=self._config_bp,
-            volume=self._vol_scratch_space,
+            volume=self._vol,
             projs=self._proj_scratch_space,
+            summand_multiplier=self._preconditioner_volume,
             block=True,
         )
-        # Multiply by the preconditioner
-        tops.multiply_textures(
-            self._vol_scratch_space.texture,
-            self._preconditioner_volume.texture,
-            tout=self._vol_scratch_space.texture,
-        )
         # Soften the edges
-        self._softmask_vol(self._vol_scratch_space)
-        # Add it
-        tops.add_textures(
-            self._vol_scratch_space.texture,
-            self._vol.texture,
-            tout=self._vol.texture,
-        )
+        self._softmask_vol(self._vol)
 
     @property
     def volume(self) -> Volume:

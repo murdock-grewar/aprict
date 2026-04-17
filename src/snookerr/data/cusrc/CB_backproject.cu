@@ -285,6 +285,7 @@ __device__ Tv _backproject_CB_getval(
 }
 
 
+// DEPRECATED!! May ignore some options, or behave in unexpected ways!
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
@@ -327,12 +328,13 @@ __global__ void backproject_CB_volmem(
 
 
 template<
-    typename Tv,  // type of volume data. e.g. float or double.
+    typename Tv,  // type of volume data. e.g. float or double. It is assumed that the summand_multiplier_surface is the same type!
     typename Tp>  // type of projection data. e.g. float or double
 __global__ void backproject_CB_voltex(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const vol_tex_chunk_spec        voltexchunkspec,
         const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
+        const cudaSurfaceObject_t       summand_multiplier_surface,  // if configured to do so, then the backprojection will be multiplied by the corresponding value in this multiplier before being added to the volume
         const proj_chunk_spec_maxlen10  proj_chunk_spec
 )
 {
@@ -355,6 +357,10 @@ __global__ void backproject_CB_voltex(
 
     // Write the value to the surface memory and leave
     if (value == (Tv)0) { return; }  // Generally not safe to typecast a number to the half type, but OK when 0.
+    // Multiply by the multiplier, if applicable
+    if (config.apply_summand_multiplier) {
+        value *= read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+    }
     value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
     write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
 }

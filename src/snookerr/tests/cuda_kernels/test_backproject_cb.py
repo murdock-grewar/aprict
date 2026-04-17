@@ -315,7 +315,13 @@ class TestCB_BACKPROJ_randomnoise:
             kernel = request.getfixturevalue("kern_BP_volmem")
         # Set up configuration objects etc
         self.config = np.array(
-            (np.bool(exact), np.bool(False), np.bool(True), volres / 2),
+            (
+                np.bool(exact),
+                np.bool(False),
+                np.bool(True),
+                volres / 2,
+                np.bool(False),
+            ),
             dtype=ks_config.dtype,
         )
         num_projs = np.uint32(numprojs)
@@ -514,6 +520,7 @@ class TestCB_BACKPROJ_randomnoise:
                     config,
                     texchunkspec,
                     self.vtex.surfobj,  # ty:ignore[unresolved-attribute]
+                    None,  # the summand_multiplier surface. For these tests, the config is set not to use it.
                     input_proj_chunk_spec,
                 )
             else:
