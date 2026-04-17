@@ -4,6 +4,8 @@
 #include "base.h"
 #include "geometry.h"
 #include "config_cb_project.h"
+#include "config_cb_project_FORBILD.h"
+#include "FORBILD_volumes.h"
 
 // Define a structure and method to compute line integrals through voxelised volumes
 typedef struct {
@@ -90,6 +92,7 @@ __device__ half read_from_tex3D<half>(
 )
 { return __ushort_as_half(read_from_tex3D<unsigned short>(surface, coords)); }
 */
+
 
 template<
     typename Tv,
@@ -325,6 +328,84 @@ __global__ void project_CB_texture_chunked(
     Tp val = 0;
     val = exact_line_integral<Tv, Tp>(
         source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
+    val *= config.multiply_before_adding;
+    // Do things ...
+    //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+
+    // Add the result atomically.
+    // (using atomicAdd allows us to launch other kernels concurrently, if desired)
+    atomicAdd(&output_projs[det_idx], val);
+}
+
+
+template<
+    typename Tp,  // type of projection data. e.g. float or double
+    typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera
+>
+__global__ void project_CB_FORBILD_shapes(
+        const config_CB_project_FORBILD   config,          // any miscellaneous config for the CB projection
+        const proj_spec*          projspecs,       // contains the source and detector configurations
+        const unsigned int        num_projs,       // length of projspecs array
+        const Ts*                 shapes,          // shapes array
+        const unsigned int        num_shapes,      // number of shapes
+        const uivec3              output_projs_strides,
+        Tp*                       output_projs
+)
+{
+
+    /*
+    const unsigned long threadid = (
+        threadIdx.x +
+        threadIdx.y * blockDim.x +
+        threadIdx.z * blockDim.x * blockDim.y
+    );
+    const unsigned long vol_chunk_size = volchunk_Xsize*volchunk_Ysize*volchunk_Zsize;
+    */
+    unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
+    unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
+    unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
+
+    /* This does make things somewhat faster, maybe 15%, but not worth the complexity I suppose.
+    // Load the shapes into a shared array.
+    __shared__ FORBILD_Shape shapes_shared[100];
+    unsigned int id_in_block = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
+    if (id_in_block < num_shapes) {
+        shapes_shared[id_in_block] = shapes[id_in_block];
+    }
+    __syncthreads();
+    */
+
+    // Now, if out of range of the detector, then return.
+    if (proj_idx >= num_projs) {
+        return;
+    }
+    proj_spec projspec = projspecs[proj_idx];
+    if ((det_idx_x >= projspec.dspec.nu) ||
+        (det_idx_y >= projspec.dspec.nv)) {
+        return;
+    }
+
+    // Get the index 'det_idx' of the detector data that this thread should write to
+    unsigned long det_idx = (
+        output_projs_strides.y * det_idx_x +
+        output_projs_strides.z * det_idx_y +
+        output_projs_strides.x * proj_idx
+    )/sizeof(Tp);
+
+    // Get the start and end points of the projection line
+    fvec3 source_pos = projspec.sourcepos;
+    fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
+
+    // Calculate projection
+    // ...
+    Tp val = 0;
+    if (config.overlap_addition) {
+        for (unsigned int i = 0; i < num_shapes; i++) {
+            val += exact_line_integral<Tp>(source_pos, det_pos, shapes[i]);
+        }
+    } else {
+        val = exact_line_integral_prioritise_last(source_pos, det_pos, shapes, num_shapes);
+    }
     val *= config.multiply_before_adding;
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);

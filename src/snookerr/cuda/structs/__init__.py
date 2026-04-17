@@ -28,8 +28,10 @@ will generate the .h files in a directory structure that mirrors this
 directory.
 """
 
+from . import FORBILD_volumes as FORBILD_volumes
 from . import test_subdir as test_subdir
 from .base import *
 from .config_cb_backproject import *
 from .config_cb_project import *
+from .config_cb_project_FORBILD import *
 from .geometry import *
