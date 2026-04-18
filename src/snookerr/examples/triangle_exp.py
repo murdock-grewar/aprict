@@ -232,7 +232,7 @@ print(
 )
 print()
 print("Generating FORBILD head phantom... ", end="", flush=True)
-vnp, voxwid_mm = snookerr.lib.phantoms.FORBILD_head_HU(
+vnp, voxwid_mm = snookerr.phantoms.FORBILD_head_HU(
     volwid * superscale_volume_factor
 )  # intentionally overwriting voxwid_mm
 print("done.")

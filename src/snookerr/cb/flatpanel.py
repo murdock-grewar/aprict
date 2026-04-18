@@ -18,7 +18,6 @@
 """End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code."""
 
 import itertools
-from typing import TYPE_CHECKING
 
 import cupy as cp
 import numpy as np
@@ -26,10 +25,7 @@ import numpy.typing as npt  # noqa: F401
 
 from ..cuda import header_injection, structs
 from ..cuda.kern_structs import _np_dtype_to_c_type
-
-if TYPE_CHECKING:
-    from ..volume import Volume
-
+from ..volume import FBVolume, Volume
 
 _delay_compile: bool = (
     True  # only compile the CUDA kernels when they are first called.
@@ -50,6 +46,31 @@ def _injected_module_project_texture_chunked() -> cp.RawModule:
             f"project_CB_texture_chunked<{t1:s},{t2:s}>"
             for t1, t2 in itertools.product(
                 ["half", "float"], ["float", "double"]
+            )
+        ]
+        + [
+            f"project_CB_FORBILD_shapes<{t1:s},{t2:s}>"
+            for t1, t2 in itertools.product(
+                ["half", "float"],
+                [
+                    "FORBILD_" + s
+                    for s in [
+                        "Box",
+                        "Cone",
+                        "Cone",
+                        "Cone",
+                        "Cone",
+                        "Cylinder",
+                        "Cylinder_x",
+                        "Cylinder_y",
+                        "Cylinder_z",
+                        "Ellipsoid",
+                        "Ellipsoid_free",
+                        "Ellipt_Cyl",
+                        "Shape",
+                        "Sphere",
+                    ]
+                ],
             )
         ],
     )
@@ -80,17 +101,26 @@ _backprojection_module: cp.RawModule = _injected_module_backproject()
 
 def _select_projection_kernel(  # noqa: ANN202
     config: ConfigProject,  # noqa: ARG001
-    volume: Volume,
+    volume: Volume | FBVolume,
     projs: ProjectionSet,
 ):
     if projs.data is None:
         msg = "Cannot select the proper kernel when the datatype of the projectionset is as-yet unknown."
         raise RuntimeError(msg)
-    t1 = _np_dtype_to_c_type[volume.dtype]
-    t2 = _np_dtype_to_c_type[projs.data.dtype]
-    return _projection_module.get_function(
-        f"project_CB_texture_chunked<{t1:s},{t2:s}>"
-    )
+    if type(volume) is Volume:
+        t1 = _np_dtype_to_c_type[volume.dtype]
+        t2 = _np_dtype_to_c_type[projs.data.dtype]
+        return _projection_module.get_function(
+            f"project_CB_texture_chunked<{t1:s},{t2:s}>"
+        )
+    if type(volume) is FBVolume:
+        tp = _np_dtype_to_c_type[projs.data.dtype]
+        tv = "FORBILD_Shape"
+        return _projection_module.get_function(
+            f"project_CB_FORBILD_shapes<{tp:s},{tv:s}>"
+        )
+    msg = f"Unknown volume type: {type(volume)}"
+    raise RuntimeError(msg)
 
 
 def _select_backprojection_kernel(  # noqa: ANN202
@@ -255,14 +285,20 @@ class ProjectionSet:
 
 
 class ConfigProject:
-    """Configuration object for projections."""
+    """Configuration object for projections. Some options will have no effect if a Volume or FBVolume."""
 
     _contents: np.dtype[structs.config_cb_project]  # ty:ignore[invalid-type-arguments]
+    _contents_fb: np.dtype[structs.config_cb_project_FORBILD]  # ty:ignore[invalid-type-arguments]
 
     @property
     def contents(self) -> np.dtype[structs.config_cb_project]:  # ty:ignore[invalid-type-arguments]
         """Get the configuration object underlying this object."""
         return self._contents.copy()  # ty:ignore[unresolved-attribute]
+
+    @property
+    def contents_fb(self) -> np.dtype[structs.config_cb_project_FORBILD]:  # ty:ignore[invalid-type-arguments]
+        """Get the configuration object underlying this object."""
+        return self._contents_fb.copy()  # ty:ignore[unresolved-attribute]
 
     def __init__(
         self,
@@ -274,6 +310,11 @@ class ConfigProject:
         mba = multiply_before_adding or 1
         self._contents = np.array(  # ty:ignore[invalid-assignment]
             (np.float32(svf), np.float32(mba)), dtype=structs.config_cb_project
+        )
+        overlap_addition: bool = False  # The default behaviour of FORBILD is to prioritise later volumes, not to add them together. Leave this behaviour as is, by keeping this False.
+        self._contents_fb = np.array(  # ty:ignore[invalid-assignment]
+            (np.float32(mba), np.bool(overlap_addition)),
+            dtype=structs.config_cb_project_FORBILD,
         )
 
 
@@ -316,17 +357,18 @@ class ConfigBackproject:
 
 def project(
     config: ConfigProject,
-    volume: Volume,
+    volume: Volume | FBVolume,
     projs: ProjectionSet,
     block: bool = False,
 ) -> ProjectionSet:
     """Add the projection of the input volume to the output array."""
     projs.create_buffer(dtype=np.float32, existing_ok=True)
     assert projs.data is not None
+    is_fb: bool = type(volume) is FBVolume
     # Prepare the kernel and the static kernel args
-    blockx = min(10, projs.data.shape[-2])
-    blocky = min(10, projs.data.shape[-1])
-    blocklayer = min(10, projs.data.shape[-3])
+    blockx = min(5 if is_fb else 10, projs.data.shape[-2])
+    blocky = min(5 if is_fb else 10, projs.data.shape[-1])
+    blocklayer = min(5 if is_fb else 10, projs.data.shape[-3])
     kern = _select_projection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blocklayer)
     grid_dims = (
@@ -334,19 +376,28 @@ def project(
         int(np.ceil(projs.data.shape[-1] / blocky)),
         int(np.ceil(projs.data.shape[-3] / blocklayer)),
     )  # gridDims:  (x,y,z)
-    texchunkspec = np.array(
-        (
-            np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
-            np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
-            np.array(
-                tuple(
-                    volume.pos_c - np.array(volume.shape, dtype=np.float32) / 2
-                ),
-                dtype=structs.fvec3.dtype,
-            ),  # texpos
-        ),
-        dtype=structs.vol_tex_chunk_spec.dtype,
-    )
+    if not is_fb:
+        assert type(volume) is Volume
+        texchunkspec = np.array(
+            (
+                np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
+                np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
+                np.array(
+                    tuple(
+                        volume.pos_c
+                        - np.array(volume.shape, dtype=np.float32) / 2
+                    ),
+                    dtype=structs.fvec3.dtype,
+                ),  # texpos
+            ),
+            dtype=structs.vol_tex_chunk_spec.dtype,
+        )
+    if is_fb:
+        assert type(volume) is FBVolume
+        input_shapes = cp.array(
+            volume.shapes, dtype=structs.FORBILD_volumes.Shape
+        )
+        input_num_shapes = np.uint32(input_shapes.size)
     input_proj_array_len = np.uint32(projs.data.shape[-3])
     input_proj_array_strides = np.array(
         projs.data.strides[-3:], dtype=structs.uivec3.dtype
@@ -369,16 +420,30 @@ def project(
             )
         )
         # Launch the kernel
-        args = (  # input args
-            config.contents,
-            input_proj_specs_slice,
-            input_proj_array_len,
-            texchunkspec,
-            volume._texture.surfobj,  # noqa: SLF001
-            input_proj_array_strides,  # strides in bytes
-            input_proj_array_ptr,  # pointer to the beginning of the det data
-        )
-        kern(grid_dims, block_dims, args)
+        if is_fb:
+            assert type(volume) is FBVolume
+            args = (  # input args
+                config.contents_fb,
+                input_proj_specs_slice,
+                input_proj_array_len,
+                input_shapes,
+                input_num_shapes,
+                input_proj_array_strides,  # strides in bytes
+                input_proj_array_ptr,  # pointer to the beginning of the det data
+            )
+            kern(grid_dims, block_dims, args)
+        else:
+            assert type(volume) is Volume
+            args = (  # input args
+                config.contents,
+                input_proj_specs_slice,
+                input_proj_array_len,
+                texchunkspec,
+                volume._texture.surfobj,  # noqa: SLF001
+                input_proj_array_strides,  # strides in bytes
+                input_proj_array_ptr,  # pointer to the beginning of the det data
+            )
+            kern(grid_dims, block_dims, args)
     if block:
         cp.cuda.get_current_stream().synchronize()
     return projs

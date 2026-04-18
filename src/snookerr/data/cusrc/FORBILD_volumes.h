@@ -515,8 +515,8 @@ __device__ fvec2 FORBILD_clip_line_segment(
     float v2z = dot_prod(v2_rel, az_normalised);
     float v2x, v2y;
     if (v1x == 0) {
-        float v2x = sqrt(max(0.f, (v2_rel.x*v2_rel.x + v2_rel.y*v2_rel.y + v2_rel.z*v2_rel.z) - v2z*v2z));
-        float v2y = 0.f;
+        v2x = sqrt(max(0.f, (v2_rel.x*v2_rel.x + v2_rel.y*v2_rel.y + v2_rel.z*v2_rel.z) - v2z*v2z));
+        v2y = 0.f;
     } else {
         fvec3 xhat = v1_rel - az_normalised*v1z;
         xhat = xhat / norm_fvec3(xhat);
@@ -952,13 +952,13 @@ __device__ fvec2 FORBILD_clip_line_segment(
     v1y /= ecyl.dy;
     v2x /= ecyl.dx;
     v2y /= ecyl.dy;
-    FORBILD_Cylinder cylinder;
-    cylinder.x = 0.f;
-    cylinder.y = 0.f;
-    cylinder.z = 0.f;
-    cylinder.r = 1.f;
-    cylinder.l = ecyl.l;
-    return FORBILD_clip_line_segment(fvec3(v1x, v1y, v1z), fvec3(v2x, v2y, v2z), cylinder);
+    FORBILD_Cylinder_z cylinder_z;
+    cylinder_z.x = 0.f;
+    cylinder_z.y = 0.f;
+    cylinder_z.z = 0.f;
+    cylinder_z.r = 1.f;
+    cylinder_z.l = ecyl.l;
+    return FORBILD_clip_line_segment(fvec3(v1x, v1y, v1z), fvec3(v2x, v2y, v2z), cylinder_z);
 }
 
 
@@ -1091,7 +1091,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
     }
     minf = max(minf, interval.x);  // first  component
     maxf = min(maxf, interval.y);  // second component
-    minf = min(minf, maxf);  // ensure maxf is greater than or equal to minf
+    maxf = max(minf, maxf);  // ensure maxf is greater than or equal to minf
     return fvec2(minf, maxf);
 }
 
@@ -1158,7 +1158,7 @@ __device__ Tp exact_line_integral(
 
 // A template method for all the shapes to use, including FORBILD_Shape
 template<typename Ts>
-__device__ float exact_line_integral_prioritise_last(
+__device__ float exact_line_integral_prioritise_last_recursive(
         const fvec3                 v1,
         const fvec3                 v2,
         const Ts*                   shapes,
@@ -1197,6 +1197,59 @@ __device__ float exact_line_integral_prioritise_last(
             v1, v1 + dv*interval.x, shapes, new_num_shapes);
         val += exact_line_integral_prioritise_last(
             v1 + dv*interval.y, v2, shapes, new_num_shapes);
+    }
+    return val;
+}
+
+// A template method for all the shapes to use, including FORBILD_Shape
+template<typename Ts>
+__device__ float exact_line_integral_prioritise_last(
+        const fvec3                 v1,
+        const fvec3                 v2,
+        const Ts*                   shapes,
+        const unsigned int          num_shapes
+)
+{
+    // Base case
+    if (num_shapes == 0) {
+        return 0.f;
+    }
+    // Return if line segment has length 0
+    const fvec3 dv = v2 - v1;
+    const float dv_norm = norm_fvec3(dv);
+    if (dv_norm == 0) {
+        return 0.f;
+    }
+
+    // To avoid recursion, use a loop to find the first shape (beginning from the end)
+    // which has any overlap with this line
+    unsigned int index;
+    float progress = 0.f;
+    float val = 0.f;
+    while (progress < 1.f) {
+        fvec2 interval = fvec2(1.f, 1.f);
+        for (unsigned int i = 0; i < num_shapes; i++) {
+            fvec2 interval_tmp = FORBILD_clip_line_segment(v1, v2, shapes[i]);
+            interval_tmp.x = max(interval_tmp.x, progress);
+            interval_tmp.y = max(interval_tmp.y, progress);
+            if (interval_tmp.y == interval_tmp.x) {
+                continue;
+            }
+            if (interval_tmp.x <= interval.x) {
+                index = i;
+                interval.x = interval_tmp.x;
+                interval.y = interval_tmp.y;
+            } else {
+                // If a later shape overlaps, then shrink the domain of integration
+                interval.y = min(interval.y, interval_tmp.x);
+            }
+        }
+        float len = interval.y - interval.x;
+        if (len > 0.f) {
+            Ts shape = shapes[index];
+            val += len * FORBILD_get_rho(shape) * dv_norm;
+        }
+        progress = interval.y;
     }
     return val;
 }

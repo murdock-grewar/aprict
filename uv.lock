@@ -492,6 +492,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pcpp"
+version = "1.30"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/07/876153f611f2c610bdb8f706a5ab560d888c938ea9ea65ed18c374a9014a/pcpp-1.30.tar.gz", hash = "sha256:5af9fbce55f136d7931ae915fae03c34030a3b36c496e72d9636cedc8e2543a1", size = 94283, upload-time = "2021-10-29T13:16:54.565Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/ca/ada7f39c5a0977893e0ef809b1617b259b2d76f6382a7abad00dd6d77904/pcpp-1.30-py2.py3-none-any.whl", hash = "sha256:05fe08292b6da57f385001c891a87f40d6aa7f46787b03e8ba326d20a3297c6e", size = 91085, upload-time = "2021-10-29T13:16:51.846Z" },
+]
+
+[[package]]
 name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -934,6 +943,7 @@ dependencies = [
     { name = "imageio" },
     { name = "numexpr" },
     { name = "numpy" },
+    { name = "pcpp" },
     { name = "pydantic" },
     { name = "scipy" },
 ]
@@ -970,6 +980,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'gui'", specifier = ">=3.10.8" },
     { name = "numexpr", specifier = ">=2.14.1" },
     { name = "numpy", specifier = ">=2.4.3" },
+    { name = "pcpp", specifier = ">=1.30" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyqtgraph", marker = "extra == 'gui'", specifier = ">=0.14.0" },
     { name = "scipy", specifier = ">=1.17.1" },

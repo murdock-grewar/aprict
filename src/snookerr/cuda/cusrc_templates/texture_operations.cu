@@ -114,7 +114,7 @@ __global__ void softmask_surface_to_cylinder_xy(
     // Scale rrel: [relrad_start, 1] --> [0, 1]
     rrel = min((rrel-relrad_start)/(1.f-relrad_start), 1.f);
     // Get the multiplier
-    T multiplier = min(1.f, max(0.f, (1+cos(rrel * PI/2.f))/2.f));
+    T multiplier = min(1.f, max(0.f, (1+cos(rrel * PI))/2.f));
     // Read the existing value, apply the multiplier and write it back
     T value = read_from_surf3D<T>(surface, idx);
     value *= multiplier;

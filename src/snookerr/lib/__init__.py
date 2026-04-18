@@ -14,9 +14,3 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Miscellaneous helper tools."""
-
-from . import phantoms
-
-__all__ = [
-    "phantoms",
-]

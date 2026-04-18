@@ -26,15 +26,17 @@ else:
     del _os
     from . import cb as cb
     from . import image_view as imview
-    from . import iterators, lib
+    from . import iterators, lib, phantoms
     from .cuda import structs as dtypes
-    from .volume import Volume
+    from .volume import FBVolume, Volume
 
     __all__ = [
+        "FBVolume",
         "Volume",
         "cb",
         "dtypes",
         "imview",
         "iterators",
         "lib",
+        "phantoms",
     ]

@@ -98,6 +98,8 @@ class SIRT_flatpanel:  # noqa: N801
             t=M.texture, ignore_zeros=True, softmax_epsilon=0.1
         )  # diag(A^T A \vec{1})^-1
         tops.multiply(M.texture, scale_factor)
+        # Add the softening factor into the preconditioner
+        self._softmask_vol(M)
         self._preconditioner_volume = M
         self._proj_scratch_space = p
 
@@ -132,7 +134,8 @@ class SIRT_flatpanel:  # noqa: N801
             block=True,
         )
         # Soften the edges
-        self._softmask_vol(self._vol)
+        # Nope, this is incorporated into the preconditioner
+        # self._softmask_vol(self._vol)
 
     @property
     def volume(self) -> Volume:

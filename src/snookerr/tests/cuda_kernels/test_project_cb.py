@@ -36,7 +36,8 @@ from ...cuda.structs import (
     vol_spec as ks_vol_spec,
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
 )
-from ...lib import phantoms, texture_tools
+from ...lib import texture_tools
+from ... import phantoms
 
 str_pytest_gen_sources: str = "ks_gen_sources"
 

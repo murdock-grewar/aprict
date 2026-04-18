@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+# Copyright (C) 2026  Murdock Grewar
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""A hacked together script to convert some .pha files to a list of Shapes for use in snookerr."""
+
+import io
+import re
+import sys
+from typing import TYPE_CHECKING
+
+import numexpr as ne
+import numpy as np
+import pcpp
+
+from ..cuda.structs import FORBILD_volumes as fv
+
+if TYPE_CHECKING:
+    import pathlib
+
+_typedict = {
+    "Sphere": fv.Sphere,
+    "Box": fv.Box,
+    "Cylinder_x": fv.Cylinder_x,
+    "Cylinder_y": fv.Cylinder_y,
+    "Cylinder_z": fv.Cylinder_z,
+    "Cylinder": fv.Cylinder,
+    "Ellipsoid": fv.Ellipsoid,
+    "Ellipsoid_free": fv.Ellipsoid_free,
+    "Ellipt_Cyl": fv.Ellipt_Cyl,
+    "Cone": fv.Cone,
+    "Cone_x": fv.Cone_x,
+    "Cone_y": fv.Cone_y,
+    "Cone_z": fv.Cone_z,
+}
+
+re_obj = re.compile(r"{[^}]*}")
+re_key = re.compile(r"(?<=[ \[])[^= ]+=\s*[^ ]+(?=[ \]])")
+re_shape = re.compile(r"\[[^\]]*\]")
+re_shape_name = re.compile(r"(?<=[\[ ])[^ \]:]*(?=:)")
+re_clip_plane = re.compile(r"(?<=[\[ \{])[^ <>:=]+[<>][^ <>:=]+(?=[ \]\}])")
+# re_define_pragma = re.compile(r"\s*#define\s+([^\s]+)\s+([^\s].*)")
+re_float3 = re.compile(
+    r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^ <>:=,]+),([^ <>:=,]+),([^ <>:=,]+)\)"
+)
+
+
+def _preprocess_file(fn: str | pathlib.Path) -> str:
+    p = pcpp.Preprocessor()
+    with open(fn, "r") as f:  # noqa: PLW1514
+        p.parse(f)
+    oh = io.StringIO()
+    p.write(oh)
+    return oh.getvalue()
+
+
+def convert_ph_file_to_shapes(  # noqa: C901, D103
+    fn: str | pathlib.Path,
+) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
+
+    shapes: list[np.ndarray[np.dtype[fv.Shape]]] = []  # ty:ignore[invalid-type-arguments]
+
+    s: str = _preprocess_file(fn)
+    # Now get rid of newlines. Treat it as one long string
+    # Shapes are contained in { ... } which makes it easy to process
+    s = s.replace("\n", " ")
+
+    # translations
+    s = s.replace("achse", "axis")
+    s = s.replace("dichte", "rho")
+    s = re.sub(
+        r"(cos|sin|tan)\(([\-+*/0-9\. ]*)\)",
+        lambda m: (
+            m.groups()[0]
+            + "("
+            + "3.1415926535898/180*("
+            + m.groups()[1]
+            + "))"
+        ),
+        s,
+    )
+
+    objs = re_obj.findall(s)
+    for obj in objs:
+        shape = re_shape.findall(obj)[0]
+        remaining = re_shape.sub("", obj)
+        remaining_properties = re_key.findall(remaining)
+        shape_name = re_shape_name.findall(shape)[0]
+        shape_properties = re_key.findall(shape)
+        clip_planes = re_clip_plane.findall(shape)
+
+        # Construct an empty object of the correct type
+        shape_obj = np.array(0, dtype=fv.Shape)
+        shape_obj[shape_name] = np.array(0, dtype=_typedict[shape_name])
+        shape_obj["type"] = fv._dict_shape_name_to_type_num[shape_name]  # noqa: SLF001
+        # Fill the shape with the found properties
+        for k, v in [
+            prop.split("=") for prop in shape_properties + remaining_properties
+        ]:
+            if k in ("formel",):
+                continue
+            shape_obj[shape_name][k] = ne.evaluate(v.strip())
+        for m in re_float3.finditer(shape):
+            name, x, y, z = m.groups()
+            x, y, z = [ne.evaluate(thing.strip()) for thing in (x, y, z)]
+            vec = np.array((x, y, z), dtype=fv.fvec3)
+            shape_obj[shape_name][name] = vec
+
+        # The FORBILD format only requires the user to specify two axes, if they wish
+        # The third must be computed from the other two.
+        zerofvec3 = np.array(0, dtype=fv.fvec3)
+        match shape_name:
+            case "Ellipsoid_free":
+                vec_name_set = {"a_x", "a_y", "a_z"}
+                for vecname in vec_name_set:
+                    if shape_obj[shape_name][vecname] == zerofvec3:
+                        u, v = [
+                            shape_obj[shape_name][vn]
+                            for vn in vec_name_set - {vecname}
+                        ]
+                        u = np.array(
+                            [u["x"], u["y"], u["z"]], dtype=np.float32
+                        )
+                        v = np.array(
+                            [v["x"], v["y"], v["z"]], dtype=np.float32
+                        )
+                        shape_obj[shape_name][vecname] = np.array(
+                            tuple(np.cross(u, v)), dtype=fv.fvec3
+                        )
+                        break
+            case "Ellipt_Cyl":
+                vec_name_set = {"a_x", "a_y", "axis"}
+                for vecname in vec_name_set:
+                    if shape_obj[shape_name][vecname] == zerofvec3:
+                        u, v = [
+                            shape_obj[shape_name][vn]
+                            for vn in vec_name_set - {vecname}
+                        ]
+                        u = np.array(
+                            [u["x"], u["y"], u["z"]], dtype=np.float32
+                        )
+                        v = np.array(
+                            [v["x"], v["y"], v["z"]], dtype=np.float32
+                        )
+                        shape_obj[shape_name][vecname] = np.array(
+                            tuple(np.cross(u, v)), dtype=fv.fvec3
+                        )
+                        break
+
+        # Process the clipping planes, up to an allowed maximum
+        clip_plane_counter: int = 0
+        for sign, (k, v) in [
+            ("<", prop.split("<")) for prop in clip_planes if "<" in prop
+        ] + [(">", prop.split(">")) for prop in clip_planes if ">" in prop]:
+            match k:
+                case "x":
+                    axis = np.array((1, 0, 0), dtype=fv.fvec3)
+                case "y":
+                    axis = np.array((0, 1, 0), dtype=fv.fvec3)
+                case "z":
+                    axis = np.array((0, 0, 1), dtype=fv.fvec3)
+                case _:
+                    raise NotImplementedError()
+            match sign:
+                case "<":
+                    mode = 1
+                case ">":
+                    mode = 2
+                case _:
+                    raise NotImplementedError()
+            dotprod = v
+            cas = np.array((axis, dotprod, mode), dtype=fv.ClipAxisSpec)
+            clip_plane_counter += 1
+            match clip_plane_counter:
+                case 1:
+                    shape_obj["cas1"] = cas
+                case 2:
+                    shape_obj["cas2"] = cas
+                case 3:
+                    shape_obj["cas3"] = cas
+                case _:
+                    msg = "Too many clip planes encountered."
+                    raise ValueError(msg)
+        shapes.append(shape_obj)
+    return np.array(shapes, dtype=fv.Shape, ndmax=1)
+
+
+if __name__ == "__main__":
+    ans = convert_ph_file_to_shapes(sys.argv[1])
+    print(ans)

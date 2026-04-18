@@ -26,6 +26,9 @@ import numpy as np
 from .lib import gpu_tools, texture_tools
 from .lib.texture_tools import operations as tops
 
+if typing.TYPE_CHECKING:
+    from .cuda.structs import FORBILD_volumes as fv
+
 _ShapeType = tuple[int, int, int]
 _DType_base = np.float16 | np.float32
 _DType = np.dtype[np.float16] | np.dtype[np.float32]
@@ -159,3 +162,40 @@ class Volume[
     ) -> None:
         """Softmask the volume to a cylinder coaxial with the z axis."""
         tops.softmask_to_cylinder_xy(self._texture, relrad_start)
+
+
+class FBVolume:
+    """A volume specified in FORBILD format."""
+
+    shapes: np.ndarray[np.dtype[fv.Shape]]  # ty:ignore[invalid-type-arguments]
+
+    def __init__(self, shapes: np.ndarray[np.dtype[fv.Shape]]) -> None:  # ty:ignore[invalid-type-arguments]
+        self.shapes = shapes
+
+    @classmethod
+    def _scale_shape_len(cls, shape, scale: float):  # noqa: ANN001, ANN206
+        s = shape.copy()
+        for key in ("cas1", "cas2", "cas3"):
+            s[key]["dotprod"] *= scale
+        for key in s.dtype.names or ():
+            for subkey in (
+                "x",
+                "y",
+                "z",
+                "r",
+                "l",
+                "dx",
+                "dy",
+                "dz",
+                "r1",
+                "r2",
+            ):
+                if subkey in (s[key].dtype.names or ()):
+                    s[key][subkey] *= scale
+        return s
+
+    def scale_len(self, factor: float) -> None:
+        """Scale up the lengths in the volume by the given factor."""
+        self.shapes = [  # ty:ignore[invalid-assignment]
+            FBVolume._scale_shape_len(shape, factor) for shape in self.shapes
+        ]

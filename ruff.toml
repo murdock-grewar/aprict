@@ -28,7 +28,7 @@ exclude = [
     "venv",
     "githooks",
     # Actual source files
-    "src/*/lib/phantoms/FORBILD_head.py",
+    "src/*/phantoms/FORBILD_head.py",
     "conftest.py",
 ]
 
