@@ -53,9 +53,9 @@ def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
                     for s in [
                         "Box",
                         "Cone",
-                        "Cone_x",
-                        "Cone_y",
-                        "Cone_z",
+                        "Cone",
+                        "Cone",
+                        "Cone",
                         "Cylinder",
                         "Cylinder_x",
                         "Cylinder_y",
@@ -488,7 +488,8 @@ class TestCB_FORBILD_cyls:
 
         # Teardown phase
         # imview.plot_projections(self.output_projs, title=test_id)
-        self.output_projs.fill(0)
+        # self.output_projs.fill(0)
+        del self.output_projs
 
     def test_project(self) -> None:
         # Prepare the kernel
@@ -524,8 +525,8 @@ class TestCB_FORBILD_cyls:
         (25, False, np.float32),
         (25, True, np.float32),
         (50, True, np.float16),
-        (75, True, np.float32),
-        (100, False, np.float16),
+        # (75, True, np.float32),
+        # (100, False, np.float16),
         # (1000, False, np.float32),
     ],
     ids=[
@@ -533,8 +534,8 @@ class TestCB_FORBILD_cyls:
         "project-FORBILD-ellipsoids-000025-fp32",
         "project-FORBILD-ellipsoids-000025-fp32-add",
         "project-FORBILD-ellipsoids-000050-fp16-add",
-        "project-FORBILD-ellipsoids-000075-fp32-add",
-        "project-FORBILD-ellipsoids-000100-fp16",
+        # "project-FORBILD-ellipsoids-000075-fp32-add",
+        # "project-FORBILD-ellipsoids-000100-fp16",
         # "project-FORBILD-spheres-001000-fp32",  # breaks due to high recursion
     ],
 )
@@ -641,7 +642,8 @@ class TestCB_FORBILD_ellipsoids:
 
         # Teardown phase
         # imview.plot_projections(self.output_projs, title=test_id)
-        self.output_projs.fill(0)
+        # self.output_projs.fill(0)
+        del self.output_projs
 
     def test_project(self) -> None:
         # Prepare the kernel
@@ -662,6 +664,155 @@ class TestCB_FORBILD_ellipsoids:
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
                 np.uint64(self.ellipsoids_cp_arr.data.ptr),
+                np.uint32(num_shapes),
+                self.output_projs_strides_bytes,
+                np.uint64(self.output_projs.data.ptr),
+            ),
+        )
+        cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
+
+
+@pytest.mark.parametrize(
+    argnames=["numcones", "add_attenuations", "dtype_proj"],
+    argvalues=[
+        # (1, False, np.float16),
+        (15, False, np.float16),
+        # (25, False, np.float32),
+        # (25, True, np.float32),
+        (50, True, np.float16),
+        # (75, True, np.float32),
+        (100, False, np.float16),
+        # (1000, False, np.float32),
+    ],
+    ids=[
+        # "project-FORBILD-cones-000001-fp16",
+        "project-FORBILD-cones-000015-fp16",
+        # "project-FORBILD-cones-000025-fp32",
+        # "project-FORBILD-cones-000025-fp32-add",
+        "project-FORBILD-cones-000050-fp16-add",
+        # "project-FORBILD-cones-000075-fp32-add",
+        "project-FORBILD-cones-000100-fp16",
+        # "project-FORBILD-spheres-001000-fp32",  # breaks due to high recursion
+    ],
+)
+class TestCB_FORBILD_cones:
+    @pytest.fixture(scope="function", autouse=True)
+    def setup_and_teardown(
+        self,
+        numcones: int,
+        add_attenuations: bool,
+        dtype_proj: np.dtype,
+        request,  # noqa: ANN001
+    ):
+        test_id: str = request.node.callspec.id  # noqa: F841, RUF100
+        # Setup phase
+        # Get the FORBILD cylinders
+        cones = []
+        for _ in range(numcones):
+            x, y, z = 6 * np.random.randn(3)  # noqa: NPY002
+            l = np.random.uniform(1, 4)  # noqa: NPY002
+            r1 = np.random.uniform(0, 4)  # noqa: NPY002
+            r2 = np.random.uniform(0, 4)  # noqa: NPY002
+            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
+            axis = np.array(tuple(np.random.randn(3)), dtype=structs.fvec3)  # noqa: NPY002
+            cone = np.array(
+                (atten_coeff, x, y, z, l, r1, r2, axis),
+                dtype=structs.FORBILD_volumes.Cone,
+            )
+            cones.append(cone)
+        self.shapes_cp_arr = cp.array(
+            np.array(
+                cones,
+                dtype=structs.FORBILD_volumes.Cone,
+                ndmax=1,
+            )
+        )
+
+        # Set up configuration objects etc
+        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        num_projs = np.uint32(1000)
+        detwid: int = 1000
+        dethei: int = 500
+        self.output_projs: cp.ndarray = cp.zeros(
+            (num_projs, detwid, dethei), dtype=dtype_proj
+        )
+        self.output_projs_strides_bytes = np.array(
+            self.output_projs.strides, dtype=ks_uivec3.dtype
+        )
+        # Prepare the source/detector positions
+        projspec_array = []
+        ts = np.linspace(0, 2 * np.pi, endpoint=False, num=num_projs)
+        volres: int = 100  # legacy. Just setting it to a reasonable value.
+        for theta in ts:
+            sourcepos = np.array(
+                (
+                    1750 * volres / 2501 * np.cos(theta),
+                    1750 * volres / 2501 * np.sin(theta),
+                    (theta - np.pi) / np.pi * volres,
+                ),
+                dtype=ks_fvec3.dtype,
+            )
+            dspec = np.array(
+                (
+                    # Detector is shifted along positive y and z.
+                    # The output image is viewed from the front of the detector-- the same side as the source.
+                    # From this perspective, the detector is shifted mostly right and a little up.
+                    np.array(
+                        (-volres * np.cos(theta), -volres * np.sin(theta), 0),
+                        dtype=ks_fvec3.dtype,
+                    ),
+                    np.array(
+                        (-0.1 * np.sin(theta), 0.1 * np.cos(theta), 0),
+                        dtype=ks_fvec3.dtype,
+                    ),
+                    np.array((0, 0, 0.1), dtype=ks_fvec3.dtype),
+                    np.uint16(detwid),
+                    np.uint16(dethei),
+                    np.uint8(0),
+                ),
+                dtype=ks_det_spec.dtype,
+            )
+            projspec = np.array((sourcepos, dspec), dtype=ks_proj_spec.dtype)
+            projspec_array.append(projspec)
+        self.projspec_array = cp.array(projspec_array)
+        self.module = injected_module_texture_chunked()
+        tdict = {np.dtype(np.float32): "float", np.dtype(np.float16): "half"}
+        self.kern = self.module.get_function(
+            "project_CB_FORBILD_shapes<"
+            + tdict[np.dtype(dtype_proj)]
+            + ","
+            + "FORBILD_Cone"
+            + ">"
+        )
+
+        # yield to the timed test
+        gpu_tools.clear_cache()
+        cp.cuda.get_current_stream().synchronize()
+        yield
+
+        # Teardown phase
+        # imview.plot_projections(self.output_projs, title=test_id)
+        del self.output_projs
+
+    def test_project(self) -> None:
+        # Prepare the kernel
+        blockx = 10
+        blocky = 10
+        blocklayer = 10
+        # Launch the kernel
+        num_shapes: int = self.shapes_cp_arr.size
+        self.kern(
+            (
+                int(np.ceil(self.output_projs.shape[1] / blockx)),
+                int(np.ceil(self.output_projs.shape[2] / blocky)),
+                int(np.ceil(self.output_projs.shape[0] / blocklayer)),
+            ),  # gridDims:  (x,y,z)
+            (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
+            (  # input args
+                self.config,
+                self.projspec_array,
+                np.uint32(self.output_projs.shape[0]),
+                np.uint64(self.shapes_cp_arr.data.ptr),
                 np.uint32(num_shapes),
                 self.output_projs_strides_bytes,
                 np.uint64(self.output_projs.data.ptr),

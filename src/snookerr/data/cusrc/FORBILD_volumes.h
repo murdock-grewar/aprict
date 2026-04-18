@@ -139,127 +139,6 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 
 
-struct FORBILD_Cone {
-    float rho;
-    float x;
-    float y;
-    float z;
-    float l;
-    float r1;
-    float r2;
-    fvec3 axis;
-};
-__device__ bool _in_region(
-    fvec3 v,
-    FORBILD_Cone cone
-)
-{
-    // TODO
-    return false;
-}
-
-__device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
-    fvec3 v1,
-    fvec3 v2,
-    FORBILD_Cone cone
-)
-{
-    // TODO
-    return fvec2(0.f, 0.f);
-}
-
-
-struct FORBILD_Cone_x {
-    float rho;
-    float x;
-    float y;
-    float z;
-    float l;
-    float r1;
-    float r2;
-};
-__device__ bool _in_region(
-    fvec3 v,
-    FORBILD_Cone_x cone_x
-)
-{
-    // TODO
-    return false;
-}
-
-__device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
-    fvec3 v1,
-    fvec3 v2,
-    FORBILD_Cone_x cone_x
-)
-{
-    // TODO
-    return fvec2(0.f, 0.f);
-}
-
-
-struct FORBILD_Cone_y {
-    float rho;
-    float x;
-    float y;
-    float z;
-    float l;
-    float r1;
-    float r2;
-};
-__device__ bool _in_region(
-    fvec3 v,
-    FORBILD_Cone_y cone_y
-)
-{
-    // TODO
-    return false;
-}
-
-__device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
-    fvec3 v1,
-    fvec3 v2,
-    FORBILD_Cone_y cone_y
-)
-{
-    // TODO
-    return fvec2(0.f, 0.f);
-}
-
-
-struct FORBILD_Cone_z {
-    float rho;
-    float x;
-    float y;
-    float z;
-    float l;
-    float r1;
-    float r2;
-};
-__device__ bool _in_region(
-    fvec3 v,
-    FORBILD_Cone_z cone_z
-)
-{
-    // TODO
-    return false;
-}
-
-__device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
-    fvec3 v1,
-    fvec3 v2,
-    FORBILD_Cone_z cone_z
-)
-{
-    // TODO
-    return fvec2(0.f, 0.f);
-}
-
-
 struct FORBILD_Cylinder {
     float rho;
     float x;
@@ -357,6 +236,402 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 
 
+struct FORBILD_Cylinder_z {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float r;
+    float l;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Cylinder_z cylinder_z
+)
+{
+    const fvec3 pos = fvec3(cylinder_z.x, cylinder_z.y, cylinder_z.z);
+    const fvec3 v_rel = v - pos;
+    if (abs(v_rel.z) > cylinder_z.l/2.f) { return false; }
+    if (v_rel.x*v_rel.x + v_rel.y*v_rel.y > cylinder_z.r*cylinder_z.r) { return false; }
+    return true;
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Cylinder_z cylinder_z
+)
+{
+    FORBILD_Cylinder cylinder;
+    cylinder.x = cylinder_z.x;
+    cylinder.y = cylinder_z.y;
+    cylinder.z = cylinder_z.z;
+    cylinder.r = cylinder_z.r;
+    cylinder.l = cylinder_z.l;
+    cylinder.axis = fvec3(0.f, 0.f, 1.f);
+    return FORBILD_clip_line_segment(v1, v2, cylinder);
+}
+
+
+struct FORBILD_Cone_z {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float r1;
+    float r2;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Cone_z cone_z
+)
+{
+    const fvec3 pos = fvec3(cone_z.x, cone_z.y, cone_z.z);
+    const fvec3 v_rel = v - pos;
+    if (abs(v_rel.z) > cone_z.l/2.f) {
+        return false;
+    }
+    const float rad = cone_z.r1 + (v_rel.z/cone_z.l + 0.5f)*(cone_z.r2 - cone_z.r1);
+    return (v_rel.x*v_rel.x + v_rel.y*v_rel.y <= rad*rad);
+}
+
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Cone_z cone_z
+)
+{
+
+    // Handle the case where r2 = r1 here, as otherwise it causes
+    // singularities in the floating point math
+    if (cone_z.r1 == cone_z.r2) {
+        FORBILD_Cylinder_z cylinder_z;
+        cylinder_z.x = cone_z.x;
+        cylinder_z.y = cone_z.y;
+        cylinder_z.z = cone_z.z;
+        cylinder_z.r = cone_z.r1;
+        cylinder_z.l = cone_z.l;
+        return FORBILD_clip_line_segment(v1, v2, cylinder_z);
+    }
+
+    const fvec3 pos = fvec3(cone_z.x, cone_z.y, cone_z.z);
+    const fvec3 dv = v2 - v1;
+    // To help handle unstable cases where the points are far away
+    // from the cone, return early if the points are both above or both below the cone
+    if (
+        ((v1.z > pos.z+cone_z.l/2.f) && (v2.z > pos.z+cone_z.l/2.f)) ||
+        ((v1.z < pos.z-cone_z.l/2.f) && (v2.z < pos.z-cone_z.l/2.f))
+    ) {
+        return fvec2(0.f, 0.f);
+    }
+
+    // To help handle unstable cases where the points are far away
+    // from the cone, return early if the points are clearly
+    // too far away to intersect with the cone
+    // Interval to be in bounds of the cylinder radius
+    // Will project v1, v2 into the plane orthogonal to cylinder z axis and containing cylinder pos
+    fvec3 v1_projected = fvec3(v1.x, v1.y, pos.z);
+    fvec3 v2_projected = fvec3(v2.x, v2.y, pos.z);
+    fvec3 dv_projected = fvec3(dv.x, dv.y, pos.z);
+    float dv_projected_norm = norm_fvec3(dv_projected);
+    // Calculate the point along the infinite line which is closest to the center of the sphere
+    // Solving for d in:
+    // (pos - d) . dv = 0, with d = v1 + m*dv
+    // ==> (v1 + m*dv - pos) . dv = 0
+    // ==> (v1 - pos) . dv + m (dv.dv) = 0
+    // ==> m (dv.dv) = (pos - v1) . dv
+    // ==> m = ((pos - v1) . dv) / (dv.dv)
+    float m = dot_prod((pos - v1_projected)/dv_projected_norm, dv_projected/dv_projected_norm);
+    // Now 'm' is the point (possibly in the interval [0,1]) of closest approach
+    fvec3 d = v1_projected + (dv_projected*m);
+    float dist = norm_fvec3(pos - d);
+    if (dist > max(cone_z.r1, cone_z.r2)) { return fvec2(0.f, 0.f); }
+
+    const bool v1_in_region = _in_region(v1, cone_z);
+    const bool v2_in_region = _in_region(v2, cone_z);
+    if (v1_in_region && v2_in_region) {
+        return fvec2(0.f, 1.f);
+    }
+
+    const fvec3 v1_rel = v1 - pos;
+    float lam1, lam2;
+    fvec2 interval = fvec2(0.f, 1.f);
+
+    // First, handle the special case of dv points along z axis
+    if ((dv.x == 0) && (dv.y == 0)) {
+        // Equation for a non-truncated cone with axis parallel to the z axis:
+        // x^2 + y^2 < r^2, where r depends on z.
+        // x^2 + y^2 < (r1 + (r2-r1)*(z/l + 0.5))^2
+        // |v_perp| < r1 + (r2-r1)*(vz/l + 0.5)
+        //
+        // when dv.x = dv.y = 0, then the intersection occurs when:
+        // |v_perp| - r1 = (r2-r1)*(vz/l + 0.5)
+        // (|v_perp| - r1)/(r2-r1) = vz/l + 0.5
+        // vz = l*((|v_perp| - r1)/(r2-r1) - 0.5)
+        const float zintersect_rel = cone_z.l * (
+            (sqrt(v1_rel.x*v1_rel.x + v1_rel.y*v1_rel.y) - cone_z.r1)/(cone_z.r2 - cone_z.r1) - 0.5f);
+        lam1 = (zintersect_rel - v1_rel.z)/dv.z;
+        if ((cone_z.r1 > cone_z.r2) != (dv.z > 0)) {
+            // upright cylinder and dv pointing down, or upside-down cylinder and dv pointing up
+            interval.x = max(interval.x, lam1);
+        } else {
+            interval.y = min(interval.y, lam1);
+        }
+    } else {
+        /// In this equation, 'v' is the vector relative to 'pos'
+        // |v_perp| < r1 + (r2-r1)*(vz/l + 0.5)
+        // ==> sqrt((v.x + lam*dv.x)^2 + (v.y + lam*dv.y)^2) = r1 + (r2-r1)*((v.z + lam*dv.z)/l + 0.5f)
+        // ==> quadratic equation for lam, with 0 = a lam^2 + b lam + c with:
+        const float r1 = cone_z.r1;
+        const float r2 = cone_z.r2;
+        const float rdiff = r2 - r1;
+        const float l  = cone_z.l;
+        const float vx = v1_rel.x;
+        const float vy = v1_rel.y;
+        const float vz = v1_rel.z;
+        const float dx = dv.x;
+        const float dy = dv.y;
+        const float dz = dv.z;
+        const float a = dx*dx + dy*dy - (dz*rdiff/l * dz*rdiff/l);
+        const float b = (
+            -(dz*rdiff/l)*(2*r1 + rdiff*(1 + 2*vz/l))
+            + 2*(dx*vx + dy*vy)
+        );
+        const float c = (
+            - r1*r1 - r1*rdiff - 0.25f*rdiff*rdiff + vx*vx + vy*vy
+            - (vz*rdiff/l)*(2*r1 + rdiff*(1 + vz/l)) // no factor of 2 next to vz/l
+        );
+        // If a = 0, then the line has the same angle from the z axis as the cone's surface.
+        if (a == 0) {
+            // 0 = b lam + c
+            if (b == 0) { // The line is exactly along the face of the cone
+                return fvec2(0.f, 0.f);
+            }
+            // Along the line, the cylinder is present in an interval of one of the forms:
+            // - [lam, infty)
+            // - (-infty, lam]
+            lam1 = -c/b;
+            if ((cone_z.r1 > cone_z.r2) != (dv.z > 0)) {
+                // upright cylinder and dv pointing down, or upside-down cylinder and dv pointing up
+                interval.x = max(interval.x, lam1);
+            } else {
+                interval.y = min(interval.y, lam1);
+            }
+        } else {
+            // Cases:
+            // a < 0: line is closer to vertical than the cone angle
+            // a > 0: line is further from vertical than the cone angle
+            const float disc = b*b - 4*a*c;
+            if (disc <= 0) {  // no intersection
+                return fvec2(0.f, 0.f);
+            }
+            const float pm_term = sqrt(disc);
+            // Two possible cases:
+            //  - the interval from (-b - pm_term)/(2a) to (-b + pm_term)/(2a)
+            //  - everything excluding the above interval (think of a double-cone)
+            // in the second case, we need to figure out which of the two remaining intervals
+            // is the correct one for this cone.
+            // The case is determined by the sign of a
+            lam1 = (-b - pm_term)/(2*a);
+            lam2 = (-b + pm_term)/(2*a);
+            if (a > 0) {
+                interval.x = max(interval.x, min(lam1, lam2));
+                interval.y = min(interval.y, max(lam1, lam2));
+            } else {
+                if ((r1 > r2) != (dz > 0)) {
+                    // upright cylinder and dv pointing down, or upside-down cylinder and dv pointing up
+                    interval.x = max(interval.x, max(lam1, lam2));
+                } else {
+                    interval.y = min(interval.y, min(lam1, lam2));
+                }
+            }
+        }
+    }
+
+
+    // Limit to the length/height of the cone
+    if (dv.z != 0) {
+        lam1 = (-0.5f * cone_z.l - v1_rel.z)/dv.z;
+        lam2 = ( 0.5f * cone_z.l - v1_rel.z)/dv.z;
+        interval.x = max(interval.x, min(lam1, lam2));
+        interval.y = min(interval.y, max(lam1, lam2));
+    }
+    interval.y = max(interval.x, interval.y);
+    return interval;
+}
+
+
+struct FORBILD_Cone {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float r1;
+    float r2;
+    fvec3 axis;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Cone cone
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone.x, cone.y, cone.z);
+    fvec3 v_rel = v - pos;
+    fvec3 az_normalised = cone.axis / norm_fvec3(cone.axis);
+    float vz = dot_prod(v_rel, az_normalised);
+    float vx = sqrt(max(0.f, (v_rel.x*v_rel.x + v_rel.y*v_rel.y + v_rel.z*v_rel.z) - vz*vz));
+    float vy = 0.f;
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone.l;
+    cz.r1 = cone.r1;
+    cz.r2 = cone.r2;
+    return _in_region(fvec3(vx, vy, vz), cz);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Cone cone
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone.x, cone.y, cone.z);
+    fvec3 v1_rel = v1 - pos;
+    fvec3 v2_rel = v2 - pos;
+    fvec3 az_normalised = cone.axis / norm_fvec3(cone.axis);
+    float v1z = dot_prod(v1_rel, az_normalised);
+    float v1x = sqrt(max(0.f, (v1_rel.x*v1_rel.x + v1_rel.y*v1_rel.y + v1_rel.z*v1_rel.z) - v1z*v1z));
+    float v1y = 0.f;
+    float v2z = dot_prod(v2_rel, az_normalised);
+    float v2x, v2y;
+    if (v1x == 0) {
+        float v2x = sqrt(max(0.f, (v2_rel.x*v2_rel.x + v2_rel.y*v2_rel.y + v2_rel.z*v2_rel.z) - v2z*v2z));
+        float v2y = 0.f;
+    } else {
+        fvec3 xhat = v1_rel - az_normalised*v1z;
+        xhat = xhat / norm_fvec3(xhat);
+        v2x = dot_prod(v2_rel, xhat);
+        v2y = sqrt(max(0.f, (v2_rel.x*v2_rel.x + v2_rel.y*v2_rel.y + v2_rel.z*v2_rel.z) - v2x*v2x - v2z*v2z));
+    }
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone.l;
+    cz.r1 = cone.r1;
+    cz.r2 = cone.r2;
+    return FORBILD_clip_line_segment(fvec3(v1x, v1y, v1z), fvec3(v2x, v2y, v2z), cz);
+}
+
+
+struct FORBILD_Cone_x {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float r1;
+    float r2;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Cone_x cone_x
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone_x.x, cone_x.y, cone_x.z);
+    fvec3 v_rel = v - pos;
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone_x.l;
+    cz.r1 = cone_x.r1;
+    cz.r2 = cone_x.r2;
+    return _in_region(fvec3(v_rel.z, v_rel.y, v_rel.x), cz);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Cone_x cone_x
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone_x.x, cone_x.y, cone_x.z);
+    fvec3 v1_rel = v1 - pos;
+    fvec3 v2_rel = v2 - pos;
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone_x.l;
+    cz.r1 = cone_x.r1;
+    cz.r2 = cone_x.r2;
+    return FORBILD_clip_line_segment(fvec3(v1_rel.z, v1_rel.y, v1_rel.x), fvec3(v2_rel.z, v2_rel.y, v2_rel.x), cz);
+}
+
+
+struct FORBILD_Cone_y {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float r1;
+    float r2;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Cone_y cone_y
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone_y.x, cone_y.y, cone_y.z);
+    fvec3 v_rel = v - pos;
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone_y.l;
+    cz.r1 = cone_y.r1;
+    cz.r2 = cone_y.r2;
+    return _in_region(fvec3(v_rel.x, v_rel.z, v_rel.y), cz);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Cone_y cone_y
+)
+{
+    // Refer to the Cone_z case
+    const fvec3 pos = fvec3(cone_y.x, cone_y.y, cone_y.z);
+    fvec3 v1_rel = v1 - pos;
+    fvec3 v2_rel = v2 - pos;
+    FORBILD_Cone_z cz;
+    cz.x = 0.f;
+    cz.y = 0.f;
+    cz.z = 0.f;
+    cz.l  = cone_y.l;
+    cz.r1 = cone_y.r1;
+    cz.r2 = cone_y.r2;
+    return FORBILD_clip_line_segment(fvec3(v1_rel.x, v1_rel.z, v1_rel.y), fvec3(v2_rel.x, v2_rel.z, v2_rel.y), cz);
+}
+
+
 struct FORBILD_Cylinder_x {
     float rho;
     float x;
@@ -429,44 +704,6 @@ __device__ fvec2 FORBILD_clip_line_segment(
     cylinder.r = cylinder_y.r;
     cylinder.l = cylinder_y.l;
     cylinder.axis = fvec3(0.f, 1.f, 0.f);
-    return FORBILD_clip_line_segment(v1, v2, cylinder);
-}
-
-
-struct FORBILD_Cylinder_z {
-    float rho;
-    float x;
-    float y;
-    float z;
-    float r;
-    float l;
-};
-__device__ bool _in_region(
-    fvec3 v,
-    FORBILD_Cylinder_z cylinder_z
-)
-{
-    const fvec3 pos = fvec3(cylinder_z.x, cylinder_z.y, cylinder_z.z);
-    const fvec3 v_rel = v - pos;
-    if (abs(v_rel.z) > cylinder_z.l/2.f) { return false; }
-    if (v_rel.x*v_rel.x + v_rel.y*v_rel.y > cylinder_z.r*cylinder_z.r) { return false; }
-    return true;
-}
-
-__device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
-    fvec3 v1,
-    fvec3 v2,
-    FORBILD_Cylinder_z cylinder_z
-)
-{
-    FORBILD_Cylinder cylinder;
-    cylinder.x = cylinder_z.x;
-    cylinder.y = cylinder_z.y;
-    cylinder.z = cylinder_z.z;
-    cylinder.r = cylinder_z.r;
-    cylinder.l = cylinder_z.l;
-    cylinder.axis = fvec3(0.f, 0.f, 1.f);
     return FORBILD_clip_line_segment(v1, v2, cylinder);
 }
 
@@ -666,29 +903,62 @@ struct FORBILD_Ellipt_Cyl {
     float l;
     float dx;
     float dy;
-    float dz;
     fvec3 axis;
     fvec3 a_x;
     fvec3 a_y;
 };
 __device__ bool _in_region(
     fvec3 v,
-    FORBILD_Ellipt_Cyl ellipt_cyl
+    FORBILD_Ellipt_Cyl ecyl
 )
 {
-    // TODO
-    return false;
+    const fvec3 pos = fvec3(ecyl.x, ecyl.y, ecyl.z);
+    fvec3 v_rel = v - pos;
+    fvec3 az_normalised = ecyl.axis / norm_fvec3(ecyl.axis);
+    float vz = dot_prod(v_rel, az_normalised);
+    if (vz > ecyl.l/2.f) {
+        return false;
+    }
+
+    fvec3 ax_normalised = ecyl.a_x / norm_fvec3(ecyl.a_x);
+    float vx = dot_prod(v_rel, ax_normalised);
+    fvec3 ay_normalised = ecyl.a_y / norm_fvec3(ecyl.a_y);
+    float vy = dot_prod(v_rel, ay_normalised);
+    vx /= ecyl.dx;
+    vy /= ecyl.dy;
+    return (vx*vx + vy*vy <= 1);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
     // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
     fvec3 v1,
     fvec3 v2,
-    FORBILD_Ellipt_Cyl ellipt_cyl
+    FORBILD_Ellipt_Cyl ecyl
 )
 {
-    // TODO
-    return fvec2(0.f, 0.f);
+    const fvec3 pos = fvec3(ecyl.x, ecyl.y, ecyl.z);
+    fvec3 v1_rel = v1 - pos;
+    fvec3 v2_rel = v2 - pos;
+    fvec3 ax_normalised = ecyl.a_x / norm_fvec3(ecyl.a_x);
+    fvec3 ay_normalised = ecyl.a_y / norm_fvec3(ecyl.a_y);
+    fvec3 az_normalised = ecyl.axis / norm_fvec3(ecyl.axis);
+    float v1x = dot_prod(v1_rel, ax_normalised);
+    float v1y = dot_prod(v1_rel, ay_normalised);
+    float v1z = dot_prod(v1_rel, az_normalised);
+    float v2x = dot_prod(v2_rel, ax_normalised);
+    float v2y = dot_prod(v2_rel, ay_normalised);
+    float v2z = dot_prod(v2_rel, az_normalised);
+    v1x /= ecyl.dx;
+    v1y /= ecyl.dy;
+    v2x /= ecyl.dx;
+    v2y /= ecyl.dy;
+    FORBILD_Cylinder cylinder;
+    cylinder.x = 0.f;
+    cylinder.y = 0.f;
+    cylinder.z = 0.f;
+    cylinder.r = 1.f;
+    cylinder.l = ecyl.l;
+    return FORBILD_clip_line_segment(fvec3(v1x, v1y, v1z), fvec3(v2x, v2y, v2z), cylinder);
 }
 
 
