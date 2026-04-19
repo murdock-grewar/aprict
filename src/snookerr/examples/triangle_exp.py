@@ -44,6 +44,7 @@ translate_phantom_mm = (
     0  # scale_phantom_size*np.array([0, 0, 125], dtype=np.float32)
 )
 total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
+fast_approx_backprojection: bool = False
 ###############################
 
 # Equilateral triangle
@@ -378,7 +379,8 @@ working_vol = snookerr.Volume.zeros(vol_shape, dtype=np.float16)  # ty:ignore[in
 
 # Backproject into the working volume
 config_backproject = cbfp.ConfigBackproject(
-    fast_approx=True, cyl_mask_rad_vox=working_vol.shape[0] / 2
+    fast_approx=fast_approx_backprojection,
+    cyl_mask_rad_vox=working_vol.shape[0] / 2,
 )
 projs = cbfp.ProjectionSet(pss, data=out_noised_attenuation_capped)
 t1 = time.time()
@@ -399,7 +401,7 @@ working_vol = snookerr.Volume.zeros(vol_shape, dtype=np.float16)  # ty:ignore[in
 working_vol.fill(0)
 recon = snookerr.iterators.SIRT_flatpanel(
     config=snookerr.iterators.SIRT_flatpanel.Config(
-        fast_backproject=True,
+        fast_backproject=fast_approx_backprojection,
         soft_from_cylinder_relrad=0.95,
     ),
     volume=working_vol,

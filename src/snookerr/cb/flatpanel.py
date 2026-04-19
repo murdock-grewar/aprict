@@ -45,13 +45,13 @@ def _injected_module_project_texture_chunked() -> cp.RawModule:
         name_expressions=[
             f"project_CB_texture_chunked<{t1:s},{t2:s}>"
             for t1, t2 in itertools.product(
-                ["half", "float"], ["float", "double"]
+                ["half", "float"], ["half", "float", "double"]
             )
         ]
         + [
             f"project_CB_FORBILD_shapes<{t1:s},{t2:s}>"
             for t1, t2 in itertools.product(
-                ["half", "float"],
+                ["half", "float", "double"],
                 [
                     "FORBILD_" + s
                     for s in [
@@ -86,7 +86,7 @@ def _injected_module_backproject() -> cp.RawModule:
         name_expressions=[
             f"backproject_CB_voltex<{t1:s},{t2:s}>"
             for t1, t2 in itertools.product(
-                ["half", "float"], ["float", "double"]
+                ["half", "float"], ["half", "float", "double"]
             )
         ],
     )
@@ -232,7 +232,12 @@ class ProjectionSet:
     @property
     def data(
         self,
-    ) -> cp.ndarray[tuple[int, ...], cp.dtype[cp.float32 | cp.float64]] | None:
+    ) -> (
+        cp.ndarray[
+            tuple[int, ...], cp.dtype[cp.float16 | cp.float32 | cp.float64]
+        ]
+        | None
+    ):
         """Return the underlying cupy array."""
         return self._data  # .copy() -- Too expensive to make a copy.
 
@@ -250,7 +255,7 @@ class ProjectionSet:
     def create_buffer(
         self,
         *,
-        dtype: type[np.float32 | np.float64],
+        dtype: type[np.float16 | np.float32 | np.float64],
         existing_ok: bool = False,
     ) -> None:
         """Create an underlying data buffer with the specified dtype."""
@@ -267,7 +272,7 @@ class ProjectionSet:
         self._data = cp.zeros(shape, dtype=dtype)
 
     def zeroed_copy(
-        self, dtype: type[np.float32 | np.float64] | None = None
+        self, dtype: type[np.float16 | np.float32 | np.float64] | None = None
     ) -> ProjectionSet:
         """Return a copy of this object, except with a buffer filled with zeroes."""
         if self._data is None and dtype is None:

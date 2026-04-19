@@ -239,7 +239,7 @@ __device__ Tp exact_line_integral(
                 if (steps_to_take < 0) {
                     printf("Negative value encountered! %.3f\n", steps_to_take);
                 }
-                accum_val += steps_to_take * (Tp)read_from_surf3D<Tv>(volume_surface, vol_idx);
+                accum_val += steps_to_take * (float)read_from_surf3D<Tv>(volume_surface, vol_idx);
             }
         } else {
             if (return_false_steps) {

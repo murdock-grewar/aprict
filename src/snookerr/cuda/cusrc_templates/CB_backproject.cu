@@ -8,6 +8,7 @@
  * efficient for that case; I'm not sure.)
  */
 
+// #include <cuda/std/type_traits>
 #include <cuda/atomic>
 #include <cuda_fp16.h>
 
@@ -214,12 +215,12 @@ __device__ Tv _backproject_CB_getval(
                 det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
                 det_coords_max = {max(det_coords_max.x, det_coords.x), max(det_coords_max.y, det_coords.y)};
             }
-            int det_idx_x_min = max(0.f, floor(det_coords_min.x + projspec.dspec.nu/2.f));
-            int det_idx_y_min = max(0.f, floor(det_coords_min.y + projspec.dspec.nv/2.f));
-            int det_idx_x_max = min(projspec.dspec.nu-1.f, ceil(det_coords_max.x + projspec.dspec.nu/2.f));
-            int det_idx_y_max = min(projspec.dspec.nv-1.f, ceil(det_coords_max.y + projspec.dspec.nv/2.f));
-            for (int det_idx_x = det_idx_x_min; det_idx_x < det_idx_x_max+1; det_idx_x++) {
-                for (int det_idx_y = det_idx_y_min; det_idx_y < det_idx_y_max+1; det_idx_y++) {
+            int det_idx_x_min = max(0, (int)floor(det_coords_min.x + projspec.dspec.nu/2.f));
+            int det_idx_y_min = max(0, (int)floor(det_coords_min.y + projspec.dspec.nv/2.f));
+            int det_idx_x_max = min(projspec.dspec.nu-1, (int)ceil(det_coords_max.x + projspec.dspec.nu/2.f));
+            int det_idx_y_max = min(projspec.dspec.nv-1, (int)ceil(det_coords_max.y + projspec.dspec.nv/2.f));
+            for (int det_idx_x = det_idx_x_min; det_idx_x <= det_idx_x_max; det_idx_x++) {
+                for (int det_idx_y = det_idx_y_min; det_idx_y <= det_idx_y_max; det_idx_y++) {
 
                     fvec3 det_pos      = projspec.dspec.pos + (
                         projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
@@ -229,7 +230,7 @@ __device__ Tv _backproject_CB_getval(
                     // Find the detector value there
                     Tp det_value;
                     if (config.backproject_all_1s) {
-                        det_value = (Tp)1.;
+                        det_value = 1.;
                     } else {
                         det_idx = (
                             input_projs_strides.y * det_idx_x +
@@ -256,6 +257,10 @@ __device__ Tv _backproject_CB_getval(
             }
         } else {
             // config.exact is FALSE
+
+            // In the approximate method, the voxel fetches the value from the detector
+            // by casting a ray. We use zeroth-order interpolation on the detector.
+
             int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
             if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
             int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));

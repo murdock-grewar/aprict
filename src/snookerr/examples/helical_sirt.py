@@ -40,15 +40,16 @@ def main() -> None:  # noqa: D103
     apply_noise: bool = False
     R_mm: float = 700  # noqa: N806
     L_mm: float = R_mm + 700  # noqa: N806
-    num_sources: int = 10000
+    num_sources: int = 3000
     num_turns: float = 0.618 * num_sources
     total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 700  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
-    dethei_mm: float = 0.20
-    pixel_wid_mm: float = 0.20
-    fast_approx_backprojection: bool = False
+    dethei_mm: float = 0.5
+    pixel_wid_mm: float = 0.5
+    fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
+    proj_dtype = np.float32  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
     ###############################
 
     # Derived quantities
@@ -76,7 +77,7 @@ def main() -> None:  # noqa: D103
     # )
     # zs = np.linspace(-300, 300, endpoint=True, num=num_sources, dtype=np.float32)
     zs = np.linspace(
-        -0.01, 0.01, endpoint=True, num=num_sources, dtype=np.float32
+        -0.000001, 0.000001, endpoint=True, num=num_sources, dtype=np.float32
     )
     ts = zs * 2 * np.pi * num_turns / (zs.max() - zs.min())
     source_pos_arr = np.array(
@@ -147,6 +148,7 @@ def main() -> None:  # noqa: D103
         * 0.0184,  # attenuation of water ~ 0.0184 per mm
     )
     projs = cbfp.ProjectionSet(pss, data=None)
+    projs.create_buffer(dtype=proj_dtype)
     print("Generating the linearised projection data... ", end="", flush=True)
     t1 = time.time()
     out = cbfp.project(  # noqa: F841
@@ -227,7 +229,7 @@ def main() -> None:  # noqa: D103
     working_vol.fill(0)
     recon = snookerr.iterators.SIRT_flatpanel(
         config=snookerr.iterators.SIRT_flatpanel.Config(
-            fast_backproject=True,
+            fast_backproject=fast_approx_backprojection,
             soft_from_cylinder_relrad=0.95,
         ),
         volume=working_vol,
