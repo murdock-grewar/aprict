@@ -45,7 +45,7 @@ def main() -> None:  # noqa: D103
     detwid_mm: float = 700  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 0.20
     pixel_wid_mm: float = 0.20
-    fast_approx_backprojection: bool = False
+    fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
     proj_dtype = np.float32  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
@@ -98,7 +98,7 @@ def main() -> None:  # noqa: D103
         det_numpixwid,
         det_numpixhei,
     )
-    print("Number of cone-beam projections: ", pss.size)
+    print("Number of fan-beam projections: ", pss.size)
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
@@ -184,11 +184,10 @@ def main() -> None:  # noqa: D103
         proj_array = out_noised_attenuation_capped
     else:
         proj_array = projs.data
-    # snookerr.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
-    snookerr.imview.plot_projections(
-        proj_array.reshape(-1, *proj_array.shape[-2:]),
-        title="max attenuation capped for plotting purposes",
-    )
+    # snookerr.imview.plot_projections(
+    #     proj_array.reshape(-1, *proj_array.shape[-2:]),
+    #     title="max attenuation capped for plotting purposes",
+    # )
 
     # Free up memory by deleting various unneeded variables
     del vol, projs

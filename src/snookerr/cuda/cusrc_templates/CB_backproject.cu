@@ -138,6 +138,59 @@ __device__ fvec3 detpos(
     return dpos;
 }
 
+template<typename Tp>
+__device__ Tp get_data_2d_guarded(
+        const int2  idx,
+        const uint2 shape,
+        const uint2 strides,
+        const Tp*   data_2d
+)
+{
+    if ((idx.x < 0) || (idx.x >= shape.x)) { return (Tp)0; }
+    if ((idx.y < 0) || (idx.y >= shape.y)) { return (Tp)0; }
+    // Find the detector value there
+    const unsigned int arr_idx = (
+        strides.x * idx.x +
+        strides.y * idx.y
+    )/sizeof(Tp);
+    const Tp value = data_2d[arr_idx];
+    return value;
+}
+
+template<typename Tp>
+__device__ Tp get_bilinear_interp(
+        const float2 det_idx_f,
+        const uint2  shape,
+        const uint2  strides,
+        const Tp*    data_2d
+)
+{
+    // Will assume zeroes outside data_2d
+    // det_idx_f = (0,0) means the CENTER of the bottom-left pixel
+
+    // Guard against reading totally outside texture
+    if (
+        (det_idx_f.x <= -1) ||
+        (det_idx_f.y <= -1) ||
+        (det_idx_f.x >= shape.x) ||
+        (det_idx_f.y >= shape.y)
+    ) {
+        return (Tp)0;
+    }
+
+    int2 idx_lower = int2({(int)floor(det_idx_f.x), (int)floor(det_idx_f.y)});
+    int2 idx_upper = int2({idx_lower.x + 1, idx_lower.y + 1});
+    float2 fractional_remainders = float2({det_idx_f.x - idx_lower.x, det_idx_f.y - idx_lower.y});
+
+    Tp val_00 = get_data_2d_guarded(idx_lower, shape, strides, data_2d);
+    Tp val_01 = get_data_2d_guarded(int2({idx_lower.x, idx_upper.y}), shape, strides, data_2d);
+    Tp val_10 = get_data_2d_guarded(int2({idx_upper.x, idx_lower.y}), shape, strides, data_2d);
+    Tp val_11 = get_data_2d_guarded(idx_upper, shape, strides, data_2d);
+
+    Tp tmp1 = val_00 * (Tp)(1.f - fractional_remainders.x) + val_10 * (Tp)fractional_remainders.x;
+    Tp tmp2 = val_01 * (Tp)(1.f - fractional_remainders.x) + val_11 * (Tp)fractional_remainders.x;
+    return tmp1 * (Tp)(1.f - fractional_remainders.y) + tmp2 * (Tp)fractional_remainders.y;
+}
 
 template<
     typename Tv,  // type of volume data. e.g. float or double.
@@ -261,6 +314,12 @@ __device__ Tv _backproject_CB_getval(
             // In the approximate method, the voxel fetches the value from the detector
             // by casting a ray. We use zeroth-order interpolation on the detector.
 
+            /*
+            // Zeroth-order interpolation
+            // 3 voxels across: middle of detector is 0, which has index 1
+            // 4 voxels across: middle of detector is 0, which has index (4-1)/2 = 1.5
+            // below 1.5 should be rounded down to 1. above 1.5 should be rounded up to 2
+            // So, we need to take floor(coord + N/2)
             int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
             if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
             int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));
@@ -272,6 +331,18 @@ __device__ Tv _backproject_CB_getval(
                 input_projs_strides.x * proj_idx
             )/sizeof(Tp);
             Tp det_value = input_projs[det_idx];
+            */
+
+            // First-order interpolation (bilinear)
+            float2 det_idx_f = float2({
+                det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
+                det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
+            });
+            uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
+            uint2 strides = uint2({input_projs_strides.y, input_projs_strides.z});
+            Tp det_value = get_bilinear_interp(
+                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+
             // Compute the physical distance to the source
             fvec3 det_pos      = projspec.dspec.pos + (
                 projspec.dspec.u * det_coords_c.x +
