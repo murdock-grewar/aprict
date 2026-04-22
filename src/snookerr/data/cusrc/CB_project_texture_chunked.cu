@@ -284,7 +284,7 @@ __global__ void project_CB_texture_chunked(
         const unsigned int        num_projs,       // length of projspecs array
         const vol_tex_chunk_spec  texchunkspec,
         cudaSurfaceObject_t       volume_surface,
-        const uivec3              output_projs_strides,
+        const ulvec3              output_projs_strides,
         Tp*                       output_projs
 )
 {
@@ -348,7 +348,7 @@ __global__ void project_CB_FORBILD_shapes(
         const unsigned int        num_projs,       // length of projspecs array
         const Ts*                 shapes,          // shapes array
         const unsigned int        num_shapes,      // number of shapes
-        const uivec3              output_projs_strides,
+        const ulvec3              output_projs_strides,
         Tp*                       output_projs
 )
 {

@@ -142,14 +142,14 @@ template<typename Tp>
 __device__ Tp get_data_2d_guarded(
         const int2  idx,
         const uint2 shape,
-        const uint2 strides,
+        const ulong2 strides,
         const Tp*   data_2d
 )
 {
     if ((idx.x < 0) || (idx.x >= shape.x)) { return (Tp)0; }
     if ((idx.y < 0) || (idx.y >= shape.y)) { return (Tp)0; }
     // Find the detector value there
-    const unsigned int arr_idx = (
+    const unsigned long arr_idx = (
         strides.x * idx.x +
         strides.y * idx.y
     )/sizeof(Tp);
@@ -161,7 +161,7 @@ template<typename Tp>
 __device__ Tp get_bilinear_interp(
         const float2 det_idx_f,
         const uint2  shape,
-        const uint2  strides,
+        const ulong2  strides,
         const Tp*    data_2d
 )
 {
@@ -222,7 +222,7 @@ __device__ Tv _backproject_CB_getval(
     }
 
     // Unpack projection metadata
-    const uivec3    input_projs_strides = proj_chunk_spec.projmemstrides;
+    const ulvec3    input_projs_strides = proj_chunk_spec.projmemstrides;
     const Tp*       input_projs         = (Tp*)proj_chunk_spec.projmemaddr;
     const unsigned short num_projs      = proj_chunk_spec.numprojs;
 
@@ -339,7 +339,7 @@ __device__ Tv _backproject_CB_getval(
                 det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
             });
             uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
-            uint2 strides = uint2({input_projs_strides.y, input_projs_strides.z});
+            ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
             Tp det_value = get_bilinear_interp(
                 det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
 

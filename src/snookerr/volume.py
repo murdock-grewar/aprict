@@ -27,6 +27,8 @@ from .lib import gpu_tools, texture_tools
 from .lib.texture_tools import operations as tops
 
 if typing.TYPE_CHECKING:
+    import cupy as cp
+
     from .cuda.structs import FORBILD_volumes as fv
 
 _ShapeType = tuple[int, int, int]
@@ -105,6 +107,15 @@ class Volume[
         )
         self._texture.cuda_array.copy_to(x)
         return x
+
+    def as_cupy_slice(
+        self, axis: int, sl: slice, *, out: cp.ndarray | None = None
+    ) -> cp.ndarray:
+        """Copy a slice of this volume's data into a numpy array."""
+        # Check for supported slice argument
+        return tops.slice_nth_axis_to_3d_cupy_array(
+            t=self._texture, out=out, axis=axis, sl=sl
+        )
 
     @classmethod
     def _new_texture(cls, shape: Shape, dtype: DType) -> texture_tools.Texture:

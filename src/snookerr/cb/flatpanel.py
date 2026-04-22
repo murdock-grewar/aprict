@@ -405,7 +405,7 @@ def project(
         input_num_shapes = np.uint32(input_shapes.size)
     input_proj_array_len = np.uint32(projs.data.shape[-3])
     input_proj_array_strides = np.array(
-        projs.data.strides[-3:], dtype=structs.uivec3.dtype
+        projs.data.strides[-3:], dtype=structs.ulvec3.dtype
     )
     # Compute the projection. Loop through higher dimensions of the passed array, if applicable.
     for index_tuple in itertools.product(

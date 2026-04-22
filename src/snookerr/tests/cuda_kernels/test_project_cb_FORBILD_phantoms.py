@@ -34,7 +34,7 @@ from ...cuda.structs import (
     config_cb_project_FORBILD as ks_config,
     det_spec as ks_det_spec,
     fvec3 as ks_fvec3,
-    uivec3 as ks_uivec3,
+    ulvec3 as ks_ulvec3,
     proj_spec as ks_proj_spec,
 )
 
@@ -106,7 +106,7 @@ class TestCB_phantom_FORBILD_head:
             (num_projs, detwid, dethei), dtype=dtype_proj
         )
         self.output_projs_strides_bytes = np.array(
-            self.output_projs.strides, dtype=ks_uivec3.dtype
+            self.output_projs.strides, dtype=ks_ulvec3.dtype
         )
         # Prepare the source/detector positions
         projspec_array = []

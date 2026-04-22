@@ -31,7 +31,7 @@ __device__ Tp exact_line_integral(
 {
     // MODE OF OPERATION
     // This function steps between boundaries of voxels, and adds the exact line integral components.
-    const uivec3 vol_strides    = volspec.strides_bytes;
+    const ulvec3 vol_strides    = volspec.strides_bytes;
     const Tv*    volume         = (Tv*)volspec.ptr_000;
 
     const fvec3 minxyz = {0.f, 0.f, 0.f};
@@ -216,12 +216,12 @@ __global__ void project_CB_sharedmem(
         const proj_spec*          projspecs,       // contains the source and detector configurations
         const unsigned int        num_projs,       // length of projspecs array
         const vol_spec            volspec,
-        const uivec3              output_projs_strides,
+        const ulvec3              output_projs_strides,
         Tp*                       output_projs
 )
 {
     const float svf = config.shrink_volume_factor;  // E.g. if equal to 2, the the volume is interpreted as being a higher-resolution description of a space of 1/2 the length in each axis.
-    const uivec3 vol_strides    = volspec.strides_bytes;
+    const ulvec3 vol_strides    = volspec.strides_bytes;
     const Tv*    volume         = (Tv*)volspec.ptr_000;
     // This kernel should be used with a blockDim.z of 1.
     // i.e. only use blocks with a X and Y width. These blocks will be tiled on the detector

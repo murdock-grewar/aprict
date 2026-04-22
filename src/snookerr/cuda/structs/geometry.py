@@ -17,7 +17,7 @@
 import numpy as np
 
 from .. import kern_structs
-from .base import fvec2, fvec3, uivec2, uivec3  # noqa: F401
+from .base import fvec2, fvec3, uivec2, uivec3, ulvec3  # noqa: F401
 
 __all__ = [
     "det_spec",
@@ -111,7 +111,7 @@ class proj_chunk_spec_maxlen10(
         kern_structs.KernelArray(dtype=proj_spec, shape=(10,)),
         np.uint8,
         np.uint64,
-        uivec3,
+        ulvec3,
     ],
 ):
     pass  # ty:ignore[invalid-argument-type]
@@ -161,7 +161,7 @@ class vol_spec(
         # will determine how much is considered within range and should be accessed.
         "pos_000",  # x,y,z position of the center of the 0,0,0 voxel.
     ],
-    dtypes=[np.uint64, uivec3, uivec3, fvec3],
+    dtypes=[np.uint64, ulvec3, uivec3, fvec3],
 ):
     pass  # ty:ignore[invalid-argument-type]
 

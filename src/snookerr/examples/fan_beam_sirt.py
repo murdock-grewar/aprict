@@ -40,8 +40,8 @@ def main() -> None:  # noqa: D103
     apply_noise: bool = False
     R_mm: float = 700  # noqa: N806
     L_mm: float = R_mm + 700  # noqa: N806
-    num_sources: int = 10000
-    total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
+    num_sources: int = 30000
+    total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 700  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 0.20
     pixel_wid_mm: float = 0.20
@@ -237,8 +237,12 @@ def main() -> None:  # noqa: D103
         _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
             title="Live plot",
             histogram_label="Attenuation coefficient",
-            plotmin=0.0184 * voxwid_mm,
-            plotmax=1.1 * 0.0184 * voxwid_mm,
+            # 0 to 100 HU
+            # plotmin=0.0184 * voxwid_mm,
+            # plotmax=1.1 * 0.0184 * voxwid_mm,
+            # 35 to 65 HU
+            plotmin=0.0184 * voxwid_mm * 1.035,
+            plotmax=0.0184 * voxwid_mm * 1.065,
             show=False,
         )
 

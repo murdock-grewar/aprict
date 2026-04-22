@@ -59,7 +59,7 @@ struct proj_chunk_spec_maxlen10 {
     proj_spec projspecs[10];
     unsigned char numprojs;
     unsigned long projmemaddr;
-    uivec3 projmemstrides;
+    ulvec3 projmemstrides;
 };
 
 struct proj_tex_chunk_spec_maxlen10 {
@@ -70,7 +70,7 @@ struct proj_tex_chunk_spec_maxlen10 {
 
 struct vol_spec {
     unsigned long ptr_000;
-    uivec3 strides_bytes;
+    ulvec3 strides_bytes;
     uivec3 shape;
     fvec3 pos_000;
 };

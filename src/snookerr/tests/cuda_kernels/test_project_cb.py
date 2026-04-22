@@ -32,6 +32,7 @@ from ...cuda.structs import (
     det_spec as ks_det_spec,
     fvec3 as ks_fvec3,
     uivec3 as ks_uivec3,
+    ulvec3 as ks_ulvec3,
     proj_spec as ks_proj_spec,
     vol_spec as ks_vol_spec,
     vol_tex_chunk_spec as ks_vol_tex_chunk_spec,
@@ -120,7 +121,7 @@ def test_cb_project_single_voxel_offset_detector(
     # actual projection data
     output_projs: cp.ndarray = cp.zeros((10, detwid, dethei), dtype=cp.float64)
     output_projs_strides_bytes = np.array(
-        output_projs.strides, dtype=ks_uivec3.dtype
+        output_projs.strides, dtype=ks_ulvec3.dtype
     )
     num_projs = np.uint32(output_projs.shape[0])
     # Volume with a single hot voxel
@@ -149,7 +150,7 @@ def test_cb_project_single_voxel_offset_detector(
             np.uint64(
                 vol.data.ptr
             ),  # pointer to the byte beginning the 0,0,0 voxel (can be offset)
-            np.array(vol.strides, dtype=ks_uivec3.dtype),  # strides_bytes
+            np.array(vol.strides, dtype=ks_ulvec3.dtype),  # strides_bytes
             np.array(vol.shape, dtype=ks_uivec3.dtype),  # shape
             np.array(
                 tuple(-(np.array(vol.shape, dtype=np.float32) - 1) / 2),
@@ -244,7 +245,7 @@ class TestCB_sharedmem_randomnoise:
             (num_projs, detwid, dethei), dtype=cp.float32
         )
         output_projs_strides_bytes = np.array(
-            output_projs.strides, dtype=ks_uivec3.dtype
+            output_projs.strides, dtype=ks_ulvec3.dtype
         )
         # Very short volume.
         vol: cp.ndarray = cp.abs(
@@ -305,7 +306,7 @@ class TestCB_sharedmem_randomnoise:
                         + k * vol.strides[2] * volblockz
                     ),  # pointer to the byte beginning the 0,0,0 voxel (can be offset)
                     np.array(
-                        vol.strides, dtype=ks_uivec3.dtype
+                        vol.strides, dtype=ks_ulvec3.dtype
                     ),  # strides_bytes
                     np.array(
                         (
@@ -394,7 +395,7 @@ class TestCB_texture_randomnoise:
             (num_projs, detwid, dethei), dtype=cp.float32
         )
         output_projs_strides_bytes = np.array(
-            output_projs.strides, dtype=ks_uivec3.dtype
+            output_projs.strides, dtype=ks_ulvec3.dtype
         )
         # Very short volume.
         vol = np.abs(np.random.randn(501, 500, 20).astype(np.float32)).copy()  # noqa: NPY002
@@ -557,7 +558,7 @@ class TestCB_texture_FORBILD:
             (num_projs, detwid, dethei), dtype=cp.float32
         )
         self.output_projs_strides_bytes = np.array(
-            self.output_projs.strides, dtype=ks_uivec3.dtype
+            self.output_projs.strides, dtype=ks_ulvec3.dtype
         )
         # Prepare the source/detector positions
         projspec_array = []

@@ -23,6 +23,7 @@ __all__ = [
     "fvec3",
     "uivec2",
     "uivec3",
+    "ulvec3",
 ]
 
 
@@ -106,6 +107,22 @@ __device__ float dot_prod(
     return v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
 }
 
+""",
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+class ulvec3(
+    kern_structs.KernelStruct,
+    struct_name="ulvec3",
+    names=["x", "y", "z"],
+    dtypes=[np.uint64, np.uint64, np.uint64],
+    insert_into_struct="""
+public:
+    // implicit constructor
+    ulvec3(unsigned long xi, unsigned long yi, unsigned long zi) : x(xi), y(yi), z(zi) {}
+    // default constructor, used with i.e. 'ulvec3 v;'
+    ulvec3() = default;
 """,
 ):
     pass  # ty:ignore[invalid-argument-type]

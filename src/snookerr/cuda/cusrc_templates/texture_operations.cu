@@ -37,6 +37,20 @@ __device__ half read_from_surf3D<half>(
 )
 { return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
 
+template<typename T>
+__device__ T read_from_surf2DLayered(
+    cudaSurfaceObject_t     surface,
+    uint3                   idx
+)
+{ return surf2DLayeredread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+
+template<>
+__device__ half read_from_surf2DLayered<half>(
+    cudaSurfaceObject_t     surface,
+    uint3                   idx
+)
+{ return __ushort_as_half(read_from_surf2DLayered<unsigned short>(surface, idx)); }
+
 
 // General math functions
 #define PI 3.1415926535898f
@@ -152,6 +166,52 @@ __global__ void multiply_surface(
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
     T existing_value = read_from_surf3D<T>(surface, idx);
     write_to_surf3D(value * existing_value, surface, idx);
+}
+
+template <typename T>  // type of both the surface and the output array
+__global__ void slice_nth_axis_to_3d_array(
+        cudaSurfaceObject_t surf,
+        const unsigned int arr_shape_x,
+        const unsigned int arr_shape_y,
+        const unsigned int arr_shape_z,
+        const unsigned int sl_start,
+        const unsigned int sl_stop,
+        const unsigned char axis_index_to_slice,
+        const unsigned long output_array_stride_x,  // measured in bytes
+        const unsigned long output_array_stride_y,
+        const unsigned long output_array_stride_z,
+        const bool surf_is_layered,
+        T* output_array
+)
+{
+    uint3 idx = uint3({
+        threadIdx.x + blockDim.x * blockIdx.x,
+        threadIdx.y + blockDim.y * blockIdx.y,
+        threadIdx.z + blockDim.z * blockIdx.z
+    });
+    if (idx.x >= arr_shape_x) { return; }
+    if (idx.y >= arr_shape_y) { return; }
+    if (idx.z >= arr_shape_z) { return; }
+    int i = idx.x;
+    int j = idx.y;
+    int k = idx.z;
+
+    // Select which index to slice
+    int* ijk;
+    if (axis_index_to_slice == 0)      { ijk = &i; idx.x += sl_start; }
+    else if (axis_index_to_slice == 1) { ijk = &j; idx.y += sl_start; }
+    else if (axis_index_to_slice == 2) { ijk = &k; idx.z += sl_start; }
+    if (*ijk >= sl_stop - sl_start) { return; }
+
+    T val;
+    if (surf_is_layered) {
+        val = read_from_surf2DLayered<T>(surf, idx);
+    } else {
+        val = read_from_surf3D<T>(surf, idx);
+    }
+    output_array[
+            (i*output_array_stride_x + j*output_array_stride_y + k*output_array_stride_z)/sizeof(T)
+        ] = val;
 }
 
 

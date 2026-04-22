@@ -202,3 +202,15 @@ public:
     uivec2() = default;
 };
 
+struct ulvec3 {
+    unsigned long x;
+    unsigned long y;
+    unsigned long z;
+
+public:
+    // implicit constructor
+    ulvec3(unsigned long xi, unsigned long yi, unsigned long zi) : x(xi), y(yi), z(zi) {}
+    // default constructor, used with i.e. 'ulvec3 v;'
+    ulvec3() = default;
+};
+
