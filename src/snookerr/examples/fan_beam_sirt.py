@@ -103,7 +103,7 @@ def main() -> None:  # noqa: D103
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
     vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
-    vol.scale_len(1 / voxwid_mm * 10)  # factor of 10 to go from cm to mm
+    vol.scale_len(1 / voxwid_mm)
     volwid_mm = 300  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)

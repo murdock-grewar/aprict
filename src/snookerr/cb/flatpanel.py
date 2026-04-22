@@ -427,6 +427,13 @@ def project(
         # Launch the kernel
         if is_fb:
             assert type(volume) is FBVolume
+            # Opportunity for significant optimisation:
+            # Prune the shapes list for each thread block.
+            # This can be accomplished by computing the bounding box
+            # for each individual shape, and their projections onto the detector.
+            # If the silhouette of a shape intersects the thread block, then keep it.
+            # Otherwise, discard it from the list and launch the kernel with
+            # the thinned-down list of shapes.
             args = (  # input args
                 config.contents_fb,
                 input_proj_specs_slice,

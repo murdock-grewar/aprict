@@ -214,6 +214,47 @@ __global__ void slice_nth_axis_to_3d_array(
         ] = val;
 }
 
+template <typename T>  // type of both the surface and the output array
+__global__ void sum_along_nth_axis_to_2d_array(
+        cudaSurfaceObject_t surf,
+        const unsigned int surf_shape_x,
+        const unsigned int surf_shape_y,
+        const unsigned int surf_shape_z,
+        const unsigned char axis_index_to_sum,
+        const unsigned long output_array_stride_x,  // measured in bytes
+        const unsigned long output_array_stride_y,
+        const bool surf_is_layered,
+        T* output_array
+)
+{
+    uint3 idx = uint3({
+        threadIdx.x + blockDim.x * blockIdx.x,
+        threadIdx.y + blockDim.y * blockIdx.y,
+        threadIdx.z + blockDim.z * blockIdx.z
+    });
+    if (idx.x >= surf_shape_x) { return; }
+    if (idx.y >= surf_shape_y) { return; }
+    if (idx.z >= surf_shape_z) { return; }
+    int i = idx.x;
+    int j = idx.y;
+    int k = idx.z;
+
+    // Get the index of this thread in the 2D output into the array
+    unsigned int iarr, jarr;
+    if (axis_index_to_sum == 0) { iarr = idx.y; jarr = idx.z; }
+    if (axis_index_to_sum == 1) { iarr = idx.x; jarr = idx.z; }
+    if (axis_index_to_sum == 2) { iarr = idx.x; jarr = idx.y; }
+
+    T val;
+    if (surf_is_layered) {
+        val = read_from_surf2DLayered<T>(surf, idx);
+    } else {
+        val = read_from_surf3D<T>(surf, idx);
+    }
+    atomicAdd(&output_array[
+            (iarr*output_array_stride_x + jarr*output_array_stride_y)/sizeof(T)
+        ], val);
+}
 
 // Multi-surface operations
 template <typename T1, typename T2, typename TO>

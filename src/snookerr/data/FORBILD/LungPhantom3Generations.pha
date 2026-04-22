@@ -1,0 +1,590 @@
+// First comes LungPhantom::Out(ostream &), below follows the phantom definition.
+/////////////////////////////////////////////////////////////////////////////////
+/*
+LungPhantom:
+************
+Using the product T[L[S[B][S]][B[B][S]]][R[S[B][S]][B[B][S]]]
+The following Branch objects are used:
+Trachea:
+--------
+BranchAngle:   0ø
+RotationAngle: 0ø
+Length:        100mm
+OuterRadius:   9mm
+InnerRadius:   7.9mm
+Scalefactor:   0.86
+
+RightMainBronchus:
+------------------
+BranchAngle:   55ø
+RotationAngle: 180ø
+Length:        50mm
+OuterRadius:   7.5mm
+InnerRadius:   6.4mm
+Scalefactor:   0.86
+
+LeftMainBronchus:
+-----------------
+BranchAngle:   -55ø
+RotationAngle: 0ø
+Length:        40mm
+OuterRadius:   6.5mm
+InnerRadius:   5.4mm
+Scalefactor:   0.86
+
+BigSprout:
+----------
+BranchAngle:   25ø
+RotationAngle: 90ø
+Length:        50mm
+OuterRadius:   8.5mm
+InnerRadius:   7.4mm
+Scalefactor:   0.86
+
+SmallSprout:
+------------
+BranchAngle:   -45ø
+RotationAngle: 10ø
+Length:        40mm
+OuterRadius:   7mm
+InnerRadius:   5.9mm
+Scalefactor:   0.86
+
+The wire (!) model of the lung lies in the bounding box [-95.0418, 87.9971] X [-17.9904, 17.9904] X [0, 181.651] mm^3
+The box dimensions are 183.039 * 35.9808 * 181.651 mm^3
+
+Now come the branches:
+
+// Object 1:
+Trachea:
+--------
+Generation: 0
+Scale: 1
+Lenght: 100 mm
+OuterRadius: 9 mm
+InnerRadius: 7.9 mm
+u = (0, 0, 0) mm, |u| = 0 mm         // Start point
+v = (0, 0, 100) mm, |v| = 100 mm         // End point
+x = (1, 0, 0) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0, 1, 0) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0, 0, 1) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 2:
+LeftMainBronchus:
+-----------------
+Generation: 1
+Scale: 0.86
+Lenght: 34.4 mm
+OuterRadius: 5.59 mm
+InnerRadius: 4.644 mm
+u = (0, 0, 100) mm, |u| = 100 mm         // Start point
+v = (28.1788, 0, 119.731) mm, |v| = 123.002 mm         // End point
+x = (0.573576, 0, -0.819152) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0, 1, 0) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.819152, 0, 0.573576) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 3:
+SmallSprout:
+------------
+Generation: 2
+Scale: 0.7396
+Lenght: 29.584 mm
+OuterRadius: 5.1772 mm
+InnerRadius: 4.36364 mm
+u = (28.1788, 0, 119.731) mm, |u| = 123.002 mm         // Start point
+v = (57.3134, 0, 114.594) mm, |v| = 128.127 mm         // End point
+x = (-0.17101, 0.173648, -0.969846) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.0301537, 0.984808, 0.17101) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.984808, 0, -0.173648) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 4:
+BigSprout:
+----------
+Generation: 3
+Scale: 0.636056
+Lenght: 31.8028 mm
+OuterRadius: 5.40648 mm
+InnerRadius: 4.70681 mm
+u = (57.3134, 0, 114.594) mm, |u| = 128.127 mm         // Start point
+v = (87.9971, -2.33391, 122.624) mm, |v| = 150.949 mm         // End point
+x = (0.0301537, 0.984808, 0.17101) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.26121, -0.157379, 0.952366) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.964811, -0.0733869, 0.252496) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 5:
+SmallSprout:
+------------
+Generation: 3
+Scale: 0.636056
+Lenght: 25.4422 mm
+OuterRadius: 4.45239 mm
+InnerRadius: 3.75273 mm
+u = (57.3134, 0, 114.594) mm, |u| = 128.127 mm         // Start point
+v = (71.9539, 3.124, 94.0219) mm, |v| = 118.437 mm         // End point
+x = (-0.799634, 0.291932, -0.524748) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.171616, 0.948524, 0.266175) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.575442, 0.122788, -0.808573) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 6:
+BigSprout:
+----------
+Generation: 2
+Scale: 0.7396
+Lenght: 36.98 mm
+OuterRadius: 6.2866 mm
+InnerRadius: 5.47304 mm
+u = (28.1788, 0, 119.731) mm, |u| = 123.002 mm         // Start point
+v = (46.6688, 0, 151.757) mm, |v| = 158.77 mm         // End point
+x = (5.3027e-17, 1, -3.06152e-17) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.866025, 6.12303e-17, 0.5) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.5, 0, 0.866025) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 7:
+BigSprout:
+----------
+Generation: 3
+Scale: 0.636056
+Lenght: 31.8028 mm
+OuterRadius: 5.40648 mm
+InnerRadius: 4.70681 mm
+u = (46.6688, 0, 151.757) mm, |u| = 158.77 mm         // Start point
+v = (61.0804, -13.4404, 176.718) mm, |v| = 187.459 mm         // End point
+x = (-0.866025, 1.16724e-16, 0.5) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.211309, -0.906308, -0.365998) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.453154, -0.422618, 0.784886) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 8:
+SmallSprout:
+------------
+Generation: 3
+Scale: 0.636056
+Lenght: 25.4422 mm
+OuterRadius: 4.45239 mm
+InnerRadius: 3.75273 mm
+u = (46.6688, 0, 151.757) mm, |u| = 158.77 mm         // Start point
+v = (55.664, 17.9904, 167.337) mm, |v| = 177.267 mm         // End point
+x = (-0.498566, 0.696364, -0.516245) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.791475, -0.122788, 0.598741) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (0.353553, 0.707107, 0.612372) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 9:
+RightMainBronchus:
+------------------
+Generation: 1
+Scale: 0.86
+Lenght: 43 mm
+OuterRadius: 6.45 mm
+InnerRadius: 5.504 mm
+u = (0, 0, 100) mm, |u| = 100 mm         // Start point
+v = (-35.2235, 0, 124.664) mm, |v| = 129.544 mm         // End point
+x = (-0.573576, 1.22461e-16, -0.819152) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-7.02405e-17, -1, -1.00314e-16) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.819152, 0, 0.573576) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 10:
+SmallSprout:
+------------
+Generation: 2
+Scale: 0.7396
+Lenght: 29.584 mm
+OuterRadius: 5.1772 mm
+InnerRadius: 4.36364 mm
+u = (-35.2235, 0, 124.664) mm, |u| = 129.544 mm         // Start point
+v = (-64.3581, 2.56176e-15, 119.527) mm, |v| = 135.752 mm         // End point
+x = (0.17101, -0.173648, -0.969846) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.0301537, -0.984808, 0.17101) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.984808, 8.65927e-17, -0.173648) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 11:
+BigSprout:
+----------
+Generation: 3
+Scale: 0.636056
+Lenght: 31.8028 mm
+OuterRadius: 5.40648 mm
+InnerRadius: 4.70681 mm
+u = (-64.3581, 2.56176e-15, 119.527) mm, |u| = 135.752 mm         // Start point
+v = (-95.0418, 2.33391, 127.557) mm, |v| = 159.088 mm         // End point
+x = (-0.0301537, -0.984808, 0.17101) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.26121, 0.157379, 0.952366) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.964811, 0.0733869, 0.252496) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 12:
+SmallSprout:
+------------
+Generation: 3
+Scale: 0.636056
+Lenght: 25.4422 mm
+OuterRadius: 4.45239 mm
+InnerRadius: 3.75273 mm
+u = (-64.3581, 2.56176e-15, 119.527) mm, |u| = 135.752 mm         // Start point
+v = (-78.9986, -3.124, 98.9547) mm, |v| = 126.659 mm         // End point
+x = (0.799634, -0.291932, -0.524748) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (-0.171616, -0.948524, 0.266175) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.575442, -0.122788, -0.808573) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 13:
+BigSprout:
+----------
+Generation: 2
+Scale: 0.7396
+Lenght: 36.98 mm
+OuterRadius: 6.2866 mm
+InnerRadius: 5.47304 mm
+u = (-35.2235, 0, 124.664) mm, |u| = 129.544 mm         // Start point
+v = (-53.7135, -1.91387e-15, 156.689) mm, |v| = 165.64 mm         // End point
+x = (-1.23268e-16, -1, -1.30929e-16) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.866025, -1.72217e-16, 0.5) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.5, -5.17541e-17, 0.866025) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 14:
+BigSprout:
+----------
+Generation: 3
+Scale: 0.636056
+Lenght: 31.8028 mm
+OuterRadius: 5.40648 mm
+InnerRadius: 4.70681 mm
+u = (-53.7135, -1.91387e-15, 156.689) mm, |u| = 165.64 mm         // Start point
+v = (-68.1251, 13.4404, 181.651) mm, |v| = 194.47 mm         // End point
+x = (0.866025, -2.27711e-16, 0.5) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.211309, 0.906308, -0.365998) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.453154, 0.422618, 0.784886) mm, |z| = 1 mm         // Direction of branch
+
+
+// Object 15:
+SmallSprout:
+------------
+Generation: 3
+Scale: 0.636056
+Lenght: 25.4422 mm
+OuterRadius: 4.45239 mm
+InnerRadius: 3.75273 mm
+u = (-53.7135, -1.91387e-15, 156.689) mm, |u| = 165.64 mm         // Start point
+v = (-62.7087, -17.9904, 172.27) mm, |v| = 184.209 mm         // End point
+x = (0.498566, -0.696364, -0.516245) mm, |x| = 1 mm         // Defines the branch plane together with z
+y = (0.791475, 0.122788, 0.598741) mm, |y| = 1 mm         // New branches will be rotated about y
+z = (-0.353553, -0.707107, 0.612372) mm, |z| = 1 mm         // Direction of branch
+
+
+
+*/
+/////////////////////////////////////////////////////////////////////////////////
+
+
+
+#define OUTERRHO 1.0
+#define INNERRHO 0.1
+#define RELEVANCE relevance
+
+
+
+Phantom
+
+// Number of Detectors: 128
+// Number of Pixels:    512^2
+
+// Detector spacing: 1.41915mm
+// PixelWidth:       0.357498mm
+
+
+// Outer Objects (a total of 15 cylinders and 15 spheres)
+
+// Object 1:
+// "Trachea", Generation 0, Scale 1
+{[Cylinder: x=0mm y=0mm z=50mm l=100mm r=9mm axis(0mm, 0mm, 1mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=0mm y=0mm z=100mm r=9mm] rho=OUTERRHO RELEVANCE}
+
+// Object 2:
+// "LeftMainBronchus", Generation 1, Scale 0.86
+{[Cylinder: x=14.0894mm y=0mm z=109.866mm l=34.4mm r=5.59mm axis(0.819152mm, 0mm, 0.573576mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=28.1788mm y=0mm z=119.731mm r=5.59mm] rho=OUTERRHO RELEVANCE}
+
+// Object 3:
+// "SmallSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=42.7461mm y=0mm z=117.162mm l=29.584mm r=5.1772mm axis(0.984808mm, 0mm, -0.173648mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=57.3134mm y=0mm z=114.594mm r=5.1772mm] rho=OUTERRHO RELEVANCE}
+
+// Object 4:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=72.6552mm y=-1.16695mm z=118.609mm l=31.8028mm r=5.40648mm axis(0.964811mm, -0.0733869mm, 0.252496mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=87.9971mm y=-2.33391mm z=122.624mm r=5.40648mm] rho=OUTERRHO RELEVANCE}
+
+// Object 5:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=64.6336mm y=1.562mm z=104.308mm l=25.4422mm r=4.45239mm axis(0.575442mm, 0.122788mm, -0.808573mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=71.9539mm y=3.124mm z=94.0219mm r=4.45239mm] rho=OUTERRHO RELEVANCE}
+
+// Object 6:
+// "BigSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=37.4238mm y=0mm z=135.744mm l=36.98mm r=6.2866mm axis(0.5mm, 0mm, 0.866025mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=46.6688mm y=0mm z=151.757mm r=6.2866mm] rho=OUTERRHO RELEVANCE}
+
+// Object 7:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=53.8746mm y=-6.72022mm z=164.237mm l=31.8028mm r=5.40648mm axis(0.453154mm, -0.422618mm, 0.784886mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=61.0804mm y=-13.4404mm z=176.718mm r=5.40648mm] rho=OUTERRHO RELEVANCE}
+
+// Object 8:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=51.1664mm y=8.99519mm z=159.547mm l=25.4422mm r=4.45239mm axis(0.353553mm, 0.707107mm, 0.612372mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=55.664mm y=17.9904mm z=167.337mm r=4.45239mm] rho=OUTERRHO RELEVANCE}
+
+// Object 9:
+// "RightMainBronchus", Generation 1, Scale 0.86
+{[Cylinder: x=-17.6118mm y=0mm z=112.332mm l=43mm r=6.45mm axis(-0.819152mm, 0mm, 0.573576mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-35.2235mm y=0mm z=124.664mm r=6.45mm] rho=OUTERRHO RELEVANCE}
+
+// Object 10:
+// "SmallSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=-49.7908mm y=1.28088e-15mm z=122.095mm l=29.584mm r=5.1772mm axis(-0.984808mm, 8.65927e-17mm, -0.173648mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-64.3581mm y=2.56176e-15mm z=119.527mm r=5.1772mm] rho=OUTERRHO RELEVANCE}
+
+// Object 11:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-79.6999mm y=1.16695mm z=123.542mm l=31.8028mm r=5.40648mm axis(-0.964811mm, 0.0733869mm, 0.252496mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-95.0418mm y=2.33391mm z=127.557mm r=5.40648mm] rho=OUTERRHO RELEVANCE}
+
+// Object 12:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-71.6784mm y=-1.562mm z=109.241mm l=25.4422mm r=4.45239mm axis(-0.575442mm, -0.122788mm, -0.808573mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-78.9986mm y=-3.124mm z=98.9547mm r=4.45239mm] rho=OUTERRHO RELEVANCE}
+
+// Object 13:
+// "BigSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=-44.4685mm y=-9.56933e-16mm z=140.677mm l=36.98mm r=6.2866mm axis(-0.5mm, -5.17541e-17mm, 0.866025mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-53.7135mm y=-1.91387e-15mm z=156.689mm r=6.2866mm] rho=OUTERRHO RELEVANCE}
+
+// Object 14:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-60.9193mm y=6.72022mm z=169.17mm l=31.8028mm r=5.40648mm axis(-0.453154mm, 0.422618mm, 0.784886mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-68.1251mm y=13.4404mm z=181.651mm r=5.40648mm] rho=OUTERRHO RELEVANCE}
+
+// Object 15:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-58.2111mm y=-8.99519mm z=164.479mm l=25.4422mm r=4.45239mm axis(-0.353553mm, -0.707107mm, 0.612372mm)] rho=OUTERRHO RELEVANCE}
+{[Sphere: x=-62.7087mm y=-17.9904mm z=172.27mm r=4.45239mm] rho=OUTERRHO RELEVANCE}
+
+
+
+
+// Inner Objects (a total of 15 cylinders and 15 spheres)
+
+// Object 1:
+// "Trachea", Generation 0, Scale 1
+{[Cylinder: x=0mm y=0mm z=50mm l=100mm r=7.9mm axis(0mm, 0mm, 1mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=0mm y=0mm z=100mm r=7.9mm] rho=INNERRHO RELEVANCE}
+
+// Object 2:
+// "LeftMainBronchus", Generation 1, Scale 0.86
+{[Cylinder: x=14.0894mm y=0mm z=109.866mm l=34.4mm r=4.644mm axis(0.819152mm, 0mm, 0.573576mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=28.1788mm y=0mm z=119.731mm r=4.644mm] rho=INNERRHO RELEVANCE}
+
+// Object 3:
+// "SmallSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=42.7461mm y=0mm z=117.162mm l=29.584mm r=4.36364mm axis(0.984808mm, 0mm, -0.173648mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=57.3134mm y=0mm z=114.594mm r=4.36364mm] rho=INNERRHO RELEVANCE}
+
+// Object 4:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=72.6552mm y=-1.16695mm z=118.609mm l=31.8028mm r=4.70681mm axis(0.964811mm, -0.0733869mm, 0.252496mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=87.9971mm y=-2.33391mm z=122.624mm r=4.70681mm] rho=INNERRHO RELEVANCE}
+
+// Object 5:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=64.6336mm y=1.562mm z=104.308mm l=25.4422mm r=3.75273mm axis(0.575442mm, 0.122788mm, -0.808573mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=71.9539mm y=3.124mm z=94.0219mm r=3.75273mm] rho=INNERRHO RELEVANCE}
+
+// Object 6:
+// "BigSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=37.4238mm y=0mm z=135.744mm l=36.98mm r=5.47304mm axis(0.5mm, 0mm, 0.866025mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=46.6688mm y=0mm z=151.757mm r=5.47304mm] rho=INNERRHO RELEVANCE}
+
+// Object 7:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=53.8746mm y=-6.72022mm z=164.237mm l=31.8028mm r=4.70681mm axis(0.453154mm, -0.422618mm, 0.784886mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=61.0804mm y=-13.4404mm z=176.718mm r=4.70681mm] rho=INNERRHO RELEVANCE}
+
+// Object 8:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=51.1664mm y=8.99519mm z=159.547mm l=25.4422mm r=3.75273mm axis(0.353553mm, 0.707107mm, 0.612372mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=55.664mm y=17.9904mm z=167.337mm r=3.75273mm] rho=INNERRHO RELEVANCE}
+
+// Object 9:
+// "RightMainBronchus", Generation 1, Scale 0.86
+{[Cylinder: x=-17.6118mm y=0mm z=112.332mm l=43mm r=5.504mm axis(-0.819152mm, 0mm, 0.573576mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-35.2235mm y=0mm z=124.664mm r=5.504mm] rho=INNERRHO RELEVANCE}
+
+// Object 10:
+// "SmallSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=-49.7908mm y=1.28088e-15mm z=122.095mm l=29.584mm r=4.36364mm axis(-0.984808mm, 8.65927e-17mm, -0.173648mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-64.3581mm y=2.56176e-15mm z=119.527mm r=4.36364mm] rho=INNERRHO RELEVANCE}
+
+// Object 11:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-79.6999mm y=1.16695mm z=123.542mm l=31.8028mm r=4.70681mm axis(-0.964811mm, 0.0733869mm, 0.252496mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-95.0418mm y=2.33391mm z=127.557mm r=4.70681mm] rho=INNERRHO RELEVANCE}
+
+// Object 12:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-71.6784mm y=-1.562mm z=109.241mm l=25.4422mm r=3.75273mm axis(-0.575442mm, -0.122788mm, -0.808573mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-78.9986mm y=-3.124mm z=98.9547mm r=3.75273mm] rho=INNERRHO RELEVANCE}
+
+// Object 13:
+// "BigSprout", Generation 2, Scale 0.7396
+{[Cylinder: x=-44.4685mm y=-9.56933e-16mm z=140.677mm l=36.98mm r=5.47304mm axis(-0.5mm, -5.17541e-17mm, 0.866025mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-53.7135mm y=-1.91387e-15mm z=156.689mm r=5.47304mm] rho=INNERRHO RELEVANCE}
+
+// Object 14:
+// "BigSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-60.9193mm y=6.72022mm z=169.17mm l=31.8028mm r=4.70681mm axis(-0.453154mm, 0.422618mm, 0.784886mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-68.1251mm y=13.4404mm z=181.651mm r=4.70681mm] rho=INNERRHO RELEVANCE}
+
+// Object 15:
+// "SmallSprout", Generation 3, Scale 0.636056
+{[Cylinder: x=-58.2111mm y=-8.99519mm z=164.479mm l=25.4422mm r=3.75273mm axis(-0.353553mm, -0.707107mm, 0.612372mm)] rho=INNERRHO RELEVANCE}
+{[Sphere: x=-62.7087mm y=-17.9904mm z=172.27mm r=3.75273mm] rho=INNERRHO RELEVANCE}
+
+
+
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=0mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=1.41915mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=2.8383mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=4.25744mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=5.67659mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=7.09574mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=8.51489mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=9.93404mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=11.3532mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=12.7723mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=14.1915mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=15.6106mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=17.0298mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=18.4489mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=19.8681mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=21.2872mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=22.7064mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=24.1255mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=25.5447mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=26.9638mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=28.383mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=29.8021mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=31.2213mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=32.6404mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=34.0596mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=35.4787mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=36.8979mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=38.317mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=39.7361mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=41.1553mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=42.5744mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=43.9936mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=45.4127mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=46.8319mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=48.251mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=49.6702mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=51.0893mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=52.5085mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=53.9276mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=55.3468mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=56.7659mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=58.1851mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=59.6042mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=61.0234mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=62.4425mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=63.8617mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=65.2808mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=66.7mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=68.1191mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=69.5383mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=70.9574mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=72.3766mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=73.7957mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=75.2149mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=76.634mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=78.0531mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=79.4723mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=80.8914mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=82.3106mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=83.7297mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=85.1489mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=86.568mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=87.9872mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=89.4063mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=90.8255mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=92.2446mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=93.6638mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=95.0829mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=96.5021mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=97.9212mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=99.3404mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=100.76mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=102.179mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=103.598mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=105.017mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=106.436mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=107.855mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=109.274mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=110.694mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=112.113mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=113.532mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=114.951mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=116.37mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=117.789mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=119.208mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=120.628mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=122.047mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=123.466mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=124.885mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=126.304mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=127.723mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=129.142mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=130.562mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=131.981mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=133.4mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=134.819mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=136.238mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=137.657mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=139.077mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=140.496mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=141.915mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=143.334mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=144.753mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=146.172mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=147.591mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=149.011mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=150.43mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=151.849mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=153.268mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=154.687mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=156.106mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=157.525mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=158.945mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=160.364mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=161.783mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=163.202mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=164.621mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=166.04mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=167.459mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=168.879mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=170.298mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=171.717mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=173.136mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=174.555mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=175.974mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=177.394mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=178.813mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}
+Detector{[Plane_xy: x=-3.52235mm y=-1.77636e-15mm z=180.232mm] x1=-91.5194mm x2=91.5194mm nx=512 y1=-91.5194mm y2=91.5194mm ny=512}

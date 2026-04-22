@@ -111,10 +111,18 @@ class Volume[
     def as_cupy_slice(
         self, axis: int, sl: slice, *, out: cp.ndarray | None = None
     ) -> cp.ndarray:
-        """Copy a slice of this volume's data into a numpy array."""
+        """Copy a slice of this volume's data into a cupy array."""
         # Check for supported slice argument
         return tops.slice_nth_axis_to_3d_cupy_array(
             t=self._texture, out=out, axis=axis, sl=sl
+        )
+
+    def sum_to_cupy_array(
+        self, axis: int, *, out: cp.ndarray | None = None
+    ) -> cp.ndarray:
+        """Sum the volume along an axis, into a 2D cupy array."""
+        return tops.sum_along_nth_axis_to_2d_cupy_array(
+            t=self._texture, out=out, axis=axis
         )
 
     @classmethod
@@ -209,4 +217,71 @@ class FBVolume:
         """Scale up the lengths in the volume by the given factor."""
         self.shapes = [  # ty:ignore[invalid-assignment]
             FBVolume._scale_shape_len(shape, factor) for shape in self.shapes
+        ]
+
+    @classmethod
+    def _flip_shape(cls, shape, axis: int | str):  # noqa: ANN001, ANN206
+        match axis:
+            case 0 | "x":
+                axis = "x"
+                relevant_number_subkeys = ("x", "dx")
+            case 1 | "y":
+                axis = "y"
+                relevant_number_subkeys = ("y", "dy")
+            case 2 | "z":
+                axis = "z"
+                relevant_number_subkeys = ("z", "dz")
+            case _:
+                msg = f"Unknown axis: {axis}"
+                raise ValueError(msg)
+        s = shape.copy()
+        for key in ("cas1", "cas2", "cas3"):
+            s[key]["axis"][axis] *= -1
+        for key in s.dtype.names or ():
+            for subkey in relevant_number_subkeys:
+                if subkey in (s[key].dtype.names or ()):
+                    s[key][subkey] *= -1
+            for subkey in (
+                "axis",
+                "a_x",
+                "a_y",
+                "a_z",
+            ):
+                if subkey in (s[key].dtype.names or ()):
+                    s[key][subkey][axis] *= -1
+        return s
+
+    def flip(self, axis: int | str) -> None:
+        """Flip the object along one of the three axes."""
+        self.shapes = [  # ty:ignore[invalid-assignment]
+            FBVolume._flip_shape(shape, axis=axis) for shape in self.shapes
+        ]
+
+    @classmethod
+    def _translate_shape(cls, shape, axis: int | str, amount: float):  # noqa: ANN001, ANN206
+        match axis:
+            case 0 | "x":
+                axis = "x"
+                relevant_number_subkeys = ("x",)
+            case 1 | "y":
+                axis = "y"
+                relevant_number_subkeys = ("y",)
+            case 2 | "z":
+                axis = "z"
+                relevant_number_subkeys = ("z",)
+            case _:
+                msg = f"Unknown axis: {axis}"
+                raise ValueError(msg)
+        s = shape.copy()
+        for key in s.dtype.names or ():
+            for subkey in relevant_number_subkeys:
+                if subkey in (s[key].dtype.names or ()):
+                    s[key][subkey] += amount
+        return s
+
+    def translate(self, axis: int | str, amount: float) -> None:
+        """Translate the shape along the given axis, by the given amount."""
+        self.shapes = [  # ty:ignore[invalid-assignment]
+            FBVolume._translate_shape(shape, axis=axis, amount=amount)
+            for shape in self.shapes
         ]

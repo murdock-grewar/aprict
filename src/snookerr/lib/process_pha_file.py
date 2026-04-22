@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 import numexpr as ne
 import numpy as np
 import pcpp
+import regex  # replaces standard 're' module. Needed for the ability to do balanced matching of parentheses
 
 from ..cuda.structs import FORBILD_volumes as fv
 
@@ -53,26 +54,45 @@ re_shape_name = re.compile(r"(?<=[\[ ])[^ \]:]*(?=:)")
 re_clip_plane = re.compile(r"(?<=[\[ \{])[^ <>:=]+[<>][^ <>:=]+(?=[ \]\}])")
 # re_define_pragma = re.compile(r"\s*#define\s+([^\s]+)\s+([^\s].*)")
 re_float3 = re.compile(
-    r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^ <>:=,]+),([^ <>:=,]+),([^ <>:=,]+)\)"
+    r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^ <>:=,]+?),([^ <>:=,]+?),([^ <>:=,]+)\)"  # assume no spaces inside (...)
+    # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^<>:=,]+)\)"  # works for lungs phantom
+    # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^ <>:=,]+)\)"  # works for the head phantom
 )
 
 
 def _preprocess_file(fn: str | pathlib.Path) -> str:
     p = pcpp.Preprocessor()
-    with open(fn, "r") as f:  # noqa: PLW1514
+    with open(fn, "r", encoding="ISO-8859-1") as f:
         p.parse(f)
     oh = io.StringIO()
     p.write(oh)
     return oh.getvalue()
 
 
-def convert_ph_file_to_shapes(  # noqa: C901, D103
+def _preprocess_str(s: str) -> str:
+    p = pcpp.Preprocessor()
+    p.parse(s)
+    oh = io.StringIO()
+    p.write(oh)
+    return oh.getvalue()
+
+
+def convert_ph_file_to_shapes(  # noqa: D103
     fn: str | pathlib.Path,
+) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
+    return _convert_preprocessed_ph_str_to_shapes(_preprocess_file(fn))
+
+
+def convert_ph_str_to_shapes(s: str) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]  # noqa: D103
+    return _convert_preprocessed_ph_str_to_shapes(_preprocess_str(s))
+
+
+def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
+    s: str,
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
 
     shapes: list[np.ndarray[np.dtype[fv.Shape]]] = []  # ty:ignore[invalid-type-arguments]
 
-    s: str = _preprocess_file(fn)
     # Now get rid of newlines. Treat it as one long string
     # Shapes are contained in { ... } which makes it easy to process
     s = s.replace("\n", " ")
@@ -91,9 +111,30 @@ def convert_ph_file_to_shapes(  # noqa: C901, D103
         ),
         s,
     )
+    # remove redundant "mm" units for distances
+    s = re.sub(
+        r"([0-9\.])mm",
+        lambda m: m.groups()[0],
+        s,
+    )
+    # remove "Detector{...}" specifications. We only want the phantom.
+    s = re.sub(
+        r"Detector\{[^\{\}]*\}",
+        lambda _: "",
+        s,
+    )
+
+    # To make the re_float3 regex pattern work, remove spaces from any expression in parentheses
+    def remove_spaces_from_parentheticals(s: str) -> str:
+        return regex.sub(
+            r"(?V1)\(((?:[^)(]+|(?R))*+)\)",  # the "(?V1)" is a flag for the 'regex' package. It's needed for the recursion feature.
+            lambda m: "(" + m.groups()[0].replace(" ", "") + ")",
+            s,
+        )
 
     objs = re_obj.findall(s)
     for obj in objs:
+        obj = remove_spaces_from_parentheticals(obj)  # noqa: PLW2901
         shape = re_shape.findall(obj)[0]
         remaining = re_shape.sub("", obj)
         remaining_properties = re_key.findall(remaining)

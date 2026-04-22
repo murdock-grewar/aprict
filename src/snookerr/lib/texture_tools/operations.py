@@ -76,7 +76,10 @@ def _get_module() -> cp.RawModule:
                 *itertools.repeat(["half", "float"], 3)
             )
         ]
-        + [f"slice_nth_axis_to_3d_array<{t1}>" for t1 in ["half", "float"]],
+        + [f"slice_nth_axis_to_3d_array<{t1}>" for t1 in ["half", "float"]]
+        + [
+            f"sum_along_nth_axis_to_2d_array<{t1}>" for t1 in ["half", "float"]
+        ],
     )
     module.compile()
     return module
@@ -315,6 +318,77 @@ def slice_nth_axis_to_3d_cupy_array(  # noqa: C901
         *(np.uint32(l) for l in out_shape),
         np.uint32(sl_start),
         np.uint32(sl_stop),
+        np.uint8(axis),
+        *(np.uint64(l) for l in out.strides),
+        np.bool_(t.is_flagset_layered),
+        out,
+    )
+
+    kern(grid_dims, block_dims, args)
+    return out
+
+
+def sum_along_nth_axis_to_2d_cupy_array(  # noqa: C901
+    t: Texture, out: cp.ndarray | None, axis: int
+) -> cp.ndarray:
+    """Sum the data from a 2D-Layered or 3D texture along an axis, into a 2D cupy array."""
+    # Check validity of inputs
+    if not t.is_surface_included:
+        msg = "No surface included in this texture. This is required to use this function."
+        raise ValueError(msg)
+    if len(t.shape) != 3:
+        msg = "The provided texture is not three-dimensional."
+        raise ValueError(msg)
+    if axis not in (0, 1, 2):
+        msg = "Invalid choice of axis. Choose 0, 1 or 2."
+        raise ValueError(msg)
+    if len(t.shape) != 3:
+        msg = "Input texture is not 3D."
+        raise ValueError(msg)
+
+    # Determine output shape
+    match axis:
+        case 0:
+            out_shape = (t.shape[1], t.shape[2])  # ty:ignore[index-out-of-bounds]
+        case 1:
+            out_shape = (t.shape[0], t.shape[2])  # ty:ignore[index-out-of-bounds]
+        case 2:
+            out_shape = (t.shape[0], t.shape[1])
+        case _:
+            # This should never happen.
+            msg = "This function has a bug."
+            raise RuntimeError(msg)
+
+    dtype = t.dtype
+    ctype = _get_c_type_name(t)
+    kern = _module.get_function(f"sum_along_nth_axis_to_2d_array<{ctype:s}>")
+
+    if out is None:
+        out = cp.empty(out_shape, dtype=dtype, order="C")
+
+    if out.shape != out_shape:
+        msg = f"Output array is the wrong shape. Its shape is {out.shape} when it should be {out_shape}."
+        raise ValueError(msg)
+
+    if not out.flags["C_CONTIGUOUS"]:
+        msg = "Cannot write to an array that isn't C contiguous at this time."
+        raise NotImplementedError(msg)
+
+    if out.dtype != dtype:
+        msg = f"Wrong dtype for output array. Provided dtype: {out.dtype}. dtype corresponding to texture object: {dtype}."
+        raise ValueError(msg)
+
+    BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z = 10, 10, 10  # noqa: N806
+    grid_dims = (
+        math.ceil(t.shape[0] / BLOCKDIM_X),
+        math.ceil(t.shape[1] / BLOCKDIM_Y),
+        math.ceil(t.shape[2] / BLOCKDIM_Z),  # ty:ignore[index-out-of-bounds]
+    )
+    block_dims = (BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z)
+
+    args = (
+        t.surfobj,
+        *(np.uint32(l) for l in t.shape),
         np.uint8(axis),
         *(np.uint64(l) for l in out.strides),
         np.bool_(t.is_flagset_layered),

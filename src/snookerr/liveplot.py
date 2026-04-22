@@ -79,7 +79,13 @@ class QLivePlot(QWidget):
     ) -> None:
         match instruction:
             case QLivePlotInstruction.UPDATE_IMAGE:
+                # Setting the current index only seems to work when there is more than one layer...
+                # It defaults to the 0th index. So, a hackish way to do this is only set the index
+                # again if the index was above 0.
+                ind = self.imv.currentIndex
                 self.update(data)
+                if ind > 0:
+                    self.imv.setCurrentIndex(ind)
             case QLivePlotInstruction.AUTOLEVEL:
                 self.imv.autoLevels()
             case _:
