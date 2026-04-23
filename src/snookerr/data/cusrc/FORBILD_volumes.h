@@ -964,23 +964,197 @@ __device__ fvec2 FORBILD_clip_line_segment(
 
 struct FORBILD_Shape {
     unsigned char type;
+    float rho;
     FORBILD_ClipAxisSpec cas1;
     FORBILD_ClipAxisSpec cas2;
     FORBILD_ClipAxisSpec cas3;
-    FORBILD_Box Box;
-    FORBILD_Cone Cone;
-    FORBILD_Cone_x Cone_x;
-    FORBILD_Cone_y Cone_y;
-    FORBILD_Cone_z Cone_z;
-    FORBILD_Cylinder Cylinder;
-    FORBILD_Cylinder_x Cylinder_x;
-    FORBILD_Cylinder_y Cylinder_y;
-    FORBILD_Cylinder_z Cylinder_z;
-    FORBILD_Ellipsoid Ellipsoid;
-    FORBILD_Ellipsoid_free Ellipsoid_free;
-    FORBILD_Ellipt_Cyl Ellipt_Cyl;
-    FORBILD_Sphere Sphere;
+    float x;
+    float y;
+    float z;
+    float dx;
+    float dy;
+    float dz;
+    float r;
+    float r1;
+    float r2;
+    float l;
+    fvec3 a_x;
+    fvec3 a_y;
+    fvec3 a_z;
+    fvec3 axis;
 };
+__device__ FORBILD_Box _to_Box(const FORBILD_Shape s)
+{
+    FORBILD_Box box;
+    box.rho = s.rho;
+    box.x = s.x;
+    box.y = s.y;
+    box.z = s.z;
+    box.dx = s.dx;
+    box.dy = s.dy;
+    box.dz = s.dz;
+    return box;
+}
+
+__device__ FORBILD_Cone _to_Cone(const FORBILD_Shape s)
+{
+    FORBILD_Cone cone;
+    cone.rho = s.rho;
+    cone.x = s.x;
+    cone.y = s.y;
+    cone.z = s.z;
+    cone.l = s.l;
+    cone.r1 = s.r1;
+    cone.r2 = s.r2;
+    cone.axis = s.axis;
+    return cone;
+}
+
+__device__ FORBILD_Cone_x _to_Cone_x(const FORBILD_Shape s)
+{
+    FORBILD_Cone_x cone;
+    cone.rho = s.rho;
+    cone.x = s.x;
+    cone.y = s.y;
+    cone.z = s.z;
+    cone.l = s.l;
+    cone.r1 = s.r1;
+    cone.r2 = s.r2;
+    return cone;
+}
+
+__device__ FORBILD_Cone_y _to_Cone_y(const FORBILD_Shape s)
+{
+    FORBILD_Cone_y cone;
+    cone.rho = s.rho;
+    cone.x = s.x;
+    cone.y = s.y;
+    cone.z = s.z;
+    cone.l = s.l;
+    cone.r1 = s.r1;
+    cone.r2 = s.r2;
+    return cone;
+}
+
+__device__ FORBILD_Cone_z _to_Cone_z(const FORBILD_Shape s)
+{
+    FORBILD_Cone_z cone;
+    cone.rho = s.rho;
+    cone.x = s.x;
+    cone.y = s.y;
+    cone.z = s.z;
+    cone.l = s.l;
+    cone.r1 = s.r1;
+    cone.r2 = s.r2;
+    return cone;
+}
+
+
+__device__ FORBILD_Cylinder _to_Cylinder(const FORBILD_Shape s)
+{
+    FORBILD_Cylinder c;
+    c.rho = s.rho;
+    c.x = s.x;
+    c.y = s.y;
+    c.z = s.z;
+    c.r = s.r;
+    c.l = s.l;
+    c.axis = s.axis;
+    return c;
+}
+
+__device__ FORBILD_Cylinder_x _to_Cylinder_x(const FORBILD_Shape s)
+{
+    FORBILD_Cylinder_x c;
+    c.rho = s.rho;
+    c.x = s.x;
+    c.y = s.y;
+    c.z = s.z;
+    c.r = s.r;
+    c.l = s.l;
+    return c;
+}
+
+__device__ FORBILD_Cylinder_y _to_Cylinder_y(const FORBILD_Shape s)
+{
+    FORBILD_Cylinder_y c;
+    c.rho = s.rho;
+    c.x = s.x;
+    c.y = s.y;
+    c.z = s.z;
+    c.r = s.r;
+    c.l = s.l;
+    return c;
+}
+
+__device__ FORBILD_Cylinder_z _to_Cylinder_z(const FORBILD_Shape s)
+{
+    FORBILD_Cylinder_z c;
+    c.rho = s.rho;
+    c.x = s.x;
+    c.y = s.y;
+    c.z = s.z;
+    c.r = s.r;
+    c.l = s.l;
+    return c;
+}
+
+__device__ FORBILD_Ellipsoid _to_Ellipsoid(const FORBILD_Shape s)
+{
+    FORBILD_Ellipsoid e;
+    e.rho = s.rho;
+    e.x = s.x;
+    e.y = s.y;
+    e.z = s.z;
+    e.dx = s.dx;
+    e.dy = s.dy;
+    e.dz = s.dz;
+    return e;
+}
+
+__device__ FORBILD_Ellipsoid_free _to_Ellipsoid_free(const FORBILD_Shape s)
+{
+    FORBILD_Ellipsoid_free e;
+    e.rho = s.rho;
+    e.x = s.x;
+    e.y = s.y;
+    e.z = s.z;
+    e.dx = s.dx;
+    e.dy = s.dy;
+    e.dz = s.dz;
+    e.a_x = s.a_x;
+    e.a_y = s.a_y;
+    e.a_z = s.a_z;
+    return e;
+}
+
+__device__ FORBILD_Ellipt_Cyl _to_Ellipt_Cyl(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dx = s.dx;
+    ec.dy = s.dy;
+    ec.axis = s.axis;
+    ec.a_x = s.a_x;
+    ec.a_y = s.a_y;
+    return ec;
+}
+
+__device__ FORBILD_Sphere _to_Sphere(const FORBILD_Shape s)
+{
+    FORBILD_Sphere sphere;
+    sphere.rho = s.rho;
+    sphere.x = s.x;
+    sphere.y = s.y;
+    sphere.z = s.z;
+    sphere.r = s.r;
+    return sphere;
+}
+
 __device__ bool _in_region(
     fvec3 v,
     FORBILD_Shape shape
@@ -994,31 +1168,31 @@ __device__ bool _in_region(
         case 0:
             return false;
         case 1:
-            return _in_region(v, shape.Box);
+            return _in_region(v, _to_Box(shape));
         case 2:
-            return _in_region(v, shape.Cone);
+            return _in_region(v, _to_Cone(shape));
         case 3:
-            return _in_region(v, shape.Cone_x);
+            return _in_region(v, _to_Cone_x(shape));
         case 4:
-            return _in_region(v, shape.Cone_y);
+            return _in_region(v, _to_Cone_y(shape));
         case 5:
-            return _in_region(v, shape.Cone_z);
+            return _in_region(v, _to_Cone_z(shape));
         case 6:
-            return _in_region(v, shape.Cylinder);
+            return _in_region(v, _to_Cylinder(shape));
         case 7:
-            return _in_region(v, shape.Cylinder_x);
+            return _in_region(v, _to_Cylinder_x(shape));
         case 8:
-            return _in_region(v, shape.Cylinder_y);
+            return _in_region(v, _to_Cylinder_y(shape));
         case 9:
-            return _in_region(v, shape.Cylinder_z);
+            return _in_region(v, _to_Cylinder_z(shape));
         case 10:
-            return _in_region(v, shape.Ellipsoid);
+            return _in_region(v, _to_Ellipsoid(shape));
         case 11:
-            return _in_region(v, shape.Ellipsoid_free);
+            return _in_region(v, _to_Ellipsoid_free(shape));
         case 12:
-            return _in_region(v, shape.Ellipt_Cyl);
+            return _in_region(v, _to_Ellipt_Cyl(shape));
         case 13:
-            return _in_region(v, shape.Sphere);
+            return _in_region(v, _to_Sphere(shape));
         default:
             return false;
     }
@@ -1047,43 +1221,43 @@ __device__ fvec2 FORBILD_clip_line_segment(
         case 0:
             return fvec2(0.f, 0.f);
         case 1:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Box);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Box(shape));
             break;
         case 2:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cone);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cone(shape));
             break;
         case 3:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cone_x);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cone_x(shape));
             break;
         case 4:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cone_y);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cone_y(shape));
             break;
         case 5:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cone_z);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cone_z(shape));
             break;
         case 6:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cylinder);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cylinder(shape));
             break;
         case 7:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cylinder_x);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cylinder_x(shape));
             break;
         case 8:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cylinder_y);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cylinder_y(shape));
             break;
         case 9:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Cylinder_z);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Cylinder_z(shape));
             break;
         case 10:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Ellipsoid);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipsoid(shape));
             break;
         case 11:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Ellipsoid_free);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipsoid_free(shape));
             break;
         case 12:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Ellipt_Cyl);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipt_Cyl(shape));
             break;
         case 13:
-            interval = FORBILD_clip_line_segment(v1, v2, shape.Sphere);
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Sphere(shape));
             break;
         default:
             interval = fvec2(0.f, 0.f);
@@ -1103,38 +1277,7 @@ __device__ float FORBILD_get_rho(Ts shape)
 template<>
 __device__ float FORBILD_get_rho<FORBILD_Shape>(FORBILD_Shape shape)
 {
-    switch (shape.type) {
-        case 0:
-            return 0.f;
-        case 1:
-            return shape.Box.rho;
-        case 2:
-            return shape.Cone.rho;
-        case 3:
-            return shape.Cone_x.rho;
-        case 4:
-            return shape.Cone_y.rho;
-        case 5:
-            return shape.Cone_z.rho;
-        case 6:
-            return shape.Cylinder.rho;
-        case 7:
-            return shape.Cylinder_x.rho;
-        case 8:
-            return shape.Cylinder_y.rho;
-        case 9:
-            return shape.Cylinder_z.rho;
-        case 10:
-            return shape.Ellipsoid.rho;
-        case 11:
-            return shape.Ellipsoid_free.rho;
-        case 12:
-            return shape.Ellipt_Cyl.rho;
-        case 13:
-            return shape.Sphere.rho;
-        default:
-            return 0.f;
-    }
+    return shape.rho;
 }
 
 // A template method for all the shapes to use, including FORBILD_Shape
@@ -1193,9 +1336,9 @@ __device__ float exact_line_integral_prioritise_last_recursive(
     const Ts shape = shapes[new_num_shapes];
     float val = (interval.y - interval.x) * FORBILD_get_rho(shape) * dv_norm;
     if (new_num_shapes > 0) {
-        val += exact_line_integral_prioritise_last(
+        val += exact_line_integral_prioritise_last_recursive(
             v1, v1 + dv*interval.x, shapes, new_num_shapes);
-        val += exact_line_integral_prioritise_last(
+        val += exact_line_integral_prioritise_last_recursive(
             v1 + dv*interval.y, v2, shapes, new_num_shapes);
     }
     return val;

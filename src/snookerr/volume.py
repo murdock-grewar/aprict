@@ -196,21 +196,19 @@ class FBVolume:
         s = shape.copy()
         for key in ("cas1", "cas2", "cas3"):
             s[key]["dotprod"] *= scale
-        for key in s.dtype.names or ():
-            for subkey in (
-                "x",
-                "y",
-                "z",
-                "r",
-                "l",
-                "dx",
-                "dy",
-                "dz",
-                "r1",
-                "r2",
-            ):
-                if subkey in (s[key].dtype.names or ()):
-                    s[key][subkey] *= scale
+        for key in (
+            "x",
+            "y",
+            "z",
+            "r",
+            "l",
+            "dx",
+            "dy",
+            "dz",
+            "r1",
+            "r2",
+        ):
+            s[key] *= scale
         return s
 
     def scale_len(self, factor: float) -> None:
@@ -237,18 +235,15 @@ class FBVolume:
         s = shape.copy()
         for key in ("cas1", "cas2", "cas3"):
             s[key]["axis"][axis] *= -1
-        for key in s.dtype.names or ():
-            for subkey in relevant_number_subkeys:
-                if subkey in (s[key].dtype.names or ()):
-                    s[key][subkey] *= -1
-            for subkey in (
-                "axis",
-                "a_x",
-                "a_y",
-                "a_z",
-            ):
-                if subkey in (s[key].dtype.names or ()):
-                    s[key][subkey][axis] *= -1
+        for key in relevant_number_subkeys:
+            s[key] *= -1
+        for key in (
+            "axis",
+            "a_x",
+            "a_y",
+            "a_z",
+        ):
+            s[key][axis] *= -1
         return s
 
     def flip(self, axis: int | str) -> None:
@@ -273,10 +268,8 @@ class FBVolume:
                 msg = f"Unknown axis: {axis}"
                 raise ValueError(msg)
         s = shape.copy()
-        for key in s.dtype.names or ():
-            for subkey in relevant_number_subkeys:
-                if subkey in (s[key].dtype.names or ()):
-                    s[key][subkey] += amount
+        for key in relevant_number_subkeys:
+            s[key] += amount
         return s
 
     def translate(self, axis: int | str, amount: float) -> None:

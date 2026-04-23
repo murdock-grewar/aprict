@@ -144,7 +144,6 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
 
         # Construct an empty object of the correct type
         shape_obj = np.array(0, dtype=fv.Shape)
-        shape_obj[shape_name] = np.array(0, dtype=_typedict[shape_name])
         shape_obj["type"] = fv._dict_shape_name_to_type_num[shape_name]  # noqa: SLF001
         # Fill the shape with the found properties
         for k, v in [
@@ -152,12 +151,12 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
         ]:
             if k in ("formel",):
                 continue
-            shape_obj[shape_name][k] = ne.evaluate(v.strip())
+            shape_obj[k] = ne.evaluate(v.strip())
         for m in re_float3.finditer(shape):
             name, x, y, z = m.groups()
             x, y, z = [ne.evaluate(thing.strip()) for thing in (x, y, z)]
             vec = np.array((x, y, z), dtype=fv.fvec3)
-            shape_obj[shape_name][name] = vec
+            shape_obj[name] = vec
 
         # The FORBILD format only requires the user to specify two axes, if they wish
         # The third must be computed from the other two.
@@ -166,10 +165,9 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
             case "Ellipsoid_free":
                 vec_name_set = {"a_x", "a_y", "a_z"}
                 for vecname in vec_name_set:
-                    if shape_obj[shape_name][vecname] == zerofvec3:
+                    if shape_obj[vecname] == zerofvec3:
                         u, v = [
-                            shape_obj[shape_name][vn]
-                            for vn in vec_name_set - {vecname}
+                            shape_obj[vn] for vn in vec_name_set - {vecname}
                         ]
                         u = np.array(
                             [u["x"], u["y"], u["z"]], dtype=np.float32
@@ -177,17 +175,16 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
                         v = np.array(
                             [v["x"], v["y"], v["z"]], dtype=np.float32
                         )
-                        shape_obj[shape_name][vecname] = np.array(
+                        shape_obj[vecname] = np.array(
                             tuple(np.cross(u, v)), dtype=fv.fvec3
                         )
                         break
             case "Ellipt_Cyl":
                 vec_name_set = {"a_x", "a_y", "axis"}
                 for vecname in vec_name_set:
-                    if shape_obj[shape_name][vecname] == zerofvec3:
+                    if shape_obj[vecname] == zerofvec3:
                         u, v = [
-                            shape_obj[shape_name][vn]
-                            for vn in vec_name_set - {vecname}
+                            shape_obj[vn] for vn in vec_name_set - {vecname}
                         ]
                         u = np.array(
                             [u["x"], u["y"], u["z"]], dtype=np.float32
@@ -195,7 +192,7 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
                         v = np.array(
                             [v["x"], v["y"], v["z"]], dtype=np.float32
                         )
-                        shape_obj[shape_name][vecname] = np.array(
+                        shape_obj[vecname] = np.array(
                             tuple(np.cross(u, v)), dtype=fv.fvec3
                         )
                         break

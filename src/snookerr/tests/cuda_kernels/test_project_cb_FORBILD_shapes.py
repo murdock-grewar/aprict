@@ -111,13 +111,19 @@ class TestCB_FORBILD_spheres:
             x, y, z = 10 * np.random.randn(3)  # noqa: NPY002
             r = np.random.uniform(10, 10)  # noqa: NPY002
             atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
+            spheres.append(
+                np.array(
+                    (atten_coeff, x, y, z, r),
+                    dtype=structs.FORBILD_volumes.Sphere,
+                )
+            )
             s = np.array(0, dtype=structs.FORBILD_volumes.Shape)
             s["type"] = 13  # sphere type is 13
-            s["Sphere"] = np.array(
-                (atten_coeff, x, y, z, r), dtype=structs.FORBILD_volumes.Sphere
-            )
-            spheres.append(s["Sphere"])
-            shapes.append(s)
+            for key, val in zip(
+                ["rho", "x", "y", "z", "r"],
+                [atten_coeff, x, y, z, r],
+            ):
+                s[key] = val
         self.shapes_cp_arr = cp.array(
             np.array(shapes, dtype=structs.FORBILD_volumes.Shape, ndmax=1)
         )
@@ -261,11 +267,17 @@ class TestCB_FORBILD_boxes:
             atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
             s = np.array(0, dtype=structs.FORBILD_volumes.Shape)
             s["type"] = 13  # sphere type is 13
-            s["Box"] = np.array(
-                (atten_coeff, x, y, z, dx, dy, dz),
-                dtype=structs.FORBILD_volumes.Box,
+            boxes.append(
+                np.array(
+                    (atten_coeff, x, y, z, dx, dy, dz),
+                    dtype=structs.FORBILD_volumes.Box,
+                )
             )
-            boxes.append(s["Box"])
+            for key, val in zip(
+                ["rho", "x", "y", "z", "dx", "dy", "dz"],
+                [atten_coeff, x, y, z, dx, dy, dz],
+            ):
+                s[key] = val
             shapes.append(s)
         self.shapes_cp_arr = cp.array(
             np.array(shapes, dtype=structs.FORBILD_volumes.Shape, ndmax=1)
@@ -411,11 +423,17 @@ class TestCB_FORBILD_cyls:
             s = np.array(0, dtype=structs.FORBILD_volumes.Shape)
             s["type"] = 13  # sphere type is 13
             axis = np.array((ax, ay, az), dtype=structs.fvec3)
-            s["Cylinder"] = np.array(
-                (atten_coeff, x, y, z, r, l, axis),
-                dtype=structs.FORBILD_volumes.Cylinder,
+            cyls.append(
+                np.array(
+                    (atten_coeff, x, y, z, r, l, axis),
+                    dtype=structs.FORBILD_volumes.Cylinder,
+                )
             )
-            cyls.append(s["Cylinder"])
+            for key, val in zip(
+                ["rho", "x", "y", "z", "r", "l", "axis"],
+                [atten_coeff, x, y, z, r, l, axis],
+            ):
+                s[key] = val
             shapes.append(s)
         self.shapes_cp_arr = cp.array(
             np.array(shapes, dtype=structs.FORBILD_volumes.Shape, ndmax=1)
