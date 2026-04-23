@@ -68,10 +68,14 @@ class SIRT_flatpanel:  # noqa: N801
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
             apply_summand_multiplier=True,  # we'll multiply by the preconditioner
         )
+        if projs.data is None:
+            msg = "The provided ProjectionSet object has no data."
+            raise ValueError(msg)
         # The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1
         # We will calculate M now.
         M: Volume = volume.zeroed_copy()  # noqa: N806
         p: cbfp.ProjectionSet = projs.zeroed_copy()
+        assert p.data is not None
         scale_factor: float = 1 / float(
             np.mean(volume.shape)
         )  # a factor used to scale things to prevent overflow etc

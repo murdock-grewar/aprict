@@ -364,7 +364,11 @@ def sum_along_nth_axis_to_2d_cupy_array(  # noqa: C901
     kern = _module.get_function(f"sum_along_nth_axis_to_2d_array<{ctype:s}>")
 
     if out is None:
-        out = cp.empty(out_shape, dtype=dtype, order="C")
+        out = cp.zeros(out_shape, dtype=dtype, order="C")
+    else:
+        out.fill(
+            0
+        )  # We will add to the array, so we need to set it to zero first.
 
     if out.shape != out_shape:
         msg = f"Output array is the wrong shape. Its shape is {out.shape} when it should be {out_shape}."

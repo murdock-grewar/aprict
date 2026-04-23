@@ -240,7 +240,7 @@ __global__ void sum_along_nth_axis_to_2d_array(
     int k = idx.z;
 
     // Get the index of this thread in the 2D output into the array
-    unsigned int iarr, jarr;
+    unsigned long iarr, jarr;
     if (axis_index_to_sum == 0) { iarr = idx.y; jarr = idx.z; }
     if (axis_index_to_sum == 1) { iarr = idx.x; jarr = idx.z; }
     if (axis_index_to_sum == 2) { iarr = idx.x; jarr = idx.y; }

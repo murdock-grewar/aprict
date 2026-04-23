@@ -34,8 +34,8 @@ def main() -> None:  # noqa: D103
     lung_generations: int = 10 if len(sys.argv) < 2 else int(sys.argv[1])
     live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
-    default_plot_range_line_attenuation: list[int | float] = [0.0, 0.2]
-    voxwid_mm: float = 0.5  # the voxel width of the head phantom
+    default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
+    voxwid_mm: float = 1.0  # the voxel width of the head phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
@@ -51,7 +51,7 @@ def main() -> None:  # noqa: D103
     fast_approx_backprojection: bool = True
     numits: int = 1000 if len(sys.argv) < 3 else int(sys.argv[2])
     vol_dtype = np.float32  # either np.float16 or np.float32
-    proj_dtype = np.float32  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
+    proj_dtype = np.float16  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
     ###############################
 
     # Derived quantities
@@ -190,7 +190,7 @@ def main() -> None:  # noqa: D103
         )
         print("done.", flush=True)
         print()
-        proj_array = out_noised_attenuation_capped
+        proj_array = out_noised_attenuation_capped.astype(proj_dtype)
     else:
         proj_array = projs.data
     snookerr.imview.plot_projections(
@@ -265,8 +265,8 @@ def main() -> None:  # noqa: D103
         # Live plot update
         if live_plot:
             recon.volume.sum_to_cupy_array(axis=1, out=liveplot_arr)
-            cp.multiply(liveplot_arr, voxwid_mm, out=liveplot_arr)
-            lp_dispatcher.update_image(liveplot_arr.get()[:, :, np.newaxis])
+            a = liveplot_arr.get()
+            lp_dispatcher.update_image(a[:, :, np.newaxis])
             if i == 0:
                 lp_dispatcher.set_visible(True)
     snookerr.imview.plot_volume(

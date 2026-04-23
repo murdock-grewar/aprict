@@ -157,6 +157,37 @@ __device__ Tp get_data_2d_guarded(
     return value;
 }
 
+template<typename T>
+__device__ T fcast(const half f)
+{
+    return (T)__half2float(f);
+}
+template<typename T>
+__device__ T fcast(const float f)
+{
+    return (T)f;
+}
+template<typename T>
+__device__ T fcast(const double f)
+{
+    return (T)f;
+}
+template<>
+__device__ half fcast<half>(const half f)
+{
+    return f;
+}
+template<>
+__device__ half fcast<half>(const float f)
+{
+    return __float2half(f);
+}
+template<>
+__device__ half fcast<half>(const double f)
+{
+    return __double2half(f);
+}
+
 template<typename Tp>
 __device__ Tp get_bilinear_interp(
         const float2 det_idx_f,
@@ -182,14 +213,14 @@ __device__ Tp get_bilinear_interp(
     int2 idx_upper = int2({idx_lower.x + 1, idx_lower.y + 1});
     float2 fractional_remainders = float2({det_idx_f.x - idx_lower.x, det_idx_f.y - idx_lower.y});
 
-    Tp val_00 = get_data_2d_guarded(idx_lower, shape, strides, data_2d);
-    Tp val_01 = get_data_2d_guarded(int2({idx_lower.x, idx_upper.y}), shape, strides, data_2d);
-    Tp val_10 = get_data_2d_guarded(int2({idx_upper.x, idx_lower.y}), shape, strides, data_2d);
-    Tp val_11 = get_data_2d_guarded(idx_upper, shape, strides, data_2d);
+    Tp val_00 = get_data_2d_guarded<Tp>(idx_lower, shape, strides, data_2d);
+    Tp val_01 = get_data_2d_guarded<Tp>(int2({idx_lower.x, idx_upper.y}), shape, strides, data_2d);
+    Tp val_10 = get_data_2d_guarded<Tp>(int2({idx_upper.x, idx_lower.y}), shape, strides, data_2d);
+    Tp val_11 = get_data_2d_guarded<Tp>(idx_upper, shape, strides, data_2d);
 
-    Tp tmp1 = val_00 * (Tp)(1.f - fractional_remainders.x) + val_10 * (Tp)fractional_remainders.x;
-    Tp tmp2 = val_01 * (Tp)(1.f - fractional_remainders.x) + val_11 * (Tp)fractional_remainders.x;
-    return tmp1 * (Tp)(1.f - fractional_remainders.y) + tmp2 * (Tp)fractional_remainders.y;
+    Tp tmp1 = val_00 * fcast<Tp>(1.f - fractional_remainders.x) + val_10 * fcast<Tp>(fractional_remainders.x);
+    Tp tmp2 = val_01 * fcast<Tp>(1.f - fractional_remainders.x) + val_11 * fcast<Tp>(fractional_remainders.x);
+    return tmp1 * fcast<Tp>(1.f - fractional_remainders.y) + tmp2 * fcast<Tp>(fractional_remainders.y);
 }
 
 template<
@@ -352,8 +383,8 @@ __device__ Tv _backproject_CB_getval(
             float dist_to_vox = norm_fvec3(vox_pos - source_pos);
             float mag = dist_to_det/dist_to_vox;
             float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
-            Tp multiplier = powint(mag,2) / pixel_area;
-            accumulator += (Tv)(det_value * multiplier);
+            Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
+            accumulator += fcast<Tv>(det_value * multiplier);
         }
     }
 
