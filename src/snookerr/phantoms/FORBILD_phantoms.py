@@ -156,7 +156,8 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                         r.apply(parent.x)
                     )  # the web page isn't clear about how the new x should be determined
                     r2 = scipy.spatial.transform.Rotation.from_rotvec(
-                        np.array(z) * -90, degrees=True
+                        np.array(z) * 90,
+                        degrees=True,  # I thought the angle here should have a minus sign, but no, it matches the 3rd generation example without it.
                     )
                     x = tuple(r2.apply(x))
                     v = tuple(np.array(u) + length * np.array(z))
@@ -190,7 +191,8 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                         r.apply(parent.x)
                     )  # the web page isn't clear about how the new x should be determined
                     r2 = scipy.spatial.transform.Rotation.from_rotvec(
-                        np.array(z) * -10, degrees=True
+                        np.array(z) * 10,
+                        degrees=True,  # I thought the angle here should have a minus sign, but no, it matches the 3rd generation example without it.
                     )
                     x = tuple(r2.apply(x))
                     v = tuple(np.array(u) + length * np.array(z))

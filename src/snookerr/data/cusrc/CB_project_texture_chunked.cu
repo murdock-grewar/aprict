@@ -338,6 +338,7 @@ __global__ void project_CB_texture_chunked(
 }
 
 
+#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // based on 48KB shared memory size, and about 150 bytes per Shape object at the time of writing
 template<
     typename Tp,  // type of projection data. e.g. float or double
     typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera
@@ -346,34 +347,38 @@ __global__ void project_CB_FORBILD_shapes(
         const config_CB_project_FORBILD   config,          // any miscellaneous config for the CB projection
         const proj_spec*          projspecs,       // contains the source and detector configurations
         const unsigned int        num_projs,       // length of projspecs array
-        const Ts*                 shapes,          // shapes array
+        Ts*                       shapes_glob,          // shapes array
         const unsigned int        num_shapes,      // number of shapes
         const ulvec3              output_projs_strides,
         Tp*                       output_projs
 )
 {
-
-    /*
-    const unsigned long threadid = (
-        threadIdx.x +
-        threadIdx.y * blockDim.x +
-        threadIdx.z * blockDim.x * blockDim.y
-    );
-    const unsigned long vol_chunk_size = volchunk_Xsize*volchunk_Ysize*volchunk_Zsize;
-    */
+    // Get the detector position and which projection layer
     unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
     unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
 
-    /* This does make things somewhat faster, maybe 15%, but not worth the complexity I suppose.
-    // Load the shapes into a shared array.
-    __shared__ FORBILD_Shape shapes_shared[100];
-    unsigned int id_in_block = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.x * blockDim.y;
-    if (id_in_block < num_shapes) {
-        shapes_shared[id_in_block] = shapes[id_in_block];
+    // If the shared memory is big enough to contain all the shapes,
+    // then load them into shared memory and use that instead.
+    Ts* shapes;
+    if (num_shapes > MAX_NUM_SHAPES_FOR_SHARED_MEMORY) {
+        shapes = shapes_glob;
+    } else {
+        const unsigned long tid = (
+            threadIdx.x +
+            threadIdx.y*blockDim.x +
+            threadIdx.z*blockDim.x*blockDim.z
+        );
+        // Load shapes into shared memory for the thread block
+        __shared__ Ts shapes_shared[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+        unsigned int num_shapes_to_load_per_thread = (unsigned int)ceil((float)num_shapes / (blockDim.x * blockDim.y * blockDim.z));
+        for (unsigned long i = tid*num_shapes_to_load_per_thread; i < (1+tid)*num_shapes_to_load_per_thread; i++) {
+            if (i >= num_shapes) { break; }
+            shapes_shared[i] = shapes_glob[i];
+        }
+        shapes = shapes_shared;
+        __syncthreads();
     }
-    __syncthreads();
-    */
 
     // Now, if out of range of the detector, then return.
     if (proj_idx >= num_projs) {
@@ -384,13 +389,6 @@ __global__ void project_CB_FORBILD_shapes(
         (det_idx_y >= projspec.dspec.nv)) {
         return;
     }
-
-    // Get the index 'det_idx' of the detector data that this thread should write to
-    unsigned long det_idx = (
-        output_projs_strides.y * det_idx_x +
-        output_projs_strides.z * det_idx_y +
-        output_projs_strides.x * proj_idx
-    )/sizeof(Tp);
 
     // Get the start and end points of the projection line
     fvec3 source_pos = projspec.sourcepos;
@@ -406,11 +404,18 @@ __global__ void project_CB_FORBILD_shapes(
     } else {
         val = exact_line_integral_prioritise_last(source_pos, det_pos, shapes, num_shapes);
     }
+    if (val == (Tp)0) { return; }
     val *= config.multiply_before_adding;
     // Do things ...
     //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
 
     // Add the result atomically.
     // (using atomicAdd allows us to launch other kernels concurrently, if desired)
+    // Get the index 'det_idx' of the detector data that this thread should write to
+    unsigned long det_idx = (
+        output_projs_strides.y * det_idx_x +
+        output_projs_strides.z * det_idx_y +
+        output_projs_strides.x * proj_idx
+    )/sizeof(Tp);
     atomicAdd(&output_projs[det_idx], val);
 }

@@ -31,7 +31,7 @@ def main() -> None:  # noqa: D103
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
-    lung_generations: int = 13  # integer >= 2
+    lung_generations: int = 10 if len(sys.argv) < 2 else int(sys.argv[1])
     live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
     default_plot_range_line_attenuation: list[int | float] = [0.0, 0.2]
@@ -43,13 +43,13 @@ def main() -> None:  # noqa: D103
     apply_noise: bool = False
     R_mm: float = 500  # noqa: N806
     L_mm: float = R_mm + 500  # noqa: N806
-    num_sources: int = 1
+    num_sources: int = 100
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 1000  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 500
     pixel_wid_mm: float = 0.3
     fast_approx_backprojection: bool = True
-    numits: int = 1000 if len(sys.argv) < 2 else int(sys.argv[1])
+    numits: int = 1000 if len(sys.argv) < 3 else int(sys.argv[2])
     vol_dtype = np.float32  # either np.float16 or np.float32
     proj_dtype = np.float32  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
     ###############################
@@ -103,16 +103,17 @@ def main() -> None:  # noqa: D103
         det_numpixwid,
         det_numpixhei,
     )
-    print("Number of fan-beam projections: ", pss.size)
+    print("Number of cone-beam projections: ", pss.size)
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
     vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.LungPhantom(
         lung_generations
     )
+    print("Number of shapes: ", len(vol.shapes))
     vol.translate(axis="z", amount=150)
     vol.scale_len(1 / voxwid_mm)
-    volwid_mm = 400  # in the future, fetch from the phantom
+    volwid_mm = 500  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
     volwid_mm *= scale_phantom_size

@@ -371,9 +371,9 @@ def project(
     assert projs.data is not None
     is_fb: bool = type(volume) is FBVolume
     # Prepare the kernel and the static kernel args
-    blockx = min(5 if is_fb else 10, projs.data.shape[-2])
-    blocky = min(5 if is_fb else 10, projs.data.shape[-1])
-    blocklayer = min(5 if is_fb else 10, projs.data.shape[-3])
+    blockx = min(25 if is_fb else 10, projs.data.shape[-2])
+    blocky = min(25 if is_fb else 10, projs.data.shape[-1])
+    blocklayer = min(1 if is_fb else 10, projs.data.shape[-3])
     kern = _select_projection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blocklayer)
     grid_dims = (
@@ -434,6 +434,11 @@ def project(
             # If the silhouette of a shape intersects the thread block, then keep it.
             # Otherwise, discard it from the list and launch the kernel with
             # the thinned-down list of shapes.
+            #
+            # We'll launch the kernel separately for each block.
+            # Each block will be given only the relevant shapes to deal with
+            # Never mind: launching the kernel separately for each block
+            # incurs massive overhead. 307.8ms --> 22837.4ms
             args = (  # input args
                 config.contents_fb,
                 input_proj_specs_slice,
