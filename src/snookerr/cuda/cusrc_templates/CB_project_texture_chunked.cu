@@ -338,7 +338,7 @@ __global__ void project_CB_texture_chunked(
 }
 
 
-#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // based on 48KB shared memory size, and about 150 bytes per Shape object at the time of writing
+#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // = 300, based on 48KB shared memory size, and about 150 bytes per Shape object at the time of writing
 template<
     typename Tp,  // type of projection data. e.g. float or double
     typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera

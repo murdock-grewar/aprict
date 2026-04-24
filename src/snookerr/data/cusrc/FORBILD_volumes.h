@@ -1344,9 +1344,10 @@ __device__ float exact_line_integral_prioritise_last_recursive(
     return val;
 }
 
+/*
 // A template method for all the shapes to use, including FORBILD_Shape
 template<typename Ts>
-__device__ float exact_line_integral_prioritise_last(
+__device__ float exact_line_integral_prioritise_last_old_and_slow_but_accurate(
         const fvec3                 v1,
         const fvec3                 v2,
         const Ts*                   shapes,
@@ -1393,6 +1394,154 @@ __device__ float exact_line_integral_prioritise_last(
             val += len * FORBILD_get_rho(shape) * dv_norm;
         }
         progress = interval.y;
+    }
+    return val;
+}
+*/
+
+// A template method for all the shapes to use, including FORBILD_Shape
+template<typename Ts>
+__device__ float exact_line_integral_prioritise_last(
+        const fvec3                 v1,
+        const fvec3                 v2,
+        Ts*                   shapes_in,
+        unsigned int          num_shapes_in
+)
+{
+    // Base case
+    if (num_shapes_in == 0) {
+        return 0.f;
+    }
+    // Return if line segment has length 0
+    const fvec3 dv = v2 - v1;
+    const float dv_norm = norm_fvec3(dv);
+    if (dv_norm == 0) {
+        return 0.f;
+    }
+
+    /*
+    // Stupid, hacky, inelegant optimisation:
+    // Cull the range of shape objects down to its minimum,
+    // so that we don't repeatedly access irrelevant shapes.
+    // We will do this by selecting the smallest contiguous selection
+    // of relevant shapes.
+    // If the first and last shape are spatially near each other,
+    // then this will do nothing to help projecting through that region.
+    Ts* shapes;
+    unsigned int num_shapes;
+    unsigned int lower_index = num_shapes_in;  // start AFTER the end, until this number is reduced
+    unsigned int upper_index = 0;
+    for (unsigned int i = 0; i < num_shapes_in; i++) {
+        fvec2 interval_tmp = FORBILD_clip_line_segment(v1, v2, shapes_in[i]);
+        if (interval_tmp.y == interval_tmp.x) {
+            continue;
+        }
+        lower_index = min(lower_index, i);
+        upper_index = max(upper_index, i);
+    }
+    // If no intersecting shape found:
+    if (lower_index == num_shapes_in) { return 0.f; }
+    shapes = &shapes_in[lower_index];
+    num_shapes = upper_index - lower_index + 1;
+    */
+    Ts* shapes = shapes_in;
+    unsigned int num_shapes = num_shapes_in;
+
+    // To avoid recursion, use a loop to find the first shape (beginning from the end)
+    // which has any overlap with this line
+    float val = 0.f;
+    fvec3 vcurrent = v1;
+    float dv_current_norm = dv_norm;
+    float entry_intersection, exit_intersection;
+    fvec2 interval;
+    Ts shape_tmp;
+    float rho;
+    unsigned int num_shapes_consecutive_nonintersecting = 0;
+    // An interval tolerance is needed. This is because when v1 is added to, it won't be exactly
+    // equal to the intersection point identified, due to floating point error.
+    // Maybe a better way to do this would be to have FORBILD_clip_line_segment return
+    // the end points of the line. For now, I'll just include this negligible tolerance term.
+    // NOTE: setting this tolerance to too small a number will greatly increase the time taken
+    // to compute projections, because of this floating point error necessitating extra steps!
+    // Setting it too low will also result in some bright spots in projections, where instability
+    // from small numbers causes an overestimation of line integrals.
+    // Example: 698ms --> 7856ms !
+    // TODO: create a better solution that doesn't need fudging around floating-point error.
+    // One option: add a "min_interval_start" parameter to the FORBILD_clip_line_segment function.
+    // The quick pruning operations could happen based on v1 + (v2-v1)*min_interval_start,
+    // and then the other calculations could happen based on the fixed input of v1, v2
+    // which would not change throughout this loop. That keeps the end point of one line segment
+    // exactly equal to the start point of the next line segment. This avoids the floating-point
+    // instability problems. This approach worked previously, but that method was too slow
+    // to be viable. It would need to be reimplemented by changing FORBILD_clip_line_segment
+    // as suggested above.
+    //const float interval_tolerance = 0.00001f;  // I tuned this amount. Do not set it lower.
+    const float interval_tolerance = 0.0001f;
+    unsigned int previous_shape_index = num_shapes;  // Initialise to a value not corresponding to any shape
+    while (dv_current_norm > interval_tolerance) {
+        num_shapes_consecutive_nonintersecting = 0;  // This will count up. If the loop ends with shape index 0 and a nonzero value for this number, then this many will be removed from the beginning of the array. This speeds up subsequent loops.
+        entry_intersection = 1.1f;  // entry intersection. in [0,1], where 0 = vcurrent and 1 = v2. Set to >1 initially.
+        exit_intersection = 1.2f;  // second lowest value found for the start of an intersection interval
+        for (int i = num_shapes-1; i >= 0; i--) {
+
+            shape_tmp = shapes[i];
+            interval = FORBILD_clip_line_segment(vcurrent, v2, shape_tmp);
+            if (interval.y <= interval.x + interval_tolerance) {
+                // Empty interval.
+                // No intersection with shape. Remove from consideration if possible
+                if (i == num_shapes - 1) {
+                    num_shapes --;  // remove shape from end
+                } else {
+                    num_shapes_consecutive_nonintersecting++;  // potentially remove shape from beginning
+                }
+            } else {
+                // The interval to integrate over ends either naturally (end of shape, interval.y)
+                // or it is interrupted by the start of a shape with a higher precedence (later in the list).
+                // In the latter case, it will be the second-lowest interval.x found so far which is the stopping
+                // point.
+
+                num_shapes_consecutive_nonintersecting = 0;
+
+                if (interval.x < entry_intersection) {
+                    if (i == previous_shape_index) {
+                        // To avoid an infinite loop caused by floating-point error,
+                        // we need to explicitly skip integrating the same shape twice in a row.
+
+                    } else {
+                        // New entry intersection.
+                        exit_intersection = min(entry_intersection, interval.y);  // stop the integral at the beginning of a higher precedence shape or the end of this shape; whichever is first
+                        entry_intersection = interval.x;
+                        previous_shape_index = i;
+                        rho = FORBILD_get_rho(shape_tmp);
+                        // If the intersection is immediate, then we don't need to search any further
+                        if (entry_intersection <= interval_tolerance) {
+                            entry_intersection = min(interval_tolerance/2.f, exit_intersection);
+                            break;
+                        }
+                    }
+                }
+            }
+            if ((i == 0) && (num_shapes_consecutive_nonintersecting > 0)) {
+                // Shift up the array of shapes to skip the beginning in future loops
+                shapes = &shapes[num_shapes_consecutive_nonintersecting];
+                previous_shape_index -= num_shapes_consecutive_nonintersecting;
+                num_shapes -= num_shapes_consecutive_nonintersecting;
+            }
+        }
+        // If all shapes exhausted, then return.
+        if (num_shapes == 0) { return val; }
+        // If the program gets to this line, then there should be at least one intersection found.
+        // At the end of the above loop, and getting to this line:
+        //  - ...
+        // Add the segment integral
+        val += rho * (exit_intersection - entry_intersection) * dv_current_norm;
+        if (exit_intersection >= 1.f) {
+            // Return if integral is over.
+            return val;
+        }
+        // Update the new starting point for further integration
+        vcurrent = vcurrent + (v2 - vcurrent) * exit_intersection;
+        dv_current_norm = norm_fvec3(v2 - vcurrent);
     }
     return val;
 }
