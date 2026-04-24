@@ -32,20 +32,20 @@ def main() -> None:  # noqa: D103
 
     ### Configurable parameters ###
     live_plot: bool = True
-    voxwid_mm: float = 0.2  # the voxel width of the head phantom
+    voxwid_mm: float = 0.3  # the voxel width of the head phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
     )
     apply_noise: bool = False
-    R_mm: float = 700  # noqa: N806
-    L_mm: float = R_mm + 700  # noqa: N806
-    num_sources: int = 3000
+    R_mm: float = 175  # noqa: N806
+    L_mm: float = 425  # noqa: N806
+    num_sources: int = 500
     num_turns: float = 0.618 * num_sources
     total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
-    detwid_mm: float = 700  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
-    dethei_mm: float = 0.5
-    pixel_wid_mm: float = 0.5
+    detwid_mm: float = 850  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
+    dethei_mm: float = 850
+    pixel_wid_mm: float = 0.425
     fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
@@ -77,9 +77,9 @@ def main() -> None:  # noqa: D103
     # )
     # zs = np.linspace(-300, 300, endpoint=True, num=num_sources, dtype=np.float32)
     zs = np.linspace(
-        -0.000001, 0.000001, endpoint=True, num=num_sources, dtype=np.float32
+        -673/2, 673/2, endpoint=True, num=num_sources, dtype=np.float32
     )
-    ts = zs * 2 * np.pi * num_turns / (zs.max() - zs.min())
+    ts = 0.618 * zs * 2 * np.pi * num_turns / (zs.max() - zs.min())
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
     ).transpose()
@@ -107,7 +107,7 @@ def main() -> None:  # noqa: D103
     print("Voxel width (mm):        ", voxwid_mm)
     vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
     vol.scale_len(1 / voxwid_mm)
-    volwid_mm = 300  # in the future, fetch from the phantom
+    volwid_mm = 250  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
     volwid_mm *= scale_phantom_size
@@ -189,9 +189,11 @@ def main() -> None:  # noqa: D103
         proj_array = projs.data
     # snookerr.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
     snookerr.imview.plot_projections(
-        proj_array.reshape(-1, *proj_array.shape[-2:]),
+        proj_array.get().reshape(-1, *proj_array.shape[-2:]),
         title="max attenuation capped for plotting purposes",
     )
+    if numits == 0:
+        return
 
     # Free up memory by deleting various unneeded variables
     del vol, projs
@@ -202,7 +204,6 @@ def main() -> None:  # noqa: D103
     vol_shape: tuple[int, int, int] = tuple(
         int(volwid_mm // voxwid_mm) for _ in range(3)
     )  # ty:ignore[invalid-assignment]  # ty is bugged here
-    vol_shape = (vol_shape[0], vol_shape[1], 1)
     print("Working volume shape: ", vol_shape)
     working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
@@ -253,7 +254,7 @@ def main() -> None:  # noqa: D103
         recon.iterate()
         # Live plot update
         if live_plot:
-            lp_dispatcher.update_image(recon.volume.as_numpy())
+            lp_dispatcher.update_image(np.flip(recon.volume.as_numpy().transpose(2, 0, 1), axis=(1, 2)))
             if i == 0:
                 lp_dispatcher.set_visible(True)
     snookerr.imview.plot_volume(recon.volume.as_numpy(), title=s)
