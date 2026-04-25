@@ -916,7 +916,7 @@ __device__ bool _in_region(
     fvec3 v_rel = v - pos;
     fvec3 az_normalised = ecyl.axis / norm_fvec3(ecyl.axis);
     float vz = dot_prod(v_rel, az_normalised);
-    if (vz > ecyl.l/2.f) {
+    if (abs(vz) > ecyl.l/2.f) {
         return false;
     }
 
