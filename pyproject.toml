@@ -17,7 +17,7 @@ classifiers = [
     'Programming Language :: Python :: 3',
 ]
 dependencies = [
-    "cupy>=14.0.1",
+    "cupy-cuda13x[ctk]>=14.0.1",
     "gpustat>=1.1.1",
     "imageio>=2.37.3",
     "numexpr>=2.14.1",
@@ -31,7 +31,9 @@ dynamic = ['scripts', 'version']
 
 [project.optional-dependencies]
 gui = [
+    "imageio>=2.37.3",
     "matplotlib>=3.10.8",
+    "pyqt6>=6.10.2",
     "pyqtgraph>=0.14.0",
 ]
 
