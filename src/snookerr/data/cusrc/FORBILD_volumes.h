@@ -1345,16 +1345,18 @@ __device__ float exact_line_integral_prioritise_last_recursive(
 }
 
 // A template method for all the shapes to use, including FORBILD_Shape
-template<typename Ts>
 __device__ float exact_line_integral_prioritise_last(
         const fvec3                 v1,
         const fvec3                 v2,
-        const Ts*                   shapes,
-        const unsigned int          num_shapes
+        //Ts*                         shapes_in,
+        //unsigned int                num_shapes_in
+        fvec2*                      intervals_in,
+        float*                      rhos_in,
+        unsigned int                num_shapes_in
 )
 {
     // Base case
-    if (num_shapes == 0) {
+    if (num_shapes_in == 0) {
         return 0.f;
     }
     // Return if line segment has length 0
@@ -1364,22 +1366,36 @@ __device__ float exact_line_integral_prioritise_last(
         return 0.f;
     }
 
+    fvec2* intervals = intervals_in;
+    float* rhos = rhos_in;
+    unsigned int num_shapes = num_shapes_in;
+
     // To avoid recursion, use a loop to find the first shape (beginning from the end)
     // which has any overlap with this line
-    unsigned int index;
+    float rho;
     float progress = 0.f;
     float val = 0.f;
     while (progress < 1.f) {
         fvec2 interval = fvec2(1.f, 1.f);
         for (unsigned int i = 0; i < num_shapes; i++) {
-            fvec2 interval_tmp = FORBILD_clip_line_segment(v1, v2, shapes[i]);
+            fvec2 interval_tmp = intervals[i];
             interval_tmp.x = max(interval_tmp.x, progress);
             interval_tmp.y = max(interval_tmp.y, progress);
             if (interval_tmp.y == interval_tmp.x) {
+                if (i == 0) {
+                    // Remove shape from beginning of list. Speeds up future loops.
+                    intervals = &intervals[1];
+                    rhos      = &rhos[1];
+                    num_shapes--;
+                    i--;  // This will cause i to underflow, but it's okay. It will be incremented back to 0.
+                } else if (i == num_shapes-1) {
+                    // Remove shape from end of list. Speeds up future loops.
+                    num_shapes--;
+                }
                 continue;
             }
             if (interval_tmp.x <= interval.x) {
-                index = i;
+                rho = rhos[i];
                 interval.x = interval_tmp.x;
                 interval.y = interval_tmp.y;
             } else {
@@ -1389,8 +1405,7 @@ __device__ float exact_line_integral_prioritise_last(
         }
         float len = interval.y - interval.x;
         if (len > 0.f) {
-            Ts shape = shapes[index];
-            val += len * FORBILD_get_rho(shape) * dv_norm;
+            val += len * rho * dv_norm;
         }
         progress = interval.y;
     }

@@ -1,5 +1,6 @@
 #include <cuda/atomic>
 #include <cuda_fp16.h>
+//#include <assert.h>
 
 #include "base.h"
 #include "geometry.h"
@@ -338,7 +339,12 @@ __global__ void project_CB_texture_chunked(
 }
 
 
-#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // = 300, based on 48KB shared memory size, and about 150 bytes per Shape object at the time of writing
+#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then a memory access violation will occur...
+// NOTE:
+// The blockDim.x must be AT LEAST 4, since 4 worker threads are used.
+// So the tiles must be at least 4 detector pixels wide.
+// Also, it is suggested to keep the blockDim.z at 1 so that there aren't
+// wasted workers and other inefficiencies.
 template<
     typename Tp,  // type of projection data. e.g. float or double
     typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera
@@ -358,28 +364,34 @@ __global__ void project_CB_FORBILD_shapes(
     unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
     unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
 
-    // If the shared memory is big enough to contain all the shapes,
-    // then load them into shared memory and use that instead.
-    Ts* shapes;
-    if (num_shapes > MAX_NUM_SHAPES_FOR_SHARED_MEMORY) {
-        shapes = shapes_glob;
-    } else {
-        const unsigned long tid = (
-            threadIdx.x +
-            threadIdx.y*blockDim.x +
-            threadIdx.z*blockDim.x*blockDim.z
-        );
-        // Load shapes into shared memory for the thread block
-        __shared__ Ts shapes_shared[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
-        unsigned int num_shapes_to_load_per_thread = (unsigned int)ceil((float)num_shapes / (blockDim.x * blockDim.y * blockDim.z));
-        for (unsigned long i = tid*num_shapes_to_load_per_thread; i < (1+tid)*num_shapes_to_load_per_thread; i++) {
-            if (i >= num_shapes) { break; }
-            shapes_shared[i] = shapes_glob[i];
-        }
-        shapes = shapes_shared;
-        __syncthreads();
-    }
+    const bool is_block_worker_1 = (
+        (threadIdx.x == 0) &&
+        (threadIdx.y == (blockDim.y-1)) &&
+        (threadIdx.z == 0)
+    );
+    const bool is_block_worker_2 = (
+        (threadIdx.x == 1) &&
+        (threadIdx.y == (blockDim.y-1)) &&
+        (threadIdx.z == 0)
+    );
+    const bool is_block_worker_3 = (
+        (threadIdx.x == 2) &&
+        (threadIdx.y == (blockDim.y-1)) &&
+        (threadIdx.z == 0)
+    );
+    const bool is_block_worker_4 = (
+        (threadIdx.x == 3) &&
+        (threadIdx.y == (blockDim.y-1)) &&
+        (threadIdx.z == 0)
+    );
 
+    proj_spec projspec = projspecs[proj_idx];
+    const bool in_range = (
+        (proj_idx < num_projs) &&
+        (det_idx_x < projspec.dspec.nu) &&
+        (det_idx_y < projspec.dspec.nv)
+    );
+    /*
     // Now, if out of range of the detector, then return.
     if (proj_idx >= num_projs) {
         return;
@@ -389,20 +401,112 @@ __global__ void project_CB_FORBILD_shapes(
         (det_idx_y >= projspec.dspec.nv)) {
         return;
     }
+    */
 
     // Get the start and end points of the projection line
     fvec3 source_pos = projspec.sourcepos;
     fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
 
+    // Now calculate and store the intervals
+    fvec2 intervals[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+    float rhos[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+    __shared__ Ts s1, s2, s3, s4;  // One shape for each of the four workers
+    unsigned int j = 0;
+    unsigned int num_shapes_relevant = 0;
+    unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
+    for (unsigned int gnum = 0; gnum < groups; gnum++) {
+        unsigned int istop = min(num_shapes, 4*(gnum+1));
+        unsigned int id = 4*gnum;
+        __syncthreads();
+        if ((id < num_shapes) && (is_block_worker_1)) {
+            s1 = shapes_glob[id];
+        }
+        id++;
+        if ((id < num_shapes) && (is_block_worker_2)) {
+            s2 = shapes_glob[id];
+        }
+        id++;
+        if ((id < num_shapes) && (is_block_worker_3)) {
+            s3 = shapes_glob[id];
+        }
+        id++;
+        if ((id < num_shapes) && (is_block_worker_4)) {
+            s4 = shapes_glob[id];
+        }
+        id = 4*gnum;
+        __syncthreads();
+        if (in_range) {
+            Ts s;
+            fvec2 interval;
+            if (id < num_shapes) {
+                s = s1;
+                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                if (interval.x < interval.y) {
+                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                    intervals[j] = interval;
+                    rhos[j] = s.rho;
+                    j++;
+                    num_shapes_relevant++;
+                }
+            }
+            id++;
+            if (id < num_shapes) {
+                s = s2;
+                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                if (interval.x < interval.y) {
+                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                    intervals[j] = interval;
+                    rhos[j] = s.rho;
+                    j++;
+                    num_shapes_relevant++;
+                }
+            }
+            id++;
+            if (id < num_shapes) {
+                s = s3;
+                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                if (interval.x < interval.y) {
+                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                    intervals[j] = interval;
+                    rhos[j] = s.rho;
+                    j++;
+                    num_shapes_relevant++;
+                }
+            }
+            id++;
+            if (id < num_shapes) {
+                s = s4;
+                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                if (interval.x < interval.y) {
+                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                    intervals[j] = interval;
+                    rhos[j] = s.rho;
+                    j++;
+                    num_shapes_relevant++;
+                }
+            }
+        }
+    }
+
+    if (!in_range) {  // The worker threads are no longer needed.
+        return;
+    }
+
     // Calculate projection
     // ...
     Tp val = 0;
     if (config.overlap_addition) {
+        /*
         for (unsigned int i = 0; i < num_shapes; i++) {
-            val += exact_line_integral<Tp>(source_pos, det_pos, shapes[i]);
+            val += exact_line_integral<Tp>(source_pos, det_pos, shapes_glob[i]);
+        }
+        */
+        for (unsigned int j = 0; j < num_shapes_relevant; j++) {
+            fvec2 interval = intervals[j];
+            val += rhos[j] * (interval.y - interval.x);
         }
     } else {
-        val = exact_line_integral_prioritise_last(source_pos, det_pos, shapes, num_shapes);
+        val = exact_line_integral_prioritise_last(source_pos, det_pos, intervals, rhos, num_shapes_relevant);
     }
     if (val == (Tp)0) { return; }
     val *= config.multiply_before_adding;
