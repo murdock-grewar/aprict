@@ -77,7 +77,7 @@ def main() -> None:  # noqa: D103
     # )
     # zs = np.linspace(-300, 300, endpoint=True, num=num_sources, dtype=np.float32)
     zs = np.linspace(
-        -673/2, 673/2, endpoint=True, num=num_sources, dtype=np.float32
+        -673 / 2, 673 / 2, endpoint=True, num=num_sources, dtype=np.float32
     )
     ts = 0.618 * zs * 2 * np.pi * num_turns / (zs.max() - zs.min())
     source_pos_arr = np.array(
@@ -254,7 +254,11 @@ def main() -> None:  # noqa: D103
         recon.iterate()
         # Live plot update
         if live_plot:
-            lp_dispatcher.update_image(np.flip(recon.volume.as_numpy().transpose(2, 0, 1), axis=(1, 2)))
+            lp_dispatcher.update_image(
+                np.flip(
+                    recon.volume.as_numpy().transpose(2, 0, 1), axis=(1, 2)
+                )
+            )
             if i == 0:
                 lp_dispatcher.set_visible(True)
     snookerr.imview.plot_volume(recon.volume.as_numpy(), title=s)

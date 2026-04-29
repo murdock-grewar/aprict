@@ -22,6 +22,7 @@ __all__ = [
     "multiply_textures",
     "slice_nth_axis_to_3d_cupy_array",
     "softmask_to_cylinder_xy",
+    "sum_along_nth_axis_to_2d_cupy_array",
 ]
 
 import itertools

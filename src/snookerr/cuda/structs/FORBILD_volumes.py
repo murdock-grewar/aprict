@@ -1680,10 +1680,9 @@ __device__ float exact_line_integral_prioritise_last_recursive(
     return val;
 }
 
-/*
 // A template method for all the shapes to use, including FORBILD_Shape
 template<typename Ts>
-__device__ float exact_line_integral_prioritise_last_old_and_slow_but_accurate(
+__device__ float exact_line_integral_prioritise_last(
         const fvec3                 v1,
         const fvec3                 v2,
         const Ts*                   shapes,
@@ -1733,11 +1732,12 @@ __device__ float exact_line_integral_prioritise_last_old_and_slow_but_accurate(
     }
     return val;
 }
-*/
 
+// Commenting out this faster method because it introduces visible errors in the recons!
+/*
 // A template method for all the shapes to use, including FORBILD_Shape
 template<typename Ts>
-__device__ float exact_line_integral_prioritise_last(
+__device__ float exact_line_integral_prioritise_last_approx(
         const fvec3                 v1,
         const fvec3                 v2,
         Ts*                   shapes_in,
@@ -1755,31 +1755,6 @@ __device__ float exact_line_integral_prioritise_last(
         return 0.f;
     }
 
-    /*
-    // Stupid, hacky, inelegant optimisation:
-    // Cull the range of shape objects down to its minimum,
-    // so that we don't repeatedly access irrelevant shapes.
-    // We will do this by selecting the smallest contiguous selection
-    // of relevant shapes.
-    // If the first and last shape are spatially near each other,
-    // then this will do nothing to help projecting through that region.
-    Ts* shapes;
-    unsigned int num_shapes;
-    unsigned int lower_index = num_shapes_in;  // start AFTER the end, until this number is reduced
-    unsigned int upper_index = 0;
-    for (unsigned int i = 0; i < num_shapes_in; i++) {
-        fvec2 interval_tmp = FORBILD_clip_line_segment(v1, v2, shapes_in[i]);
-        if (interval_tmp.y == interval_tmp.x) {
-            continue;
-        }
-        lower_index = min(lower_index, i);
-        upper_index = max(upper_index, i);
-    }
-    // If no intersecting shape found:
-    if (lower_index == num_shapes_in) { return 0.f; }
-    shapes = &shapes_in[lower_index];
-    num_shapes = upper_index - lower_index + 1;
-    */
     Ts* shapes = shapes_in;
     unsigned int num_shapes = num_shapes_in;
 
@@ -1881,6 +1856,7 @@ __device__ float exact_line_integral_prioritise_last(
     }
     return val;
 }
+*/
 """,
 ):
     pass  # ty:ignore[invalid-argument-type]

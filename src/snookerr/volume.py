@@ -23,7 +23,7 @@ import typing
 
 import numpy as np
 
-from .lib import gpu_tools, texture_tools
+from .lib import gpu_tools, sample_FORBILD, texture_tools
 from .lib.texture_tools import operations as tops
 
 if typing.TYPE_CHECKING:
@@ -187,9 +187,37 @@ class FBVolume:
     """A volume specified in FORBILD format."""
 
     shapes: np.ndarray[np.dtype[fv.Shape]]  # ty:ignore[invalid-type-arguments]
+    _kernel_point_sampling: cp.RawKernel
 
     def __init__(self, shapes: np.ndarray[np.dtype[fv.Shape]]) -> None:  # ty:ignore[invalid-type-arguments]
         self.shapes = shapes
+
+    def to_cupy(
+        self,
+        xs: np.ndarray,
+        ys: np.ndarray,
+        zs: np.ndarray,
+        *,
+        out: cp.ndarray | None = None,
+        supersamp_cubic_vox_wid: float | None = None,
+        supersamp_factor: int | None = None,
+    ) -> cp.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
+        """Convert to a float32 cupy array by simple point-sampling."""
+        return sample_FORBILD.sample_FORBILD(
+            self.shapes,
+            xs,
+            ys,
+            zs,
+            out=out,
+            supersamp_cubic_vox_wid=supersamp_cubic_vox_wid,
+            supersamp_factor=supersamp_factor,
+        )
+
+    def to_numpy(
+        self, xs: np.ndarray, ys: np.ndarray, zs: np.ndarray
+    ) -> np.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
+        """Convert to a float32 numpy array by simple point-sampling."""
+        return self.to_cupy(xs, ys, zs).get()
 
     @classmethod
     def _scale_shape_len(cls, shape, scale: float):  # noqa: ANN001, ANN206
