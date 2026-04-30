@@ -1,6 +1,22 @@
 repos:
 - repo: local
   hooks:
+    - id: flush-dtypes
+      name: (Build) Flush any cached dtypes
+      entry: ./githooks/flush-dtypes.sh
+      language: script
+      pass_filenames: false
+      always_run: true
+      verbose: false
+  hooks:
+    - id: flush-ptx
+      name: (Build) Flush any cached PTX files
+      entry: ./githooks/flush-ptx.sh
+      language: script
+      pass_filenames: false
+      always_run: true
+      verbose: false
+  hooks:
     - id: generate-cusrc
       name: (Build) Generate CUDA source files
       entry: ./githooks/generate-cusrc.sh

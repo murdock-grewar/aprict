@@ -26,6 +26,16 @@ import typing
 import cupy as cp
 import numpy as np
 import numpy.typing as npt
+from cuda.core import (  # noqa: F401
+    Device,
+    LaunchConfig,
+    ObjectCode,
+    Program,
+    ProgramOptions,
+    launch,
+)
+
+from . import dtype_cacher, ptx_cacher
 
 _valid_C_identifier_regex = re.compile(r"[_a-zA-Z]+\w*")  # noqa: N816
 
@@ -47,6 +57,9 @@ _np_dtype_to_c_type = {
     np.dtype(np.complex128):    "complex<double>",
 }
 # fmt: on
+
+_dev = Device()
+_dev.set_current()
 
 
 class KernelStruct[T: np.dtype[typing.Any]](
@@ -218,9 +231,18 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             )
             + "}"
         )
-        return cp.RawKernel(
-            struct_layout_code, f"get_struct_layout_{struct_name}"
+
+        module_unique_name = f"module_get_struct_layout_{struct_name}"
+        module_ptx = ptx_cacher.compile_module(
+            code_cpp=struct_layout_code,
+            uid=module_unique_name,
+            name_expressions=(f"get_struct_layout_{struct_name}",),
         )
+        return module_ptx.get_kernel(f"get_struct_layout_{struct_name}")
+
+        # return cp.RawKernel(
+        #     struct_layout_code, f"get_struct_layout_{struct_name}"
+        # )
 
     @classmethod
     def save_c_struct_to_file(
@@ -323,41 +345,61 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             *tuples_type_name,
         ) + ("" if extra_code is None else extra_code)
 
-        # Run a CUDA kernel with the appropriate set of arguments, and find out
-        # how CUDA arranges the offsets in memory of the various members. We'll
-        # need this to define the custom np.dtype.
-        #  itemsize -> overall struct size
-        #  sizes    -> individual struct member sizes, determined with sizeof
-        #  offsets  -> individual struct member offsets, determined with offsetof
-        num_members = len(tuples_type_name)
-        # fmt: off
-        itemsize = cp.ndarray(shape=(1,),           dtype=np.uint64)
-        sizes    = cp.ndarray(shape=(num_members,), dtype=np.uint64)
-        offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
-        # fmt: on
-        kernel = cls._kernel_get_struct_layout(
-            dtype_to_cname_dict,
-            struct_name,
-            force_dependencies,
-            insert_into_struct,
-            *tuples_type_name,
-        )
-        kernel((1,), (1,), (itemsize, sizes, offsets))
-        (itemsize, sizes, offsets) = map(
-            cp.asnumpy, (itemsize, sizes, offsets)
-        )
-        itemsize = itemsize.item()
-        names = [name for t, name in tuples_type_name]
-        formats = [t for t, name in tuples_type_name]
+        # If the dtype isn't in the cache, then generate it now.
+        uid: str = cls.struct_name
+        dtype = dtype_cacher.query(uid=uid)
+        if dtype is not None:
+            cls.dtype = dtype  # ty:ignore[invalid-assignment]
+        else:
+            # Run a CUDA kernel with the appropriate set of arguments, and find out
+            # how CUDA arranges the offsets in memory of the various members. We'll
+            # need this to define the custom np.dtype.
+            #  itemsize -> overall struct size
+            #  sizes    -> individual struct member sizes, determined with sizeof
+            #  offsets  -> individual struct member offsets, determined with offsetof
+            num_members = len(tuples_type_name)
+            # fmt: off
+            itemsize = cp.ndarray(shape=(1,),           dtype=np.uint64)
+            sizes    = cp.ndarray(shape=(num_members,), dtype=np.uint64)
+            offsets  = cp.ndarray(shape=(num_members,), dtype=np.uint64)
+            # fmt: on
+            kernel = cls._kernel_get_struct_layout(
+                dtype_to_cname_dict,
+                struct_name,
+                force_dependencies,
+                insert_into_struct,
+                *tuples_type_name,
+            )
+            # kernel((1,), (1,), (itemsize, sizes, offsets))
 
-        cls.dtype = np.dtype(  # ty:ignore[invalid-assignment]
-            {
-                "names": names,
-                "formats": formats,
-                "offsets": offsets,
-                "itemsize": itemsize,
-            }
-        )
+            kconfig = LaunchConfig(grid=(1,), block=(1,))
+            stream = _dev.create_stream()
+            launch(
+                stream,
+                kconfig,
+                kernel,
+                itemsize.data.ptr,
+                sizes.data.ptr,
+                offsets.data.ptr,
+            )
+            stream.sync()
+
+            (itemsize, sizes, offsets) = map(
+                cp.asnumpy, (itemsize, sizes, offsets)
+            )
+            itemsize = itemsize.item()
+            names = [name for t, name in tuples_type_name]
+            formats = [t for t, name in tuples_type_name]
+
+            cls.dtype = np.dtype(  # ty:ignore[invalid-assignment]
+                {
+                    "names": names,
+                    "formats": formats,
+                    "offsets": offsets,
+                    "itemsize": itemsize,
+                }
+            )
+            dtype_cacher.save(uid=uid, dtype=cls.dtype)  # ty:ignore[invalid-argument-type]
 
 
 class KernelArray:

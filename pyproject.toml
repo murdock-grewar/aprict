@@ -17,6 +17,7 @@ classifiers = [
     'Programming Language :: Python :: 3',
 ]
 dependencies = [
+    "cuda-core[cu13]>=0.7.0",
     "cupy-cuda13x[ctk]>=14.0.1",
     "gpustat>=1.1.1",
     "imageio>=2.37.3",

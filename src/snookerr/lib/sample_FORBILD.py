@@ -55,7 +55,7 @@ def _get_module() -> cp.RawModule:
             )
         ],
     )
-    module.compile()
+    # module.compile()
     return module
 
 

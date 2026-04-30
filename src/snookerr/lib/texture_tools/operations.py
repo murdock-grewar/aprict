@@ -82,7 +82,7 @@ def _get_module() -> cp.RawModule:
             f"sum_along_nth_axis_to_2d_array<{t1}>" for t1 in ["half", "float"]
         ],
     )
-    module.compile()
+    # module.compile()
     return module
 
 
