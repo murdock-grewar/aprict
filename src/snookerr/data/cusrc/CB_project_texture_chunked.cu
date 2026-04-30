@@ -410,79 +410,47 @@ __global__ void project_CB_FORBILD_shapes(
     // Now calculate and store the intervals
     fvec2 intervals[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
     float rhos[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
-    __shared__ Ts s1, s2, s3, s4;  // One shape for each of the four workers
+    __shared__ Ts ss[4];  // One shape for each of the four workers
     unsigned int j = 0;
     unsigned int num_shapes_relevant = 0;
-    unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
+    const unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
     for (unsigned int gnum = 0; gnum < groups; gnum++) {
         unsigned int istop = min(num_shapes, 4*(gnum+1));
         unsigned int id = 4*gnum;
         __syncthreads();
+        // Attempting to turn this into a loop, even with a #pragmo unroll, results in a 100% performance penalty!
         if ((id < num_shapes) && (is_block_worker_1)) {
-            s1 = shapes_glob[id];
+            ss[0] = shapes_glob[id];
         }
         id++;
         if ((id < num_shapes) && (is_block_worker_2)) {
-            s2 = shapes_glob[id];
+            ss[1] = shapes_glob[id];
         }
         id++;
         if ((id < num_shapes) && (is_block_worker_3)) {
-            s3 = shapes_glob[id];
+            ss[2] = shapes_glob[id];
         }
         id++;
         if ((id < num_shapes) && (is_block_worker_4)) {
-            s4 = shapes_glob[id];
+            ss[3] = shapes_glob[id];
         }
         id = 4*gnum;
         __syncthreads();
         if (in_range) {
             Ts s;
             fvec2 interval;
-            if (id < num_shapes) {
-                s = s1;
-                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
-                if (interval.x < interval.y) {
-                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                    intervals[j] = interval;
-                    rhos[j] = s.rho;
-                    j++;
-                    num_shapes_relevant++;
-                }
-            }
-            id++;
-            if (id < num_shapes) {
-                s = s2;
-                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
-                if (interval.x < interval.y) {
-                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                    intervals[j] = interval;
-                    rhos[j] = s.rho;
-                    j++;
-                    num_shapes_relevant++;
-                }
-            }
-            id++;
-            if (id < num_shapes) {
-                s = s3;
-                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
-                if (interval.x < interval.y) {
-                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                    intervals[j] = interval;
-                    rhos[j] = s.rho;
-                    j++;
-                    num_shapes_relevant++;
-                }
-            }
-            id++;
-            if (id < num_shapes) {
-                s = s4;
-                interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
-                if (interval.x < interval.y) {
-                    //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                    intervals[j] = interval;
-                    rhos[j] = s.rho;
-                    j++;
-                    num_shapes_relevant++;
+            #pragma unroll // I have no idea why it hurts performance so much to have this loop. It's about a 30% increase in computation time if the loop is not unrolled.
+            for (unsigned char offset_ind : {0, 1, 2, 3}) {
+                if (id + offset_ind < num_shapes) {
+                    s = ss[offset_ind];
+                    interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                    if (interval.x < interval.y) {
+                        //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                        intervals[j] = interval;
+                        rhos[j] = s.rho;
+                        j++;
+                        num_shapes_relevant++;
+                    }
                 }
             }
         }

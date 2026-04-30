@@ -371,9 +371,14 @@ def project(
     assert projs.data is not None
     is_fb: bool = type(volume) is FBVolume
     # Prepare the kernel and the static kernel args
-    blockx = min(25 if is_fb else 10, projs.data.shape[-2])
-    blocky = min(25 if is_fb else 10, projs.data.shape[-1])
-    blocklayer = min(1 if is_fb else 10, projs.data.shape[-3])
+    if is_fb:
+        blockx = 32  # needs to be at least 4
+        blocky = 20
+        blocklayer = 1
+    else:
+        blockx = min(10, projs.data.shape[-2])
+        blocky = min(10, projs.data.shape[-1])
+        blocklayer = min(10, projs.data.shape[-3])
     kern = _select_projection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blocklayer)
     grid_dims = (
