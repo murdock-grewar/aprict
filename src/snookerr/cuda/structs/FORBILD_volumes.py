@@ -1254,7 +1254,7 @@ _dict_shape_name_to_type_num: dict[str, int] = {
 }
 
 
-class Shape(  # Cone with axis parallel to x axis
+class Shape(  # A generic container for any shape
     kern_structs.KernelStruct,
     struct_name="FORBILD_Shape",
     names=[
