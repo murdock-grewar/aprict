@@ -33,10 +33,13 @@ def main() -> None:  # noqa: C901, D103
 
     ### Configurable parameters ###
     lung_generations: int = 10 if len(sys.argv) < 2 else int(sys.argv[1])
-    live_plot: bool = False
+    lung_scale_factor: float | None = 0.8  # Set to None for default
+    lung_taper: bool | None = True  # Set to None for default
+    lung_fix: bool | None = True  # Set to None for default
+    live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
     default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
-    voxwid_mm: float = 1  # the voxel width of the head phantom
+    voxwid_mm: float = 0.5  # the voxel width of the head phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
@@ -49,6 +52,7 @@ def main() -> None:  # noqa: C901, D103
     detwid_mm: float = 1200  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 500
     pixel_wid_mm: float = 0.66
+    num_helix_turns: float = 2
     fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 3 else int(sys.argv[2])
     vol_dtype = np.float32  # either np.float16 or np.float32
@@ -93,7 +97,8 @@ def main() -> None:  # noqa: C901, D103
     zs = np.linspace(
         -150, 150, endpoint=True, num=num_sources, dtype=np.float32
     )
-    ts = 0.618 * 2 * np.pi * np.arange(num_sources, dtype=np.float32)
+    # ts = 0.618 * 2 * np.pi * np.arange(num_sources, dtype=np.float32)
+    ts = 2 * np.pi * num_helix_turns / num_sources * np.arange(num_sources, dtype=np.float32)
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
     ).transpose()
@@ -122,7 +127,10 @@ def main() -> None:  # noqa: C901, D103
     print()
     print("Creating volume... ", end="", flush=True)
     vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.LungPhantom(
-        lung_generations
+        generation=lung_generations,
+        scale_factor=lung_scale_factor,
+        taper=lung_taper,
+        fix=lung_fix,
     )
     print("done.")
     print("Number of shapes in volume: ", len(vol.shapes))
@@ -223,9 +231,11 @@ def main() -> None:  # noqa: C901, D103
         out_noised_attenuation, out_noised_transmission, out_
 
     # Set up the working volume
-    vol_shape: tuple[int, int, int] = tuple(
-        int(volwid_mm // voxwid_mm) for _ in range(3)
-    )  # ty:ignore[invalid-assignment]  # ty is bugged here
+    vol_shape: tuple[int, int, int] = (
+        int(volwid_mm // voxwid_mm),
+        int(volwid_mm // voxwid_mm),
+        int((volwid_mm // voxwid_mm) * 3 / 4),
+    )
     print("Working volume shape: ", vol_shape)
     working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
