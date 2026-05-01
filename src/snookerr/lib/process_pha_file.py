@@ -16,7 +16,11 @@
 
 """A hacked together script to convert some .pha files to a list of Shapes for use in snookerr."""
 
+import functools
 import io
+import itertools
+import multiprocessing
+import operator
 import re
 import sys
 from typing import TYPE_CHECKING
@@ -69,6 +73,7 @@ def _preprocess_file(fn: str | pathlib.Path) -> str:
     return oh.getvalue()
 
 
+# Slower than I would like
 def _preprocess_str(s: str) -> str:
     p = pcpp.Preprocessor()
     p.parse(s)
@@ -83,15 +88,17 @@ def convert_ph_file_to_shapes(  # noqa: D103
     return _convert_preprocessed_ph_str_to_shapes(_preprocess_file(fn))
 
 
-def convert_ph_str_to_shapes(s: str) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]  # noqa: D103
+def convert_ph_str_to_shapes(  # noqa: D103
+    s: str, skip_preprocessing: bool = False
+) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
+    if skip_preprocessing:
+        return _convert_preprocessed_ph_str_to_shapes(s)
     return _convert_preprocessed_ph_str_to_shapes(_preprocess_str(s))
 
 
-def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
+def _convert_preprocessed_ph_str_to_shapes(
     s: str,
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
-
-    shapes: list[np.ndarray[np.dtype[fv.Shape]]] = []  # ty:ignore[invalid-type-arguments]
 
     # Now get rid of newlines. Treat it as one long string
     # Shapes are contained in { ... } which makes it easy to process
@@ -124,17 +131,35 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
         s,
     )
 
-    # To make the re_float3 regex pattern work, remove spaces from any expression in parentheses
-    def remove_spaces_from_parentheticals(s: str) -> str:
-        return regex.sub(
-            r"(?V1)\(((?:[^)(]+|(?R))*+)\)",  # the "(?V1)" is a flag for the 'regex' package. It's needed for the recursion feature.
-            lambda m: "(" + m.groups()[0].replace(" ", "") + ")",
-            s,
-        )
-
     objs = re_obj.findall(s)
+    min_shapes_per_group: int = 100
+    nprocs = min(
+        (len(objs) + (min_shapes_per_group - 1)) // min_shapes_per_group, 64
+    )
+    groupsize = (len(objs) + (nprocs - 1)) // nprocs
+    with multiprocessing.Pool(nprocs) as p:
+        shapes = functools.reduce(
+            operator.iadd,
+            p.map(_objs_to_shape, itertools.batched(objs, groupsize)),
+            [],
+        )
+    return np.array(shapes, dtype=fv.Shape, ndmax=1)
+
+
+# To make the re_float3 regex pattern work, remove spaces from any expression in parentheses
+def _remove_spaces_from_parentheticals(s: str) -> str:
+    return regex.sub(
+        r"(?V1)\(((?:[^)(]+|(?R))*+)\)",  # the "(?V1)" is a flag for the 'regex' package. It's needed for the recursion feature.
+        lambda m: "(" + m.groups()[0].replace(" ", "") + ")",
+        s,
+    )
+
+
+# Need this to be at the top-level so it can be used in multiprocessing.Pool.map
+def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
+    shape_objs = []
     for obj in objs:
-        obj = remove_spaces_from_parentheticals(obj)  # noqa: PLW2901
+        obj = _remove_spaces_from_parentheticals(obj)  # noqa: PLW2901
         shape = re_shape.findall(obj)[0]
         remaining = re_shape.sub("", obj)
         remaining_properties = re_key.findall(remaining)
@@ -231,8 +256,8 @@ def _convert_preprocessed_ph_str_to_shapes(  # noqa: C901
                 case _:
                     msg = "Too many clip planes encountered."
                     raise ValueError(msg)
-        shapes.append(shape_obj)
-    return np.array(shapes, dtype=fv.Shape, ndmax=1)
+        shape_objs.append(shape_obj)
+    return shape_objs
 
 
 if __name__ == "__main__":

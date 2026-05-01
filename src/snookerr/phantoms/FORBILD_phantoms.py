@@ -269,9 +269,13 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 del d[key]  # delete the old branch
         # First, print out the outer tubes and spheres
         ans = ""  # we will build the final string from this
-        ans += "#define OUTERRHO 1.0\n"
-        ans += "#define INNERRHO 0.1\n"
-        ans += "#define RELEVANCE relevance\n"
+
+        # HOTFIX: preprocessing the file with pcpp takes a long time. It's single-threaded.
+        # To speed this up, I'll not use these macros. I'll just directly generate the files with the values replaced.
+        # ans += "#define OUTERRHO 1.0\n"
+        # ans += "#define INNERRHO 0.1\n"
+        # ans += "#define RELEVANCE relevance\n"
+
         ans += "\n"
         ans += "// Outer Objects:\n"
         ans += "\n"
@@ -285,23 +289,23 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             if b.taper_factor == 1:
                 ans += (
                     "{"
-                    + f"[Cylinder: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r={b.radius_outer}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=OUTERRHO RELEVANCE"
+                    + f"[Cylinder: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r={b.radius_outer}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=1.0 relevance"
                     + "}\n"
                 )
                 ans += (
                     "{"
-                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_outer}mm] rho=OUTERRHO RELEVANCE"
+                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_outer}mm] rho=1.0 relevance"
                     + "}\n"
                 )
             else:
                 ans += (
                     "{"
-                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_outer / b.taper_factor}mm r2={b.radius_outer} axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=OUTERRHO RELEVANCE"
+                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_outer / b.taper_factor}mm r2={b.radius_outer} axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=1.0 relevance"
                     + "}\n"
                 )
                 ans += (
                     "{"
-                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_outer}mm] rho=OUTERRHO RELEVANCE"
+                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_outer}mm] rho=1.0 relevance"
                     + "}\n"
                 )
             ans += "\n"
@@ -319,23 +323,23 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             if b.taper_factor == 1:
                 ans += (
                     "{"
-                    + f"[Cylinder: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=INNERRHO RELEVANCE"
+                    + f"[Cylinder: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=0.1 relevance"
                     + "}\n"
                 )
                 ans += (
                     "{"
-                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_inner}mm] rho=INNERRHO RELEVANCE"
+                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_inner}mm] rho=0.1 relevance"
                     + "}\n"
                 )
             else:
                 ans += (
                     "{"
-                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_inner / b.taper_factor}mm r2={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=INNERRHO RELEVANCE"
+                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_inner / b.taper_factor}mm r2={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=0.1 relevance"
                     + "}\n"
                 )
                 ans += (
                     "{"
-                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_inner}mm] rho=INNERRHO RELEVANCE"
+                    + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_inner}mm] rho=0.1 relevance"
                     + "}\n"
                 )
         return ans
@@ -358,7 +362,9 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             fix=fix,
         )
         # Create the shapes and return the constucted volume
-        fbv = FBVolume(ppf.convert_ph_str_to_shapes(phastr))
+        fbv = FBVolume(
+            ppf.convert_ph_str_to_shapes(phastr, skip_preprocessing=True)
+        )
         # Phantom is defined upside down. Fix it here.
         fbv.flip(axis="z")
         return fbv
