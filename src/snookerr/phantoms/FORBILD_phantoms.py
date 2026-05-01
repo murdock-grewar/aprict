@@ -50,6 +50,7 @@ class _MetaPhantomContainer(type):
     @property
     def LungPhantom3Generations(cls) -> FBVolume:
         """LungPhantom3Generations.pha"""
+        # DEV NOTE: make sure this phantom loads the reference file published by the Arbeitsgruppe Phantome. This is used in a unittest to ensure that the generation procedure for N generations matches in this case.
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
                 path_to_FORBILD_src.joinpath("LungPhantom3Generations.pha")
@@ -64,7 +65,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
     """A container for the phantom objects."""
 
     @classmethod
-    def LungPhantom(cls, generation: int) -> FBVolume:  # noqa: C901
+    def _LungPhantom_phastring(cls, generation: int) -> str:  # noqa: C901
         """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
         if type(generation) is not int or generation < 2:
             msg = "'generation' must be an integer >=2"
@@ -243,7 +244,12 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         ans += "\n"
         ans += "// Outer Objects:\n"
         ans += "\n"
+        gen: int = -1  # keep track of generation. When it increments, print a comment line saying so
         for b in lst:
+            if b.generation > gen:
+                gen = b.generation
+                ans += "\n"
+                ans += f"// Generation {gen:02d}\n"
             pos = (np.array(b.u) + np.array(b.v)) / 2
             ans += (
                 "{"
@@ -255,11 +261,17 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_outer}mm] rho=OUTERRHO RELEVANCE"
                 + "}\n"
             )
+            ans += "\n"
         # Second, print out the inner tubes and spheres
         ans += "\n"
         ans += "// Inner Objects:\n"
         ans += "\n"
+        gen: int = -1  # keep track of generation. When it increments, print a comment line saying so
         for b in lst:
+            if b.generation > gen:
+                gen = b.generation
+                ans += "\n"
+                ans += f"// Generation {gen:02d}\n"
             pos = (np.array(b.u) + np.array(b.v)) / 2
             ans += (
                 "{"
@@ -271,8 +283,14 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 + f"[Sphere: x={b.v[0]}mm y={b.v[1]}mm z={b.v[2]}mm r={b.radius_inner}mm] rho=INNERRHO RELEVANCE"
                 + "}\n"
             )
+        return ans
+
+    @classmethod
+    def LungPhantom(cls, generation: int) -> FBVolume:
+        """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
+        phastr: str = cls._LungPhantom_phastring(generation)
         # Create the shapes and return the constucted volume
-        fbv = FBVolume(ppf.convert_ph_str_to_shapes(ans))
+        fbv = FBVolume(ppf.convert_ph_str_to_shapes(phastr))
         # Phantom is defined upside down. Fix it here.
         fbv.flip(axis="z")
         return fbv
