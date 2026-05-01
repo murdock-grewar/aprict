@@ -132,17 +132,20 @@ def _convert_preprocessed_ph_str_to_shapes(
     )
 
     objs = re_obj.findall(s)
-    min_shapes_per_group: int = 100
+    min_shapes_per_group: int = 300
     nprocs = min(
         (len(objs) + (min_shapes_per_group - 1)) // min_shapes_per_group, 64
     )
     groupsize = (len(objs) + (nprocs - 1)) // nprocs
-    with multiprocessing.Pool(nprocs) as p:
-        shapes = functools.reduce(
-            operator.iadd,
-            p.map(_objs_to_shape, itertools.batched(objs, groupsize)),
-            [],
-        )
+    if len(objs) <= groupsize:
+        shapes = _objs_to_shape(objs)
+    else:
+        with multiprocessing.Pool(nprocs) as p:
+            shapes = functools.reduce(
+                operator.iadd,
+                p.map(_objs_to_shape, itertools.batched(objs, groupsize)),
+                [],
+            )
     return np.array(shapes, dtype=fv.Shape, ndmax=1)
 
 
