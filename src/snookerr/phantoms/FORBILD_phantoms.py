@@ -66,12 +66,14 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
 
     @classmethod
     def _LungPhantom_phastring(  # noqa: C901
-            cls,
-            generation: int,
-            scale_factor: float | None = None,  # Leave at None for default configuration
-            taper: bool | None = None,  # Leave at None for default configuration
-            fix: bool | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
-        ) -> str:
+        cls,
+        generation: int,
+        scale_factor: float
+        | None = None,  # Leave at None for default configuration
+        taper: bool | None = None,  # Leave at None for default configuration
+        fix: bool
+        | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
+    ) -> str:
         """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
         if type(generation) is not int or generation < 2:
             msg = "'generation' must be an integer >=2"
@@ -119,7 +121,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                         0,
                         1.0,
                         100.0,
-                        1.0,  # do not taper the trachea
+                        1,  # do not taper the trachea
                         9.0,
                         7.9,
                         (0.0, 0.0, 0.0),
@@ -170,9 +172,11 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                     # The parent can be the smaller of the two parents,
                     # in which case it needs to taper by less than the full
                     # inverse scale_factor
-                    radius_outer = scale * 8.5 * (7.5/8.5 if fix else 1)
+                    radius_outer = scale * 8.5 * (7.5 / 8.5 if fix else 1)
                     radius_inner = radius_outer * (7.4 / 8.5)
-                    taper_factor = radius_outer / parent.radius_outer
+                    taper_factor = (
+                        radius_outer / parent.radius_outer if taper else 1
+                    )
                     u = parent.v
                     z = tuple(r.apply(parent.z))
                     x = tuple(
@@ -207,9 +211,11 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                     generation = parent.generation + 1
                     scale = parent.scale * scale_factor
                     length = scale * 40
-                    radius_outer = scale * 7.0 * (7.5/8.5 if fix else 1)
+                    radius_outer = scale * 7.0 * (7.5 / 8.5 if fix else 1)
                     radius_inner = radius_outer * (5.9 / 7.0)
-                    taper_factor = radius_outer / parent.radius_outer
+                    taper_factor = (
+                        radius_outer / parent.radius_outer if taper else 1
+                    )
                     u = parent.v
                     z = tuple(r.apply(parent.z))
                     x = tuple(
@@ -290,7 +296,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             else:
                 ans += (
                     "{"
-                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_outer/b.taper_factor}mm r2={b.radius_outer} axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=OUTERRHO RELEVANCE"
+                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_outer / b.taper_factor}mm r2={b.radius_outer} axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=OUTERRHO RELEVANCE"
                     + "}\n"
                 )
                 ans += (
@@ -324,7 +330,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             else:
                 ans += (
                     "{"
-                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_inner/b.taper_factor}mm r2={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=INNERRHO RELEVANCE"
+                    + f"[Cone: x={pos[0]}mm y={pos[1]}mm z={pos[2]}mm l={b.length}mm r1={b.radius_inner / b.taper_factor}mm r2={b.radius_inner}mm axis({b.z[0]}mm, {b.z[1]}mm, {b.z[2]}mm)] rho=INNERRHO RELEVANCE"
                     + "}\n"
                 )
                 ans += (
@@ -336,12 +342,14 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
 
     @classmethod
     def LungPhantom(
-            cls,
-            generation: int,
-            scale_factor: float | None = None,  # Leave at None for default configuration
-            taper: bool | None = None,  # Leave at None for default configuration
-            fix: bool | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
-        ) -> FBVolume:
+        cls,
+        generation: int,
+        scale_factor: float
+        | None = None,  # Leave at None for default configuration
+        taper: bool | None = None,  # Leave at None for default configuration
+        fix: bool
+        | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
+    ) -> FBVolume:
         """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
         phastr: str = cls._LungPhantom_phastring(
             generation=generation,
