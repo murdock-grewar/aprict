@@ -34,6 +34,9 @@ __all__ = [
     "Ellipsoid",
     "Ellipsoid_free",
     "Ellipt_Cyl",
+    "Ellipt_Cyl_x",
+    "Ellipt_Cyl_y",
+    "Ellipt_Cyl_z",
     "Shape",
     "Sphere",
 ]
@@ -728,6 +731,207 @@ __device__ fvec2 FORBILD_clip_line_segment(
     pass  # ty:ignore[invalid-argument-type]
 
 
+class Ellipt_Cyl_x(  # Cylinder with an elliptical cross-section
+    kern_structs.KernelStruct,
+    struct_name="FORBILD_Ellipt_Cyl_x",
+    names=[
+        "rho",
+        "x",
+        "y",
+        "z",
+        "l",  # length along principal axis
+        "dy",  # half-axis length
+        "dz",  # half-axis length
+    ],
+    dtypes=[
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+    ],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    extra_code="""
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_x ecylx
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylx.rho;
+    ecyl.x = ecylx.x;
+    ecyl.y = ecylx.y;
+    ecyl.z = ecylx.z;
+    ecyl.l = ecylx.l;
+    ecyl.dx = ecylx.dy;
+    ecyl.dy = ecylx.dz;
+    ecyl.axis = fvec3(1.f,0.f,0.f);
+    ecyl.a_x = fvec3(0.f,1.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_x ecylx
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylx.rho;
+    ecyl.x = ecylx.x;
+    ecyl.y = ecylx.y;
+    ecyl.z = ecylx.z;
+    ecyl.l = ecylx.l;
+    ecyl.dx = ecylx.dy;
+    ecyl.dy = ecylx.dz;
+    ecyl.axis = fvec3(1.f,0.f,0.f);
+    ecyl.a_x = fvec3(0.f,1.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+""",
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+class Ellipt_Cyl_y(  # Cylinder with an elliptical cross-section
+    kern_structs.KernelStruct,
+    struct_name="FORBILD_Ellipt_Cyl_y",
+    names=[
+        "rho",
+        "x",
+        "y",
+        "z",
+        "l",  # length along principal axis
+        "dx",  # half-axis length
+        "dz",  # half-axis length
+    ],
+    dtypes=[
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+    ],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    extra_code="""
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_y ecyly
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecyly.rho;
+    ecyl.x = ecyly.x;
+    ecyl.y = ecyly.y;
+    ecyl.z = ecyly.z;
+    ecyl.l = ecyly.l;
+    ecyl.dx = ecyly.dx;
+    ecyl.dy = ecyly.dz;
+    ecyl.axis = fvec3(0.f,1.f,0.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_y ecyly
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecyly.rho;
+    ecyl.x = ecyly.x;
+    ecyl.y = ecyly.y;
+    ecyl.z = ecyly.z;
+    ecyl.l = ecyly.l;
+    ecyl.dx = ecyly.dx;
+    ecyl.dy = ecyly.dz;
+    ecyl.axis = fvec3(0.f,1.f,0.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+""",
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+class Ellipt_Cyl_z(  # Cylinder with an elliptical cross-section
+    kern_structs.KernelStruct,
+    struct_name="FORBILD_Ellipt_Cyl_z",
+    names=[
+        "rho",
+        "x",
+        "y",
+        "z",
+        "l",  # length along principal axis
+        "dx",  # half-axis length
+        "dy",  # half-axis length
+    ],
+    dtypes=[
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
+    ],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    extra_code="""
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_z ecylz
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylz.rho;
+    ecyl.x = ecylz.x;
+    ecyl.y = ecylz.y;
+    ecyl.z = ecylz.z;
+    ecyl.l = ecylz.l;
+    ecyl.dx = ecylz.dx;
+    ecyl.dy = ecylz.dy;
+    ecyl.axis = fvec3(0.f,0.f,1.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,1.f,0.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_z ecylz
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylz.rho;
+    ecyl.x = ecylz.x;
+    ecyl.y = ecylz.y;
+    ecyl.z = ecylz.z;
+    ecyl.l = ecylz.l;
+    ecyl.dx = ecylz.dx;
+    ecyl.dy = ecylz.dy;
+    ecyl.axis = fvec3(0.f,0.f,1.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,1.f,0.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+""",
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
 # Other cone cases may be reduced to this case
 class Cone_z(  # Cone with axis parallel to x axis
     kern_structs.KernelStruct,
@@ -1165,7 +1369,7 @@ class ClipAxisSpec(  # Cone with axis parallel to x axis
     kern_structs.KernelStruct,
     struct_name="FORBILD_ClipAxisSpec",
     names=[
-        "axis",  # note: it should be of unit length. This in NOT enforced!
+        "axis",  # note: it should be of unit length. This is NOT enforced!
         "dotprod",
         "mode",  # 0 = don't apply this plane. 1 --> enforce axis.r <= dotprod. 2 --> enforce axis.r > dotprod
     ],
@@ -1251,6 +1455,9 @@ _dict_shape_name_to_type_num: dict[str, int] = {
     "Ellipsoid_free": 11,
     "Ellipt_Cyl": 12,
     "Sphere": 13,
+    "Ellipt_Cyl_x": 14,
+    "Ellipt_Cyl_y": 15,
+    "Ellipt_Cyl_z": 16,
 }
 
 
@@ -1316,6 +1523,9 @@ class Shape(  # A generic container for any shape
         Ellipsoid,
         Ellipsoid_free,
         Ellipt_Cyl,
+        Ellipt_Cyl_x,
+        Ellipt_Cyl_y,
+        Ellipt_Cyl_z,
         Sphere,
     ],
     extra_code=r"""
@@ -1480,6 +1690,45 @@ __device__ FORBILD_Ellipt_Cyl _to_Ellipt_Cyl(const FORBILD_Shape s)
     return ec;
 }
 
+__device__ FORBILD_Ellipt_Cyl_x _to_Ellipt_Cyl_x(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_x ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dy = s.dy;
+    ec.dz = s.dz;
+    return ec;
+}
+
+__device__ FORBILD_Ellipt_Cyl_y _to_Ellipt_Cyl_y(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_y ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dx = s.dx;
+    ec.dz = s.dz;
+    return ec;
+}
+
+__device__ FORBILD_Ellipt_Cyl_z _to_Ellipt_Cyl_z(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_z ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dx = s.dx;
+    ec.dy = s.dy;
+    return ec;
+}
+
 __device__ FORBILD_Sphere _to_Sphere(const FORBILD_Shape s)
 {
     FORBILD_Sphere sphere;
@@ -1529,6 +1778,12 @@ __device__ bool _in_region(
             return _in_region(v, _to_Ellipt_Cyl(shape));
         case 13:
             return _in_region(v, _to_Sphere(shape));
+        case 14:
+            return _in_region(v, _to_Ellipt_Cyl_x(shape));
+        case 15:
+            return _in_region(v, _to_Ellipt_Cyl_y(shape));
+        case 16:
+            return _in_region(v, _to_Ellipt_Cyl_z(shape));
         default:
             return false;
     }
