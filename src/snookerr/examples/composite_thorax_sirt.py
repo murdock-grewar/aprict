@@ -49,11 +49,11 @@ def main() -> None:  # noqa: C901, D103
     apply_noise: bool = False
     R_mm: float = 500  # noqa: N806
     L_mm: float = R_mm + 500  # noqa: N806
-    num_sources: int = 10
+    num_sources: int = 100
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
-    detwid_mm: float = 1201  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
-    dethei_mm: float = 500
-    pixel_wid_mm: float = 0.66
+    detwid_mm: float = 1200  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
+    dethei_mm: float = 600
+    pixel_wid_mm: float = 0.30
     fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
@@ -94,7 +94,7 @@ def main() -> None:  # noqa: C901, D103
     #   detpixwid,
     #   detpixhei,
     # )
-    zmin_mm = -150
+    zmin_mm = -100
     zmax_mm = 500
     zs, ts = np.array(
         list(
