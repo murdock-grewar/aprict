@@ -188,6 +188,9 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
             shape_obj[k] = val
         for m in re_float3.finditer(shape):
             name, x, y, z = m.groups()
+            if name == "r":
+                # In this case, this is actually part of a clipping plane and will already be handled.
+                continue
             x, y, z = [ne.evaluate(thing.strip()) for thing in (x, y, z)]
             vec = np.array((x, y, z), dtype=fv.fvec3)
             shape_obj[name] = vec
@@ -244,7 +247,15 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
                 case "z":
                     axis = np.array((0, 0, 1), dtype=fv.fvec3)
                 case _:
-                    raise NotImplementedError()
+                    if k[0] == "r":
+                        # This is clipping plane specification
+                        match = re_float3.search(" " + k)
+                        _, x, y, z = match.groups()  # ty:ignore[unresolved-attribute]
+                        axis_np = np.array([ne.evaluate(expr) for expr in [x, y, z]], dtype=np.float32)
+                        axis_np /= np.linalg.norm(axis_np)
+                        axis = np.array(tuple(axis_np), dtype=fv.fvec3)
+                    else:
+                        raise NotImplementedError()
             match sign:
                 case "<":
                     mode = 1
