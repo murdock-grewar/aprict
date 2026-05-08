@@ -71,8 +71,6 @@ class _MetaPhantomContainer(type):
         # Phantom is defined with centimeters as the unit of length.
         # Convert it to mm here.
         fbv.scale_len(10)
-        # Phantom is defined upside down. Fix it here.
-        fbv.flip(axis="z")
         return fbv
 
 
