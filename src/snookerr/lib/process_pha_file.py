@@ -182,7 +182,7 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
         for k, v in [
             prop.split("=") for prop in shape_properties + remaining_properties
         ]:
-            if k in ("formel",):
+            if k in ("formel", "formula"):
                 continue
             shape_obj[k] = ne.evaluate(v.strip())
         for m in re_float3.finditer(shape):
