@@ -251,7 +251,10 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
                         # This is clipping plane specification
                         match = re_float3.search(" " + k)
                         _, x, y, z = match.groups()  # ty:ignore[unresolved-attribute]
-                        axis_np = np.array([ne.evaluate(expr) for expr in [x, y, z]], dtype=np.float32)
+                        axis_np = np.array(
+                            [ne.evaluate(expr) for expr in [x, y, z]],
+                            dtype=np.float32,
+                        )
                         axis_np /= np.linalg.norm(axis_np)
                         axis = np.array(tuple(axis_np), dtype=fv.fvec3)
                     else:
