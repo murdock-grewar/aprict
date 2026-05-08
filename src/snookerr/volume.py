@@ -250,13 +250,13 @@ class FBVolume:
         match axis:
             case 0 | "x":
                 axis = "x"
-                relevant_number_subkeys = ("x", "dx")
+                relevant_number_subkeys = ("x",)
             case 1 | "y":
                 axis = "y"
-                relevant_number_subkeys = ("y", "dy")
+                relevant_number_subkeys = ("y",)
             case 2 | "z":
                 axis = "z"
-                relevant_number_subkeys = ("z", "dz")
+                relevant_number_subkeys = ("z",)
             case _:
                 msg = f"Unknown axis: {axis}"
                 raise ValueError(msg)
