@@ -184,7 +184,8 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
         ]:
             if k in ("formel", "formula"):
                 continue
-            shape_obj[k] = ne.evaluate(v.strip())
+            val = ne.evaluate(v.strip())
+            shape_obj[k] = val
         for m in re_float3.finditer(shape):
             name, x, y, z = m.groups()
             x, y, z = [ne.evaluate(thing.strip()) for thing in (x, y, z)]
@@ -251,7 +252,7 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
                     mode = 2
                 case _:
                     raise NotImplementedError()
-            dotprod = v
+            dotprod = ne.evaluate(v)
             cas = np.array((axis, dotprod, mode), dtype=fv.ClipAxisSpec)
             clip_plane_counter += 1
             match clip_plane_counter:
