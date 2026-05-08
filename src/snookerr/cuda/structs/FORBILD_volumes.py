@@ -1850,6 +1850,15 @@ __device__ fvec2 FORBILD_clip_line_segment(
         case 13:
             interval = FORBILD_clip_line_segment(v1, v2, _to_Sphere(shape));
             break;
+        case 14:
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipt_Cyl_x(shape));
+            break;
+        case 15:
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipt_Cyl_y(shape));
+            break;
+        case 16:
+            interval = FORBILD_clip_line_segment(v1, v2, _to_Ellipt_Cyl_z(shape));
+            break;
         default:
             interval = fvec2(0.f, 0.f);
             break;
