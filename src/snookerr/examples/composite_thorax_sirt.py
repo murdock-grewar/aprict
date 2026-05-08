@@ -15,6 +15,8 @@
 
 """Simulate an example experiment with a helical scan."""
 
+import itertools
+import math
 import pathlib
 import sys
 import time
@@ -32,6 +34,10 @@ def main() -> None:  # noqa: C901, D103
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
+    output_projs_path: pathlib.Path | None = (
+        None if len(sys.argv) < 4 else pathlib.Path(sys.argv[3])
+    )
+    reconstruct: bool = False
     live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
     default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
@@ -43,12 +49,11 @@ def main() -> None:  # noqa: C901, D103
     apply_noise: bool = False
     R_mm: float = 500  # noqa: N806
     L_mm: float = R_mm + 500  # noqa: N806
-    num_sources: int = 100
+    num_sources: int = 10
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 1201  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 500
     pixel_wid_mm: float = 0.66
-    num_helix_turns: float = 2
     fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
@@ -56,7 +61,7 @@ def main() -> None:  # noqa: C901, D103
     save_volume_path: pathlib.Path | None = (
         None if len(sys.argv) < 3 else pathlib.Path(sys.argv[2])
     )
-    show_plots_before_recon: bool = True
+    show_plots_before_recon: bool = False
     ###############################
 
     if save_volume_path is not None:
@@ -89,18 +94,18 @@ def main() -> None:  # noqa: C901, D103
     #   detpixwid,
     #   detpixhei,
     # )
-    # zs = np.linspace(-300, 300, endpoint=True, num=num_sources, dtype=np.float32)
-    zs = np.linspace(
-        -150, 150, endpoint=True, num=num_sources, dtype=np.float32
-    )
-    # ts = 0.618 * 2 * np.pi * np.arange(num_sources, dtype=np.float32)
-    ts = (
-        2
-        * np.pi
-        * num_helix_turns
-        / num_sources
-        * np.arange(num_sources, dtype=np.float32)
-    )
+    zmin_mm = -150
+    zmax_mm = 500
+    zs, ts = np.array(
+        list(
+            itertools.islice(
+                snookerr.lib.lds.lds_cyl(zmin=zmin_mm, zmax=zmax_mm, rad=R_mm),
+                num_sources,
+            )
+        ),
+        dtype=np.float32,
+    ).transpose()
+
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
     ).transpose()
@@ -128,11 +133,40 @@ def main() -> None:  # noqa: C901, D103
     print("Voxel width (mm):        ", voxwid_mm)
     print()
     print("Creating volume... ", end="", flush=True)
-    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.ThoraxPhantom
-    print("done.")
-    print("Number of shapes in volume: ", len(vol.shapes))
-    vol.translate(axis="z", amount=0)
+    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
+    vol.translate(axis="y", amount=25)
+    vol.translate(axis="z", amount=360)
+    vol = vol.superimpose_onto(snookerr.phantoms.FORBILD.ThoraxPhantom)
+    vol_lungs = snookerr.phantoms.FORBILD.LungPhantom(
+        fix=True, generation=12, taper=True, scale_factor=0.6
+    )
+    vol_lungs.translate(axis="z", amount=150)
+    vol_lungs.scale_len(
+        1.8
+    )  # initially too small to fit in the thorax lung pockets
+    vol = vol_lungs.superimpose_onto(vol)
     vol.scale_len(1 / voxwid_mm)
+    print("done.")
+    if False:
+        vol_numpy = vol.to_numpy(
+            xs=np.linspace(
+                -400, 400, num=1001, endpoint=True, dtype=np.float32
+            ),
+            ys=np.linspace(
+                -400, 400, num=1001, endpoint=True, dtype=np.float32
+            ),
+            zs=np.linspace(
+                2 * math.floor(zmin_mm),
+                2 * math.floor(zmax_mm),
+                endpoint=True,
+                num=1 + math.floor(zmax_mm) - math.floor(zmin_mm),
+                dtype=np.float32,
+            ),
+        )
+        snookerr.imview.plot_volume(vol_numpy)
+        exit(0)
+        del vol_numpy
+    print("Number of shapes in volume: ", len(vol.shapes))
     volwid_mm = 500  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
@@ -219,87 +253,102 @@ def main() -> None:  # noqa: C901, D103
             proj_array.reshape(-1, *proj_array.shape[-2:]),
             title="max attenuation capped for plotting purposes",
         )
+
+    # Write the projections to disk
+    if output_projs_path is not None:
+        np.save(
+            output_projs_path, proj_array.reshape(-1, *proj_array.shape[-2:])
+        )
+
     if numits == 0:
         return
 
     # Free up memory by deleting various unneeded variables
     del vol, projs
     if apply_noise:
-        out_noised_attenuation, out_noised_transmission, out_
+        del out_noised_attenuation, out_noised_transmission, out_
 
-    # Set up the working volume
-    vol_shape: tuple[int, int, int] = (
-        int(volwid_mm // voxwid_mm),
-        int(volwid_mm // voxwid_mm),
-        int((volwid_mm // voxwid_mm) * 3 / 4),
-    )
-    print("Working volume shape: ", vol_shape)
-    working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    if reconstruct:
+        # Set up the working volume
+        vol_shape: tuple[int, int, int] = (
+            int(volwid_mm // voxwid_mm),
+            int(volwid_mm // voxwid_mm),
+            int((volwid_mm // voxwid_mm) * 2 / 4),
+        )
+        print("Working volume shape: ", vol_shape)
+        working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)
 
-    # Backproject into the working volume
-    config_backproject = cbfp.ConfigBackproject(
-        fast_approx=fast_approx_backprojection,
-        cyl_mask_rad_vox=working_vol.shape[0] / 2,
-    )
-    projs = cbfp.ProjectionSet(pss, data=proj_array)
-    t1 = time.time()
-    working_vol = cbfp.backproject(
-        config_backproject,
-        working_vol,
-        projs,
-        block=True,
-    )
-    t2 = time.time()
-    elapsed_milliseconds: float = (t2 - t1) * 1000
-    print(f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True)
-    # snookerr.imview.plot_volume(working_vol.as_numpy())
+        # Backproject into the working volume
+        config_backproject = cbfp.ConfigBackproject(
+            fast_approx=fast_approx_backprojection,
+            cyl_mask_rad_vox=working_vol.shape[0] / 2,
+        )
+        projs = cbfp.ProjectionSet(pss, data=proj_array)
+        t1 = time.time()
+        working_vol = cbfp.backproject(
+            config_backproject,
+            working_vol,
+            projs,
+            block=True,
+        )
+        t2 = time.time()
+        elapsed_milliseconds: float = (t2 - t1) * 1000
+        print(
+            f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True
+        )
+        # snookerr.imview.plot_volume(working_vol.as_numpy())
 
-    # Make a SIRT object
-    working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
-    working_vol.fill(0)
-    recon = snookerr.iterators.SIRT_flatpanel(
-        config=snookerr.iterators.SIRT_flatpanel.Config(
-            fast_backproject=fast_approx_backprojection,
-            soft_from_cylinder_relrad=0.95,
-        ),
-        volume=working_vol,
-        projs=projs,
-    )
-
-    # Set up live plot
-    if live_plot:
-        _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
-            title="Live plot -- projection along Y axis",
-            histogram_label="Line Attenuation",
-            plotmin=default_plot_range_line_attenuation[0],
-            plotmax=default_plot_range_line_attenuation[1],
-            # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
-            # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
-            show=False,
+        # Make a SIRT object
+        working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)
+        working_vol.fill(0)
+        recon = snookerr.iterators.SIRT_flatpanel(
+            config=snookerr.iterators.SIRT_flatpanel.Config(
+                fast_backproject=fast_approx_backprojection,
+                soft_from_cylinder_relrad=0.95,
+            ),
+            volume=working_vol,
+            projs=projs,
         )
 
-    # Run the recon
-    liveplot_arr = cp.empty(
-        (working_vol.shape[0], working_vol.shape[2]), dtype=vol_dtype
-    )
-    for i in range(numits + 1):
-        s = f"Iteration {i:04d}/{numits:04d}"
-        print(s + "   -- UNIX time: ", time.time(), flush=True)
-        recon.iterate()
-        # Live plot update
+        # Set up live plot
         if live_plot:
-            recon.volume.sum_to_cupy_array(axis=1, out=liveplot_arr)
-            a = liveplot_arr.get()
-            lp_dispatcher.update_image(a[:, :, np.newaxis])
-            if i == 0:
-                lp_dispatcher.set_visible(True)
-    v = recon.volume.as_numpy()
-    if save_volume_path is not None:
-        np.save(save_volume_path, v)
-    snookerr.imview.plot_volume(
-        v.transpose(0, 2, 1),
-        title=s,
-    )
+            _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
+                title="Live plot -- projection along Y axis",
+                histogram_label="Line Attenuation",
+                plotmin=default_plot_range_line_attenuation[0],
+                plotmax=default_plot_range_line_attenuation[1],
+                # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
+                # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
+                show=False,
+            )
+
+        # Run the recon
+        liveplot_arr = cp.empty(
+            (working_vol.shape[0], working_vol.shape[2]), dtype=vol_dtype
+        )
+        for i in range(numits + 1):
+            s = f"Iteration {i:04d}/{numits:04d}"
+            print(s + "   -- UNIX time: ", time.time(), flush=True)
+            recon.iterate()
+            # Live plot update
+            if live_plot:
+                recon.volume.sum_to_cupy_array(axis=1, out=liveplot_arr)
+                a = liveplot_arr.get()
+                lp_dispatcher.update_image(a[:, :, np.newaxis])
+                if i == 0:
+                    lp_dispatcher.set_visible(True)
+        v = recon.volume.as_numpy()
+        if save_volume_path is not None:
+            np.save(save_volume_path, v)
+        if False:
+            snookerr.imview.plot_volume(
+                v.transpose(0, 2, 1),
+                title=s + " -- view of y slices",
+            )
+            snookerr.imview.plot_volume(
+                v,
+                title=s + " -- view of z slices",
+            )
 
 
 if __name__ == "__main__":
