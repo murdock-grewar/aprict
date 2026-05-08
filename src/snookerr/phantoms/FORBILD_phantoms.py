@@ -60,6 +60,21 @@ class _MetaPhantomContainer(type):
         fbv.flip(axis="z")
         return fbv
 
+    @property
+    def ThoraxPhantom(cls) -> FBVolume:
+        """ThoraxPhantom.pha"""
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath("ThoraxPhantom.pha")
+            )
+        )
+        # Phantom is defined with centimeters as the unit of length.
+        # Convert it to mm here.
+        fbv.scale_len(10)
+        # Phantom is defined upside down. Fix it here.
+        fbv.flip(axis="z")
+        return fbv
+
 
 class PhantomContainer(metaclass=_MetaPhantomContainer):
     """A container for the phantom objects."""
