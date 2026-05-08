@@ -130,7 +130,12 @@ def _convert_preprocessed_ph_str_to_shapes(
         lambda _: "",
         s,
     )
-
+    # remove space between "axis" and opening parenthesis. Do this for each vector type
+    s = re.sub(
+        r"(axis|a_x|a_y|a_z) \(",
+        lambda m: m.groups()[0] + "(",
+        s,
+    )
     objs = re_obj.findall(s)
     min_shapes_per_group: int = 300
     nprocs = min(
