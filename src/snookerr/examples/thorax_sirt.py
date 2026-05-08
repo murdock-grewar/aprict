@@ -94,7 +94,13 @@ def main() -> None:  # noqa: C901, D103
         -150, 150, endpoint=True, num=num_sources, dtype=np.float32
     )
     # ts = 0.618 * 2 * np.pi * np.arange(num_sources, dtype=np.float32)
-    ts = 2 * np.pi * num_helix_turns / num_sources * np.arange(num_sources, dtype=np.float32)
+    ts = (
+        2
+        * np.pi
+        * num_helix_turns
+        / num_sources
+        * np.arange(num_sources, dtype=np.float32)
+    )
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
     ).transpose()
