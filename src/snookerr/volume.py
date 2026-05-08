@@ -213,6 +213,10 @@ class FBVolume:
             supersamp_factor=supersamp_factor,
         )
 
+    def superimpose_onto(self, vol: FBVolume) -> FBVolume:
+        """Superimpose this volume onto another."""
+        return FBVolume(shapes=vol.shapes + self.shapes)
+
     def to_numpy(
         self, xs: np.ndarray, ys: np.ndarray, zs: np.ndarray
     ) -> np.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
