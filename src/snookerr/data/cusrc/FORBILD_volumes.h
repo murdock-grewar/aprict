@@ -962,6 +962,156 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 
 
+struct FORBILD_Ellipt_Cyl_x {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float dy;
+    float dz;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_x ecylx
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylx.rho;
+    ecyl.x = ecylx.x;
+    ecyl.y = ecylx.y;
+    ecyl.z = ecylx.z;
+    ecyl.l = ecylx.l;
+    ecyl.dx = ecylx.dy;
+    ecyl.dy = ecylx.dz;
+    ecyl.axis = fvec3(1.f,0.f,0.f);
+    ecyl.a_x = fvec3(0.f,1.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_x ecylx
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylx.rho;
+    ecyl.x = ecylx.x;
+    ecyl.y = ecylx.y;
+    ecyl.z = ecylx.z;
+    ecyl.l = ecylx.l;
+    ecyl.dx = ecylx.dy;
+    ecyl.dy = ecylx.dz;
+    ecyl.axis = fvec3(1.f,0.f,0.f);
+    ecyl.a_x = fvec3(0.f,1.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+
+
+struct FORBILD_Ellipt_Cyl_y {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float dx;
+    float dz;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_y ecyly
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecyly.rho;
+    ecyl.x = ecyly.x;
+    ecyl.y = ecyly.y;
+    ecyl.z = ecyly.z;
+    ecyl.l = ecyly.l;
+    ecyl.dx = ecyly.dx;
+    ecyl.dy = ecyly.dz;
+    ecyl.axis = fvec3(0.f,1.f,0.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_y ecyly
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecyly.rho;
+    ecyl.x = ecyly.x;
+    ecyl.y = ecyly.y;
+    ecyl.z = ecyly.z;
+    ecyl.l = ecyly.l;
+    ecyl.dx = ecyly.dx;
+    ecyl.dy = ecyly.dz;
+    ecyl.axis = fvec3(0.f,1.f,0.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,0.f,1.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+
+
+struct FORBILD_Ellipt_Cyl_z {
+    float rho;
+    float x;
+    float y;
+    float z;
+    float l;
+    float dx;
+    float dy;
+};
+__device__ bool _in_region(
+    fvec3 v,
+    FORBILD_Ellipt_Cyl_z ecylz
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylz.rho;
+    ecyl.x = ecylz.x;
+    ecyl.y = ecylz.y;
+    ecyl.z = ecylz.z;
+    ecyl.l = ecylz.l;
+    ecyl.dx = ecylz.dx;
+    ecyl.dy = ecylz.dy;
+    ecyl.axis = fvec3(0.f,0.f,1.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,1.f,0.f);
+    return _in_region(v, ecyl);
+}
+
+__device__ fvec2 FORBILD_clip_line_segment(
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    fvec3 v1,
+    fvec3 v2,
+    FORBILD_Ellipt_Cyl_z ecylz
+)
+{
+    FORBILD_Ellipt_Cyl ecyl;
+    ecyl.rho = ecylz.rho;
+    ecyl.x = ecylz.x;
+    ecyl.y = ecylz.y;
+    ecyl.z = ecylz.z;
+    ecyl.l = ecylz.l;
+    ecyl.dx = ecylz.dx;
+    ecyl.dy = ecylz.dy;
+    ecyl.axis = fvec3(0.f,0.f,1.f);
+    ecyl.a_x = fvec3(1.f,0.f,0.f);
+    ecyl.a_y = fvec3(0.f,1.f,0.f);
+    return FORBILD_clip_line_segment(v1, v2, ecyl);
+}
+
+
 struct FORBILD_Shape {
     unsigned char type;
     float rho;
@@ -1144,6 +1294,45 @@ __device__ FORBILD_Ellipt_Cyl _to_Ellipt_Cyl(const FORBILD_Shape s)
     return ec;
 }
 
+__device__ FORBILD_Ellipt_Cyl_x _to_Ellipt_Cyl_x(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_x ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dy = s.dy;
+    ec.dz = s.dz;
+    return ec;
+}
+
+__device__ FORBILD_Ellipt_Cyl_y _to_Ellipt_Cyl_y(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_y ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dx = s.dx;
+    ec.dz = s.dz;
+    return ec;
+}
+
+__device__ FORBILD_Ellipt_Cyl_z _to_Ellipt_Cyl_z(const FORBILD_Shape s)
+{
+    FORBILD_Ellipt_Cyl_z ec;
+    ec.rho = s.rho;
+    ec.x = s.x;
+    ec.y = s.y;
+    ec.z = s.z;
+    ec.l = s.l;
+    ec.dx = s.dx;
+    ec.dy = s.dy;
+    return ec;
+}
+
 __device__ FORBILD_Sphere _to_Sphere(const FORBILD_Shape s)
 {
     FORBILD_Sphere sphere;
@@ -1193,6 +1382,12 @@ __device__ bool _in_region(
             return _in_region(v, _to_Ellipt_Cyl(shape));
         case 13:
             return _in_region(v, _to_Sphere(shape));
+        case 14:
+            return _in_region(v, _to_Ellipt_Cyl_x(shape));
+        case 15:
+            return _in_region(v, _to_Ellipt_Cyl_y(shape));
+        case 16:
+            return _in_region(v, _to_Ellipt_Cyl_z(shape));
         default:
             return false;
     }
