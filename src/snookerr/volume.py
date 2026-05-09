@@ -23,13 +23,13 @@ import typing
 
 import numpy as np
 
+from .cuda.structs import FORBILD_volumes as fv
 from .lib import gpu_tools, sample_FORBILD, texture_tools
 from .lib.texture_tools import operations as tops
 
 if typing.TYPE_CHECKING:
     import cupy as cp
 
-    from .cuda.structs import FORBILD_volumes as fv
 
 _ShapeType = tuple[int, int, int]
 _DType_base = np.float16 | np.float32
@@ -215,7 +215,9 @@ class FBVolume:
 
     def superimpose_onto(self, vol: FBVolume) -> FBVolume:
         """Superimpose this volume onto another."""
-        return FBVolume(shapes=vol.shapes + self.shapes)
+        return FBVolume(
+            shapes=np.concatenate((vol.shapes, self.shapes), axis=0)
+        )
 
     def to_numpy(
         self, xs: np.ndarray, ys: np.ndarray, zs: np.ndarray
@@ -245,9 +247,13 @@ class FBVolume:
 
     def scale_len(self, factor: float) -> None:
         """Scale up the lengths in the volume by the given factor."""
-        self.shapes = [  # ty:ignore[invalid-assignment]
-            FBVolume._scale_shape_len(shape, factor) for shape in self.shapes
-        ]
+        self.shapes = np.array(
+            [
+                FBVolume._scale_shape_len(shape, factor)
+                for shape in self.shapes
+            ],
+            dtype=fv.Shape,
+        )
 
     @classmethod
     def _flip_shape(cls, shape, axis: int | str):  # noqa: ANN001, ANN206
@@ -306,7 +312,10 @@ class FBVolume:
 
     def translate(self, axis: int | str, amount: float) -> None:
         """Translate the shape along the given axis, by the given amount."""
-        self.shapes = [  # ty:ignore[invalid-assignment]
-            FBVolume._translate_shape(shape, axis=axis, amount=amount)
-            for shape in self.shapes
-        ]
+        self.shapes = np.array(
+            [
+                FBVolume._translate_shape(shape, axis=axis, amount=amount)
+                for shape in self.shapes
+            ],
+            dtype=fv.Shape,
+        )

@@ -136,6 +136,27 @@ def _convert_preprocessed_ph_str_to_shapes(
         lambda m: m.groups()[0] + "(",
         s,
     )
+    # remove spaces on either side of an equals sign
+    s = re.sub(
+        r" ?= ?",
+        lambda _: "=",
+        s,
+    )
+    # replace tabs with spaces
+    s = re.sub(
+        r"\t",
+        lambda _: " ",
+        s,
+    )
+    # if there is a minus sign before a number,
+    # make sure there's no space. If there is a space and it's meant as a negative number,
+    # then numexpr.evaluate(...) can't understand it.
+    s = re.sub(
+        r"-\s+([0-9\.])",
+        lambda m: "-" + m.groups()[0],
+        s,
+    )
+
     objs = re_obj.findall(s)
     min_shapes_per_group: int = 300
     nprocs = min(

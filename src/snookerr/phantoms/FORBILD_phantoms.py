@@ -35,11 +35,121 @@ path_to_FORBILD_src = pathlib.Path(str(data.__path__[0])).joinpath("FORBILD")  #
 
 class _MetaPhantomContainer(type):
     @property
+    def CustomComposite(cls) -> FBVolume:
+        hi, ab, th, he, ja = [
+            FBVolume(
+                ppf.convert_ph_file_to_shapes(
+                    path_to_FORBILD_src.joinpath("custom_composite/" + fn)
+                )
+            )
+            for fn in (
+                "part_01_hip.pha",
+                "part_02_abdomen.pha",
+                "part_03_thorax.pha",
+                "part_04_head.pha",
+                "part_05_jaw.pha",
+            )
+        ]
+
+        # Create the lungs phantom which will sit on top of everything
+        lu = PhantomContainer.LungPhantom(
+            fix=True, generation=10, taper=True, scale_factor=0.60
+        )
+        lu.translate(axis="z", amount=150)
+        lu.scale_len(
+            1.8
+        )  # initially too small to fit in the thorax lung pockets
+
+        # Convert cm to mm.
+        ja.scale_len(10)
+        he.scale_len(10)
+        th.scale_len(10)
+        ab.scale_len(10)
+        hi.scale_len(10)
+
+        # The jaw is not located correctly with respect to the head. Correct it here.
+        ja.translate(axis="y", amount=-20)
+        ja.translate(axis="z", amount=-120)
+        # Translate the head up and slightly forwards
+        amount = 360
+        he.translate(axis="z", amount=amount)
+        ja.translate(axis="z", amount=amount)
+        amount = 0  # Never mind. Don't translate it forwards.
+        he.translate(axis="y", amount=amount)
+        ja.translate(axis="y", amount=amount)
+        # Translate abdomen and hip down
+        amount = -200
+        ab.translate(axis="z", amount=amount)
+        hi.translate(axis="z", amount=amount)
+        # Translate the hips down further
+        amount = -300
+        hi.translate(axis="z", amount=amount)
+
+        # Remove the background shapes making up the thoracical/abdominal cavity. We'll place these objects first in the list after composing the full object, so that they remoain in the background.
+        # cavity = FBVolume(th.shapes[[2]]).superimpose_onto(FBVolume(ab.shapes[[0]]))
+        cavity = FBVolume(th.shapes[[2]])
+        ab = FBVolume(ab.shapes[1:])
+        th = FBVolume(np.concatenate((th.shapes[0:2], th.shapes[3:]), axis=0))
+        # Extend the cavity to meet the hips
+        cavity.shapes[0]["z"] -= 50
+        cavity.shapes[0]["l"] += 100
+        # Superimpose in order
+        v = ja.superimpose_onto(lu)  # jaws on top of lungs is better
+        v = v.superimpose_onto(he)
+        v = v.superimpose_onto(th)
+        v = v.superimpose_onto(ab)
+        v = v.superimpose_onto(hi)
+        v = v.superimpose_onto(cavity)
+        return v  # noqa: RET504
+
+    @property
+    def JawPhantom(cls) -> FBVolume:
+        """The JawPhantom.txt"""
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath("jaw/JawPhantom.pha")
+            )
+        )
+        # Phantom is defined with centimeters as the unit of length.
+        # Convert it to mm here.
+        fbv.scale_len(10)
+        return fbv
+
+    @property
     def HeadPhantom(cls) -> FBVolume:
         """HeadPhantom.pha"""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("HeadPhantom.pha")
+                path_to_FORBILD_src.joinpath("head/HeadPhantom.pha")
+            )
+        )
+        # Phantom is defined with centimeters as the unit of length.
+        # Convert it to mm here.
+        fbv.scale_len(10)
+        return fbv
+
+    @property
+    def HipPhantom(cls) -> FBVolume:
+        """HipPhantom.pha"""
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath("hip/HipPhantom.pha")
+            )
+        )
+        # Phantom is defined with centimeters as the unit of length.
+        # Convert it to mm here.
+        fbv.scale_len(10)
+        return fbv
+
+    @property
+    def AbdomenPhantom(cls) -> FBVolume:
+        """Fixed AbdomenPhantom.txt"""
+        # The AbdomenPhantom.pha file has a bug in it. Load a manually fixed version.
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath(
+                    "abdomen/AbdomenPhantom_fixed.pha"
+                )
             )
         )
         # Phantom is defined with centimeters as the unit of length.
@@ -53,7 +163,9 @@ class _MetaPhantomContainer(type):
         # DEV NOTE: make sure this phantom loads the reference file published by the Arbeitsgruppe Phantome. This is used in a unittest to ensure that the generation procedure for N generations matches in this case.
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("LungPhantom3Generations.pha")
+                path_to_FORBILD_src.joinpath(
+                    "lungs/LungPhantom3Generations.pha"
+                )
             )
         )
         # Phantom is defined upside down. Fix it here.
@@ -65,7 +177,7 @@ class _MetaPhantomContainer(type):
         """ThoraxPhantom.pha"""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("ThoraxPhantom.pha")
+                path_to_FORBILD_src.joinpath("thorax/ThoraxPhantom.pha")
             )
         )
         # Phantom is defined with centimeters as the unit of length.

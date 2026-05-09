@@ -33,27 +33,40 @@ from snookerr.cb import flatpanel as cbfp
 def main() -> None:  # noqa: C901, D103
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
+    # Set the region of interest, in millimeters
+    # [[xmin, xmax], [ymin, ymax], [zmin, zmax]]
+    # roi = [[-150, 0], [-75, 75], [-25, 25]]
+    roi = [[-150, 0], [-75, 75], [-100, 100]]
+
     ### Configurable parameters ###
     output_projs_path: pathlib.Path | None = (
         None if len(sys.argv) < 4 else pathlib.Path(sys.argv[3])
     )
+    output_points_zt_path: pathlib.Path | None = (
+        None if len(sys.argv) < 5 else pathlib.Path(sys.argv[4])
+    )
+
     reconstruct: bool = False
     live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
     default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
-    voxwid_mm: float = 0.5  # the voxel width of the head phantom
+    voxwid_mm: float = (
+        0.75  # the voxel width of the head phantom--- for reconstruction only
+    )
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
     )
+    plot_volume: bool = False
     apply_noise: bool = False
+    # R_mm: float = 500
     R_mm: float = 500  # noqa: N806
     L_mm: float = R_mm + 500  # noqa: N806
-    num_sources: int = 100
+    num_sources: int = 30
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
-    detwid_mm: float = 1200  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
+    detwid_mm: float = 1200
     dethei_mm: float = 600
-    pixel_wid_mm: float = 0.30
+    pixel_wid_mm: float = 1
     fast_approx_backprojection: bool = True
     numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
@@ -61,7 +74,7 @@ def main() -> None:  # noqa: C901, D103
     save_volume_path: pathlib.Path | None = (
         None if len(sys.argv) < 3 else pathlib.Path(sys.argv[2])
     )
-    show_plots_before_recon: bool = False
+    show_plots_before_recon: bool = True
     ###############################
 
     if save_volume_path is not None:
@@ -79,11 +92,14 @@ def main() -> None:  # noqa: C901, D103
     )
 
     # Print some information about the geometry
-    print("Distance from center to detector (mm): ", L_mm)
-    print("Detector width  (mm):     ", detwid_mm)
-    print("Detector height (mm):     ", dethei_mm)
-    print("Detector width  (px):     ", det_numpixwid)
-    print("Detector height (px):     ", det_numpixhei)
+    print("Distance from source to axs      (mm): ", R_mm)
+    print("Distance from source to detector (mm): ", L_mm)
+    print("Detector width  (mm):       ", detwid_mm)
+    print("Detector height (mm):       ", dethei_mm)
+    print("Detector width  (px):       ", det_numpixwid)
+    print("Detector height (px):       ", det_numpixhei)
+    print("Detector pixel width  (mm): ", pixel_wid_mm)
+    print("Detector pixel height (mm): ", pixel_wid_mm)  # same as pixel width
 
     # Generate projection specifications
     # cbfp.create_proj_spec_array(
@@ -94,8 +110,30 @@ def main() -> None:  # noqa: C901, D103
     #   detpixwid,
     #   detpixhei,
     # )
-    zmin_mm = -100
-    zmax_mm = 500
+    roi_maxrad = np.sqrt(
+        np.square(max(abs(roi[0][0]), abs(roi[0][1])))
+        + np.square(max(abs(roi[1][0]), abs(roi[1][1])))
+    )
+    # h = height of source cylinder
+    zeta = np.arctan2(
+        # Vertical distance to corner of detector
+        dethei_mm / 2,
+        # Lateral distance to corner of detector
+        np.sqrt(np.square(L_mm) + np.square(detwid_mm / 2)),
+    )
+    print(
+        f"Vertical cone angle (after Colsher window): {np.rad2deg(2 * zeta):.1f} degs"
+    )
+    h = (
+        # z height of ROI
+        (roi[2][1] - roi[2][0])
+        # Lateral distance from source point to furthest point in ROI
+        + 2 * np.tan(zeta) * (roi_maxrad + R_mm)
+    )
+    zmid_mm = (roi[2][0] + roi[2][1]) / 2
+    zmin_mm = zmid_mm - h / 2
+    zmax_mm = zmid_mm + h / 2
+
     zs, ts = np.array(
         list(
             itertools.islice(
@@ -105,6 +143,9 @@ def main() -> None:  # noqa: C901, D103
         ),
         dtype=np.float32,
     ).transpose()
+
+    if output_points_zt_path is not None:
+        np.save(output_points_zt_path, np.array([zs, ts]).transpose())
 
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
@@ -133,18 +174,40 @@ def main() -> None:  # noqa: C901, D103
     print("Voxel width (mm):        ", voxwid_mm)
     print()
     print("Creating volume... ", end="", flush=True)
-    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
-    vol.translate(axis="y", amount=25)
-    vol.translate(axis="z", amount=360)
-    vol = vol.superimpose_onto(snookerr.phantoms.FORBILD.ThoraxPhantom)
-    vol_lungs = snookerr.phantoms.FORBILD.LungPhantom(
-        fix=True, generation=12, taper=True, scale_factor=0.6
-    )
-    vol_lungs.translate(axis="z", amount=150)
-    vol_lungs.scale_len(
-        1.8
-    )  # initially too small to fit in the thorax lung pockets
-    vol = vol_lungs.superimpose_onto(vol)
+    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.CustomComposite
+    if plot_volume:
+        print("plotting volume... ", end="", flush=True)
+        xs = np.linspace(-300, 300, num=601, endpoint=True)
+        ys = np.linspace(-200, 200, num=401, endpoint=True)
+        zs = np.linspace(-750, 500, num=1251, endpoint=True)
+        xvol = vol.to_numpy(xs, ys, zs)
+        snookerr.imview.plot_volume(
+            xvol.transpose((2, 1, 0)), title="Side profile of whole volume"
+        )
+        # Plot region of interest (ROI)
+        xs = np.linspace(
+            roi[0][0],
+            roi[0][1],
+            num=1 + math.ceil(4 * (roi[0][1] - roi[0][0])),
+            endpoint=True,
+        )
+        ys = np.linspace(
+            roi[1][0],
+            roi[1][1],
+            num=1 + math.ceil(4 * (roi[1][1] - roi[1][0])),
+            endpoint=True,
+        )
+        zs = np.linspace(
+            roi[2][0],
+            roi[2][1],
+            num=1 + math.ceil(4 * (roi[2][1] - roi[2][0])),
+            endpoint=True,
+        )
+        xvol = vol.to_numpy(xs, ys, zs)
+        snookerr.imview.plot_volume(
+            xvol, title="Region of interest (axial slices)"
+        )
+        del xvol
     vol.scale_len(1 / voxwid_mm)
     print("done.")
     if False:
