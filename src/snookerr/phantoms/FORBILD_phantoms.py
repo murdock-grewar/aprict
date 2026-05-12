@@ -17,6 +17,7 @@
 """Provides FORBILD phantoms from the files published by the Arbeitsgruppe Phantome."""
 
 import dataclasses
+import itertools
 import pathlib
 
 import numpy as np
@@ -555,10 +556,10 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             posrad = np.sqrt(rng.random()*inner_radius**2)
             r = min(0.002*inner_radius*np.exp(6*rng.random()-3), inner_radius-posrad)
             # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
-            if rng.choice([0, 1], p=[0.95, 0.05]):
+            if rng.choice([0, 1], p=[0.90, 0.10]):
                 rho = 0.1*np.exp(6*rng.random())
             else:
-                rho = 1 + 0.03*np.exp(2*rng.random())
+                rho = 1 + 0.10*(np.exp(2*rng.random())-1)
             phi = 2*np.pi*rng.random()
             x = offset_x + posrad*np.cos(phi)
             y = offset_y + posrad*np.sin(phi)
@@ -581,10 +582,10 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             sintheta = np.sqrt(max(0, 1-axis_z**2))
             axis = np.array([sintheta*np.cos(axis_longitude), sintheta*np.sin(axis_longitude), axis_z], dtype=np.float32)  # In case of numerical imprecision, normalise the vector explcitly
             # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
-            if rng.choice([0, 1], p=[0.95, 0.05]):
+            if rng.choice([0, 1], p=[0.90, 0.10]):
                 rho = 0.1*np.exp(6*rng.random())
             else:
-                rho = 1 + 0.03*np.exp(3*rng.random())
+                rho = 1 + 0.10*(np.exp(3*rng.random())-1)
 
             axis = axis/np.linalg.norm(axis)
             axis = np.array(tuple(axis), dtype=fv.fvec3)
@@ -675,6 +676,8 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         # Add the middle band. It will overwrite the interior shapes.
         mbh = middle_band_height or 0  # null-coalesce to 0
         if mbh > 0:
+            mbz = 0
+
             mb_rho = 1.1 * outer_container_rho
             s = np.array(0, dtype=fv.Shape)
             s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
@@ -683,7 +686,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s["x"] = offset_x
             s["y"] = offset_y
             s["l"] = mbh
-            s["z"] = 0
+            s["z"] = mbz
             mbs = []
             mbs.append(s)
             # Make a high-frequency, low-contrast pattern in z.
@@ -694,14 +697,30 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s = np.array(0, dtype=fv.Shape)
             s["type"] = fv._dict_shape_name_to_type_num["Ellipsoid"]  # noqa: SLF001
             s["x"] = offset_x + inner_radius/2
-            s["y"] = offset_y
+            s["y"] = offset_y + inner_radius/4
             s["rho"] = 1.05 * mb_rho
             s["dx"] = inner_radius/3
             s["dy"] = inner_radius/4
             s["dz"] = dz/2
             for z in zs:
                 s_ = s.copy()
-                s_["z"] = z
+                s_["z"] = z + mbz
+                mbs.append(s_)
+            # Make some large, high-frequency 'bubbles' in the band
+            s = np.array(0, dtype=fv.Shape)
+            s["type"] = fv._dict_shape_name_to_type_num["Sphere"]  # noqa: SLF001
+            s["rho"] = 0
+            r = min(0.0075 * inner_radius, mbh/4)
+            s["r"] = r
+            numheight = min(7, max(1, mbh/(4*r)-2))
+            xs = (np.arange(25)-(25-1)/2)*4*r - inner_radius/7
+            ys = (np.arange(10)-(10-1)/2)*4*r - inner_radius/2
+            zs = (np.arange(numheight)-(numheight-1)/2)*4*r
+            for x, y, z in itertools.product(xs, ys, zs):
+                s_ = s.copy()
+                s_["x"] = offset_x + x
+                s_["y"] = offset_y + y
+                s_["z"] = z + mbz
                 mbs.append(s_)
             shapes.extend(mbs)
 
@@ -722,7 +741,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             for z in zs:
                 s_ = s.copy()
                 s_["r"] = outer_radius
-                s_["rho"] = outer_container_rho * (1 + 0.01*(1-2*rng_knurl.random()))
+                s_["rho"] = outer_container_rho * (1 + 0.02*(1-2*rng_knurl.random()))
                 s_["z"] = z
                 shapes.insert(0, s_)
             # Now add the cylindrical cut-outs
@@ -740,5 +759,3 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 shapes.append(s)
 
         return FBVolume(np.array(shapes, dtype=fv.Shape))
-
-# ruff: enable[N802,D400]
