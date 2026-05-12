@@ -24,6 +24,7 @@ import regex
 import scipy
 
 from .. import data
+from ..cuda.structs import FORBILD_volumes as fv
 from ..lib import process_pha_file as ppf
 from ..volume import FBVolume
 
@@ -494,5 +495,250 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         fbv.flip(axis="z")
         return fbv
 
+    @classmethod
+    def TallRockPhantom(  # noqa: C901
+        cls,
+        num_interior_objects: int = 10000,
+        *,
+        h: float,
+        r: float,
+        rng_seed: int | None = None,
+        caps_height: float | None = None,
+        middle_band_height: float | None = None,
+        num_knurls: int | None = None,
+        outer_container_rho: float | None = None,
+        inner_container_rho: float | None = None,
+    ) -> FBVolume:
+        """Generate a pseudorandom tall rock phantom."""
+        # Calling rng.random() will produce a float in [0,1)
+        rng = np.random.default_rng(rng_seed)
+        rng_knurl = np.random.default_rng((rng_seed or 0) +1)
+
+        shapes = []
+
+        outer_container_rho = outer_container_rho or 1
+        inner_container_rho = inner_container_rho or 0.05
+        num_knurls = num_knurls or 0
+
+        # Pseudorandom geometric parameters
+        outer_radius =  r * (4/5 + 1/5*rng.random())
+        inner_radius = outer_radius * (0.9 + 0.05*rng.random())
+        offset_angle = 2*np.pi*rng.random()
+        offset_radius = (r - outer_radius)*rng.random()
+        offset_x = offset_radius*np.cos(offset_angle)
+        offset_y = offset_radius*np.sin(offset_angle)
+
+        # Make rock container -- it will be contained within the radius r,
+        # but will be a little smaller and have randomised position
+        cyl_outer = np.array(0, dtype=fv.Shape)
+        cyl_outer["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+        cyl_outer["r"] = outer_radius
+        cyl_outer["x"] = offset_x
+        cyl_outer["y"] = offset_y
+        cyl_outer["rho"] = outer_container_rho
+        cyl_outer["l"] = h
+        if num_knurls > 0:
+            # In this case, the knurls will fill out the remaining radius
+            cyl_outer["r"] = (outer_radius + inner_radius)/2
+        shapes.append(cyl_outer)
+        cyl_inner = np.array(0, dtype=fv.Shape)
+        cyl_inner["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+        cyl_inner["r"] = inner_radius
+        cyl_inner["x"] = offset_x
+        cyl_inner["y"] = offset_y
+        cyl_inner["rho"] = inner_container_rho
+        cyl_inner["l"] = h
+        shapes.append(cyl_inner)
+
+        # Generate random shapes
+        def random_sphere():  # noqa: ANN202
+            posrad = np.sqrt(rng.random()*inner_radius**2)
+            r = min(0.002*inner_radius*np.exp(6*rng.random()-3), inner_radius-posrad)
+            # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
+            if rng.choice([0, 1], p=[0.95, 0.05]):
+                rho = 0.1*np.exp(6*rng.random())
+            else:
+                rho = 1 + 0.03*np.exp(2*rng.random())
+            phi = 2*np.pi*rng.random()
+            x = offset_x + posrad*np.cos(phi)
+            y = offset_y + posrad*np.sin(phi)
+            z = (h-2*r)*(rng.random()-1/2)
+            # Generate the shape baed on the randomised parameters
+            t = "Sphere"
+            s = np.array(0, dtype=fv.Shape)
+            s["x"] = x
+            s["y"] = y
+            s["z"] = z
+            s["r"] = r
+            s["rho"] = rho
+            s["type"] = fv._dict_shape_name_to_type_num[t]  # noqa: SLF001
+            return s
+
+        def random_cone():  # noqa: ANN202
+            axis_z = 1 - 2*rng.random()
+            axis_longitude = 2*np.pi*rng.random()
+            costheta = axis_z
+            sintheta = np.sqrt(max(0, 1-axis_z**2))
+            axis = np.array([sintheta*np.cos(axis_longitude), sintheta*np.sin(axis_longitude), axis_z], dtype=np.float32)  # In case of numerical imprecision, normalise the vector explcitly
+            # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
+            if rng.choice([0, 1], p=[0.95, 0.05]):
+                rho = 0.1*np.exp(6*rng.random())
+            else:
+                rho = 1 + 0.03*np.exp(3*rng.random())
+
+            axis = axis/np.linalg.norm(axis)
+            axis = np.array(tuple(axis), dtype=fv.fvec3)
+            r1 = 0.02*inner_radius*np.exp(4*rng.random()-2)
+            r2 = 0.02*inner_radius*np.exp(4*rng.random()-2)
+            phi = 2*np.pi*rng.random()
+            posrad = np.sqrt(rng.random()*inner_radius**2)
+            x = offset_x + posrad*np.cos(phi)
+            y = offset_y + posrad*np.sin(phi)
+            z = h*(rng.random()-1/2)
+            l = 10*rng.random()
+            # Cap the length so that the object doesn't pierce the inner cylinder
+            try_count: int = 0
+            while True:
+                c1 = (np.sqrt(
+                        np.square(posrad*np.cos(phi) - l/2*np.cos(axis_longitude)*sintheta) +
+                        np.square(posrad*np.sin(phi) - l/2*np.sin(axis_longitude)*sintheta)
+                    ) + r1*abs(costheta)) + r1
+                c2 = (np.sqrt(
+                        np.square(posrad*np.cos(phi) + l/2*np.cos(axis_longitude)*sintheta) +
+                        np.square(posrad*np.sin(phi) + l/2*np.sin(axis_longitude)*sintheta)
+                    ) + r2*abs(costheta)) + r2
+                if max(c1, c2) <= inner_radius:
+                    break
+                if try_count > 10:
+                    return None
+                try_count += 1
+                l *= 0.98
+                r1 *= 0.95
+                r2 *= 0.9
+
+            # Generate the shape baed on the randomised parameters
+            t = "Cone"
+            s = np.array(0, dtype=fv.Shape)
+            s["axis"] = axis
+            s["x"] = x
+            s["y"] = y
+            s["z"] = z
+            s["r1"] = r1
+            s["r2"] = r2
+            s["l"] = l
+            s["rho"] = rho
+            s["type"] = fv._dict_shape_name_to_type_num[t]  # noqa: SLF001
+            # Apply clipping axes if necessary, to keep the cone within bounds
+            if (s["z"] + max(s["r1"], s["r2"]) + s["l"]/2 > h/2):
+                # Add top clipping axis
+                cas1 = np.array(0, dtype=fv.ClipAxisSpec)
+                cas1["axis"] = np.array((0, 0, 1), dtype=fv.fvec3)
+                cas1["dotprod"] = h/2
+                cas1["mode"] = 1
+                s["cas1"] = cas1
+            if (s["z"] - max(s["r1"], s["r2"]) - s["l"]/2 < -h/2):
+                # Add bottom clipping axis
+                cas2 = np.array(0, dtype=fv.ClipAxisSpec)
+                cas2["axis"] = np.array((0, 0, 1), dtype=fv.fvec3)
+                cas2["dotprod"] = -h/2
+                cas2["mode"] = 2
+                s["cas2"] = cas2
+            return s
+
+        def random_shape():  # noqa: ANN202
+            f = rng.choice(
+                [
+                    random_cone,
+                    random_sphere,
+                ], p=[0.3, 0.7])  # ty:ignore[no-matching-overload]  # ty is bugged
+            return f()
+
+        while len(shapes) < num_interior_objects + 2:
+            shapes.extend(random_shape() for _ in range(num_interior_objects - len(shapes) + 2))
+            shapes = [s for s in shapes if s is not None]
+        # Sort by largest radius to small-- this way, the big shapes won't
+        # just overwrite the small ones
+        shapes = sorted(shapes, key=lambda s: max(s["r"], s["r1"], s["r2"]), reverse=True)
+        # Add the caps, if applicable
+        if caps_height is not None:
+            captop = np.array(0, dtype=fv.Shape)
+            captop["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            captop["rho"] = 1.1 * outer_container_rho
+            captop["l"] = caps_height
+            captop["r"] = outer_radius
+            captop["x"] = offset_x
+            captop["y"] = offset_y
+            captop["z"] = h/2 - caps_height/2
+            capbot = captop.copy()
+            capbot["z"] = -h/2 + caps_height/2
+            shapes.extend([captop, capbot])
+        # Add the middle band. It will overwrite the interior shapes.
+        mbh = middle_band_height or 0  # null-coalesce to 0
+        if mbh > 0:
+            mb_rho = 1.1 * outer_container_rho
+            s = np.array(0, dtype=fv.Shape)
+            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            s["rho"] = mb_rho
+            s["r"] = (inner_radius + outer_radius)/2
+            s["x"] = offset_x
+            s["y"] = offset_y
+            s["l"] = mbh
+            s["z"] = 0
+            mbs = []
+            mbs.append(s)
+            # Make a high-frequency, low-contrast pattern in z.
+            # This may be interfered with by the knurling.
+            zs = np.linspace(-mbh/2, mbh/2, endpoint=True, num=11)
+            dz = zs[1] - zs[0]
+            zs = zs[2:-2]
+            s = np.array(0, dtype=fv.Shape)
+            s["type"] = fv._dict_shape_name_to_type_num["Ellipsoid"]  # noqa: SLF001
+            s["x"] = offset_x + inner_radius/2
+            s["y"] = offset_y
+            s["rho"] = 1.05 * mb_rho
+            s["dx"] = inner_radius/3
+            s["dy"] = inner_radius/4
+            s["dz"] = dz/2
+            for z in zs:
+                s_ = s.copy()
+                s_["z"] = z
+                mbs.append(s_)
+            shapes.extend(mbs)
+
+        # Add the container knurling
+        if num_knurls > 0:
+            # Insert after the external container, but before the internal cylinder
+            ch = caps_height or 0  # will null-coalesce to 0
+            zs = np.linspace(-h/2 + ch/2, h/2 - ch/2, endpoint=True, num=2+num_knurls)
+            dz = zs[1] - zs[0]
+            # knurl_wid = dz
+            zs = zs[1:-1]
+            s = np.array(0, dtype=fv.Shape)
+            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            s["rho"] = 0
+            s["x"] = offset_x
+            s["y"] = offset_y
+            s["l"] = dz/2
+            for z in zs:
+                s_ = s.copy()
+                s_["r"] = outer_radius
+                s_["rho"] = outer_container_rho * (1 + 0.01*(1-2*rng_knurl.random()))
+                s_["z"] = z
+                shapes.insert(0, s_)
+            # Now add the cylindrical cut-outs
+            r = 1/2 * (outer_radius - inner_radius)
+            num_cutouts = max(3, int(np.ceil(outer_radius * 2*np.pi / (2*r) / 2)))  # arbitrarily chosen
+            for theta in np.linspace(0, 2*np.pi, num=num_cutouts, endpoint=False):
+                s = np.array(0, dtype=fv.Shape)
+                s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+                s["rho"] = 0
+                s["x"] = offset_x + outer_radius * np.cos(theta)
+                s["y"] = offset_y + outer_radius * np.sin(theta)
+                s["z"] = 0
+                s["l"] = h - ch  # have the cutouts go to half-way through the caps
+                s["r"] = r
+                shapes.append(s)
+
+        return FBVolume(np.array(shapes, dtype=fv.Shape))
 
 # ruff: enable[N802,D400]

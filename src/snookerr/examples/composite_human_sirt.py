@@ -92,7 +92,7 @@ def main() -> None:  # noqa: C901, D103
     )
 
     # Print some information about the geometry
-    print("Distance from source to axs      (mm): ", R_mm)
+    print("Distance from source to axis     (mm): ", R_mm)
     print("Distance from source to detector (mm): ", L_mm)
     print("Detector width  (mm):       ", detwid_mm)
     print("Detector height (mm):       ", dethei_mm)
