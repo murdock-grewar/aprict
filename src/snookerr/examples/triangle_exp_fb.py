@@ -31,11 +31,15 @@ def main() -> None:  # noqa: D103
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
-    voxwid_mm: float = 0.5  # the voxel width of the head phantom
+    voxwid_mm: float = 1.0  # the voxel width of the phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
     )
+    fast_backproj: bool = (
+        True  # whether to use the fast approximate backrpojection
+    )
+    numits: int = 100  # Number of SIRT iterations to apply
     apply_noise: bool = True
     D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle  # noqa: N806
     flattened_corner_width_mm: float = 440  # also the detector width
@@ -95,26 +99,30 @@ def main() -> None:  # noqa: D103
     print("Distance from center to detector (mm): ", rdet * voxwid_mm)
     print("Detector width (mm):     ", detwid * voxwid_mm)
     print(
-        "Source strip width (mm): ", voxwid_mm * float(np.linalg.norm(e12 - e11))
+        "Source strip width (mm): ",
+        voxwid_mm * float(np.linalg.norm(e12 - e11)),
     )
 
     # Generate source positions
     # These are scattered along the three edges.
     if curved_source_edges:
         c2 = rdet * np.array(
-            [np.cos(np.deg2rad(90)), np.sin(np.deg2rad(90)), 0], dtype=np.float32
+            [np.cos(np.deg2rad(90)), np.sin(np.deg2rad(90)), 0],
+            dtype=np.float32,
         )
         ang_start2 = np.arctan2((e21 - c2)[1], (e21 - c2)[0])
         ang_end2 = np.arctan2((e22 - c2)[1], (e22 - c2)[0])
         rad2 = np.linalg.norm(e22 - c2)
         c3 = rdet * np.array(
-            [np.cos(np.deg2rad(210)), np.sin(np.deg2rad(210)), 0], dtype=np.float32
+            [np.cos(np.deg2rad(210)), np.sin(np.deg2rad(210)), 0],
+            dtype=np.float32,
         )
         ang_start3 = np.arctan2((e31 - c3)[1], (e31 - c3)[0])
         ang_end3 = np.arctan2((e32 - c3)[1], (e32 - c3)[0])
         rad3 = np.linalg.norm(e32 - c3)
         c1 = rdet * np.array(
-            [np.cos(np.deg2rad(330)), np.sin(np.deg2rad(330)), 0], dtype=np.float32
+            [np.cos(np.deg2rad(330)), np.sin(np.deg2rad(330)), 0],
+            dtype=np.float32,
         )
         ang_start1 = np.arctan2((e11 - c1)[1], (e11 - c1)[0])
         ang_end1 = np.arctan2((e12 - c1)[1], (e12 - c1)[0])
@@ -131,7 +139,8 @@ def main() -> None:  # noqa: D103
                                 [np.cos(ang), np.sin(ang), 0], dtype=np.float32
                             )
                         )
-                        + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2])
+                        + (1 - 2 * (i % 2))
+                        * np.array([0, 0, source_z_spread / 2])
                     )
                     for i, ang in enumerate(
                         np.linspace(
@@ -155,7 +164,11 @@ def main() -> None:  # noqa: D103
         sps = np.array(
             [
                 [
-                    (v + (1 - 2 * (i % 2)) * np.array([0, 0, source_z_spread / 2]))
+                    (
+                        v
+                        + (1 - 2 * (i % 2))
+                        * np.array([0, 0, source_z_spread / 2])
+                    )
                     for i, v in enumerate(
                         np.linspace(
                             endpoint1,
@@ -165,7 +178,9 @@ def main() -> None:  # noqa: D103
                         )[1:-1]
                     )
                 ]
-                for endpoint1, endpoint2 in zip((e11, e21, e31), (e12, e22, e32))
+                for endpoint1, endpoint2 in zip(
+                    (e11, e21, e31), (e12, e22, e32)
+                )
             ],
             dtype=np.float32,
         )
@@ -181,7 +196,11 @@ def main() -> None:  # noqa: D103
     # Define the horizontal vector pointing from one pixel to the next along the same row
     u1, u2, u3 = np.array(
         [
-            [pixwid * np.cos(ang - np.pi / 2), pixwid * np.sin(ang - np.pi / 2), 0]
+            [
+                pixwid * np.cos(ang - np.pi / 2),
+                pixwid * np.sin(ang - np.pi / 2),
+                0,
+            ]
             for ang in [np.deg2rad(angdeg) for angdeg in (330, 90, 210)]
         ],
         dtype=np.float32,
@@ -221,7 +240,9 @@ def main() -> None:  # noqa: D103
     print("Voxel width (mm):        ", voxwid_mm)
     # vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
     vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.CustomComposite
-    vol.scale_len(1 / voxwid_mm)  # factor to change from units of mm to units of voxel-lengths
+    vol.scale_len(
+        1 / voxwid_mm
+    )  # factor to change from units of mm to units of voxel-lengths
     volwid_mm = 300  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
@@ -306,7 +327,9 @@ def main() -> None:  # noqa: D103
     assert projs.data is not None  # helpful assertion for type-checking
     t2 = time.time()
     elapsed_milliseconds: float = (t2 - t1) * 1000
-    print(f"done. Projection time (ms): {elapsed_milliseconds:.1f}", flush=True)
+    print(
+        f"done. Projection time (ms): {elapsed_milliseconds:.1f}", flush=True
+    )
     if apply_noise:
         print("Applying Poisson noise... ", end="", flush=True)
         out_ = projs.data.copy()
@@ -350,7 +373,7 @@ def main() -> None:  # noqa: D103
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
-        fast_approx=False, cyl_mask_rad_vox=working_vol.shape[0] / 2
+        fast_approx=fast_backproj, cyl_mask_rad_vox=working_vol.shape[0] / 2
     )
     projs = cbfp.ProjectionSet(pss, data=proj_array)
     t1 = time.time()
@@ -369,7 +392,7 @@ def main() -> None:  # noqa: D103
         title="Live plot -- reconstructed volume",
         histogram_label="Line Attenuation",
         plotmin=0,
-        plotmax=1.8*0.0184*voxwid_mm,
+        plotmax=1.8 * 0.0184 * voxwid_mm,
         # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
         # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
         show=True,
@@ -379,22 +402,29 @@ def main() -> None:  # noqa: D103
     working_vol.fill(0)
     recon = snookerr.iterators.SIRT_flatpanel(
         config=snookerr.iterators.SIRT_flatpanel.Config(
-            fast_backproject=True,
+            fast_backproject=fast_backproj,
             soft_from_cylinder_relrad=0.95,
         ),
         volume=working_vol,
         projs=projs,
     )
-    numits: int = 100
     for i in range(numits + 1):
         s = f"Iteration {i:04d}/{numits:04d}"
         print(s + "   -- UNIX time: ", time.time(), flush=True)
         recon.iterate()
-        lp_dispatcher.update_image(cp.flip(recon.volume.as_cupy().transpose((2, 0, 1)), axis=(1, 2)).get())
+        lp_dispatcher.update_image(
+            cp.flip(
+                recon.volume.as_cupy().transpose((2, 0, 1)), axis=(1, 2)
+            ).get()
+        )
     v = recon.volume.as_numpy()
     snookerr.imview.plot_volume(v, title=s + " -- top-down")
-    snookerr.imview.plot_volume(v.transpose((0, 2, 1)), title=s + " -- through y axis")
-    snookerr.imview.plot_volume(v.transpose((2, 1, 0)), title=s + " -- through x axis")
+    snookerr.imview.plot_volume(
+        v.transpose((0, 2, 1)), title=s + " -- through y axis"
+    )
+    snookerr.imview.plot_volume(
+        v.transpose((2, 1, 0)), title=s + " -- through x axis"
+    )
 
 
 if __name__ == "__main__":
