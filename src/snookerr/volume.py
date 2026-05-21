@@ -21,15 +21,12 @@
 
 import typing
 
+import cupy as cp
 import numpy as np
 
 from .cuda.structs import FORBILD_volumes as fv
 from .lib import gpu_tools, sample_FORBILD, texture_tools
 from .lib.texture_tools import operations as tops
-
-if typing.TYPE_CHECKING:
-    import cupy as cp
-
 
 _ShapeType = tuple[int, int, int]
 _DType_base = np.float16 | np.float32
@@ -104,6 +101,16 @@ class Volume[
             out
             if out is not None
             else np.empty(self._shape, dtype=self._dtype)
+        )
+        self._texture.cuda_array.copy_to(x)
+        return x
+
+    def as_cupy(self, out: cp.ndarray | None = None) -> cp.ndarray:
+        """Copy this volume's data into a cupy array."""
+        x = (
+            out
+            if out is not None
+            else cp.empty(self._shape, dtype=self._dtype)
         )
         self._texture.cuda_array.copy_to(x)
         return x
