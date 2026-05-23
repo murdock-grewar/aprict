@@ -321,6 +321,7 @@ class TestCB_BACKPROJ_randomnoise:
                 np.bool(True),
                 volres / 2,
                 np.bool(False),
+                0,
             ),
             dtype=ks_config.dtype,
         )

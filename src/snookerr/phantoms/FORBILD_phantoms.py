@@ -513,7 +513,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         """Generate a pseudorandom tall rock phantom."""
         # Calling rng.random() will produce a float in [0,1)
         rng = np.random.default_rng(rng_seed)
-        rng_knurl = np.random.default_rng((rng_seed or 0) +1)
+        rng_knurl = np.random.default_rng((rng_seed or 0) + 1)
 
         shapes = []
 
@@ -522,12 +522,12 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         num_knurls = num_knurls or 0
 
         # Pseudorandom geometric parameters
-        outer_radius =  r * (4/5 + 1/5*rng.random())
-        inner_radius = outer_radius * (0.9 + 0.05*rng.random())
-        offset_angle = 2*np.pi*rng.random()
-        offset_radius = (r - outer_radius)*rng.random()
-        offset_x = offset_radius*np.cos(offset_angle)
-        offset_y = offset_radius*np.sin(offset_angle)
+        outer_radius = r * (4 / 5 + 1 / 5 * rng.random())
+        inner_radius = outer_radius * (0.9 + 0.05 * rng.random())
+        offset_angle = 2 * np.pi * rng.random()
+        offset_radius = (r - outer_radius) * rng.random()
+        offset_x = offset_radius * np.cos(offset_angle)
+        offset_y = offset_radius * np.sin(offset_angle)
 
         # Make rock container -- it will be contained within the radius r,
         # but will be a little smaller and have randomised position
@@ -540,7 +540,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         cyl_outer["l"] = h
         if num_knurls > 0:
             # In this case, the knurls will fill out the remaining radius
-            cyl_outer["r"] = (outer_radius + inner_radius)/2
+            cyl_outer["r"] = (outer_radius + inner_radius) / 2
         shapes.append(cyl_outer)
         cyl_inner = np.array(0, dtype=fv.Shape)
         cyl_inner["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
@@ -553,17 +553,20 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
 
         # Generate random shapes
         def random_sphere():  # noqa: ANN202
-            posrad = np.sqrt(rng.random()*inner_radius**2)
-            r = min(0.002*inner_radius*np.exp(6*rng.random()-3), inner_radius-posrad)
+            posrad = np.sqrt(rng.random() * inner_radius**2)
+            r = min(
+                0.002 * inner_radius * np.exp(6 * rng.random() - 3),
+                inner_radius - posrad,
+            )
             # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
             if rng.choice([0, 1], p=[0.90, 0.10]):
-                rho = 0.1*np.exp(6*rng.random())
+                rho = 0.1 * np.exp(6 * rng.random())
             else:
-                rho = 1 + 0.10*(np.exp(2*rng.random())-1)
-            phi = 2*np.pi*rng.random()
-            x = offset_x + posrad*np.cos(phi)
-            y = offset_y + posrad*np.sin(phi)
-            z = (h-2*r)*(rng.random()-1/2)
+                rho = 1 + 0.10 * (np.exp(2 * rng.random()) - 1)
+            phi = 2 * np.pi * rng.random()
+            x = offset_x + posrad * np.cos(phi)
+            y = offset_y + posrad * np.sin(phi)
+            z = (h - 2 * r) * (rng.random() - 1 / 2)
             # Generate the shape baed on the randomised parameters
             t = "Sphere"
             s = np.array(0, dtype=fv.Shape)
@@ -576,38 +579,63 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             return s
 
         def random_cone():  # noqa: ANN202
-            axis_z = 1 - 2*rng.random()
-            axis_longitude = 2*np.pi*rng.random()
+            axis_z = 1 - 2 * rng.random()
+            axis_longitude = 2 * np.pi * rng.random()
             costheta = axis_z
-            sintheta = np.sqrt(max(0, 1-axis_z**2))
-            axis = np.array([sintheta*np.cos(axis_longitude), sintheta*np.sin(axis_longitude), axis_z], dtype=np.float32)  # In case of numerical imprecision, normalise the vector explcitly
+            sintheta = np.sqrt(max(0, 1 - axis_z**2))
+            axis = np.array(
+                [
+                    sintheta * np.cos(axis_longitude),
+                    sintheta * np.sin(axis_longitude),
+                    axis_z,
+                ],
+                dtype=np.float32,
+            )  # In case of numerical imprecision, normalise the vector explcitly
             # Choose whether this will be a potentially high-attenuation 'problem-maker' or a low-contrast object
             if rng.choice([0, 1], p=[0.90, 0.10]):
-                rho = 0.1*np.exp(6*rng.random())
+                rho = 0.1 * np.exp(6 * rng.random())
             else:
-                rho = 1 + 0.10*(np.exp(3*rng.random())-1)
+                rho = 1 + 0.10 * (np.exp(3 * rng.random()) - 1)
 
-            axis = axis/np.linalg.norm(axis)
+            axis = axis / np.linalg.norm(axis)
             axis = np.array(tuple(axis), dtype=fv.fvec3)
-            r1 = 0.02*inner_radius*np.exp(4*rng.random()-2)
-            r2 = 0.02*inner_radius*np.exp(4*rng.random()-2)
-            phi = 2*np.pi*rng.random()
-            posrad = np.sqrt(rng.random()*inner_radius**2)
-            x = offset_x + posrad*np.cos(phi)
-            y = offset_y + posrad*np.sin(phi)
-            z = h*(rng.random()-1/2)
-            l = 10*rng.random()
+            r1 = 0.02 * inner_radius * np.exp(4 * rng.random() - 2)
+            r2 = 0.02 * inner_radius * np.exp(4 * rng.random() - 2)
+            phi = 2 * np.pi * rng.random()
+            posrad = np.sqrt(rng.random() * inner_radius**2)
+            x = offset_x + posrad * np.cos(phi)
+            y = offset_y + posrad * np.sin(phi)
+            z = h * (rng.random() - 1 / 2)
+            l = 10 * rng.random()
             # Cap the length so that the object doesn't pierce the inner cylinder
             try_count: int = 0
             while True:
-                c1 = (np.sqrt(
-                        np.square(posrad*np.cos(phi) - l/2*np.cos(axis_longitude)*sintheta) +
-                        np.square(posrad*np.sin(phi) - l/2*np.sin(axis_longitude)*sintheta)
-                    ) + r1*abs(costheta)) + r1
-                c2 = (np.sqrt(
-                        np.square(posrad*np.cos(phi) + l/2*np.cos(axis_longitude)*sintheta) +
-                        np.square(posrad*np.sin(phi) + l/2*np.sin(axis_longitude)*sintheta)
-                    ) + r2*abs(costheta)) + r2
+                c1 = (
+                    np.sqrt(
+                        np.square(
+                            posrad * np.cos(phi)
+                            - l / 2 * np.cos(axis_longitude) * sintheta
+                        )
+                        + np.square(
+                            posrad * np.sin(phi)
+                            - l / 2 * np.sin(axis_longitude) * sintheta
+                        )
+                    )
+                    + r1 * abs(costheta)
+                ) + r1
+                c2 = (
+                    np.sqrt(
+                        np.square(
+                            posrad * np.cos(phi)
+                            + l / 2 * np.cos(axis_longitude) * sintheta
+                        )
+                        + np.square(
+                            posrad * np.sin(phi)
+                            + l / 2 * np.sin(axis_longitude) * sintheta
+                        )
+                    )
+                    + r2 * abs(costheta)
+                ) + r2
                 if max(c1, c2) <= inner_radius:
                     break
                 if try_count > 10:
@@ -630,18 +658,18 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s["rho"] = rho
             s["type"] = fv._dict_shape_name_to_type_num[t]  # noqa: SLF001
             # Apply clipping axes if necessary, to keep the cone within bounds
-            if (s["z"] + max(s["r1"], s["r2"]) + s["l"]/2 > h/2):
+            if s["z"] + max(s["r1"], s["r2"]) + s["l"] / 2 > h / 2:
                 # Add top clipping axis
                 cas1 = np.array(0, dtype=fv.ClipAxisSpec)
                 cas1["axis"] = np.array((0, 0, 1), dtype=fv.fvec3)
-                cas1["dotprod"] = h/2
+                cas1["dotprod"] = h / 2
                 cas1["mode"] = 1
                 s["cas1"] = cas1
-            if (s["z"] - max(s["r1"], s["r2"]) - s["l"]/2 < -h/2):
+            if s["z"] - max(s["r1"], s["r2"]) - s["l"] / 2 < -h / 2:
                 # Add bottom clipping axis
                 cas2 = np.array(0, dtype=fv.ClipAxisSpec)
                 cas2["axis"] = np.array((0, 0, 1), dtype=fv.fvec3)
-                cas2["dotprod"] = -h/2
+                cas2["dotprod"] = -h / 2
                 cas2["mode"] = 2
                 s["cas2"] = cas2
             return s
@@ -651,15 +679,22 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 [
                     random_cone,
                     random_sphere,
-                ], p=[0.3, 0.7])  # ty:ignore[no-matching-overload]  # ty is bugged
+                ],
+                p=[0.3, 0.7],
+            )  # ty:ignore[no-matching-overload]  # ty is bugged
             return f()
 
         while len(shapes) < num_interior_objects + 2:
-            shapes.extend(random_shape() for _ in range(num_interior_objects - len(shapes) + 2))
+            shapes.extend(
+                random_shape()
+                for _ in range(num_interior_objects - len(shapes) + 2)
+            )
             shapes = [s for s in shapes if s is not None]
         # Sort by largest radius to small-- this way, the big shapes won't
         # just overwrite the small ones
-        shapes = sorted(shapes, key=lambda s: max(s["r"], s["r1"], s["r2"]), reverse=True)
+        shapes = sorted(
+            shapes, key=lambda s: max(s["r"], s["r1"], s["r2"]), reverse=True
+        )
         # Add the caps, if applicable
         if caps_height is not None:
             captop = np.array(0, dtype=fv.Shape)
@@ -669,9 +704,9 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             captop["r"] = outer_radius
             captop["x"] = offset_x
             captop["y"] = offset_y
-            captop["z"] = h/2 - caps_height/2
+            captop["z"] = h / 2 - caps_height / 2
             capbot = captop.copy()
-            capbot["z"] = -h/2 + caps_height/2
+            capbot["z"] = -h / 2 + caps_height / 2
             shapes.extend([captop, capbot])
         # Add the middle band. It will overwrite the interior shapes.
         mbh = middle_band_height or 0  # null-coalesce to 0
@@ -682,7 +717,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s = np.array(0, dtype=fv.Shape)
             s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
             s["rho"] = mb_rho
-            s["r"] = (inner_radius + outer_radius)/2
+            s["r"] = (inner_radius + outer_radius) / 2
             s["x"] = offset_x
             s["y"] = offset_y
             s["l"] = mbh
@@ -691,17 +726,17 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             mbs.append(s)
             # Make a high-frequency, low-contrast pattern in z.
             # This may be interfered with by the knurling.
-            zs = np.linspace(-mbh/2, mbh/2, endpoint=True, num=11)
+            zs = np.linspace(-mbh / 2, mbh / 2, endpoint=True, num=11)
             dz = zs[1] - zs[0]
             zs = zs[2:-2]
             s = np.array(0, dtype=fv.Shape)
             s["type"] = fv._dict_shape_name_to_type_num["Ellipsoid"]  # noqa: SLF001
-            s["x"] = offset_x + inner_radius/2
-            s["y"] = offset_y + inner_radius/4
+            s["x"] = offset_x + inner_radius / 2
+            s["y"] = offset_y + inner_radius / 4
             s["rho"] = 1.05 * mb_rho
-            s["dx"] = inner_radius/3
-            s["dy"] = inner_radius/4
-            s["dz"] = dz/2
+            s["dx"] = inner_radius / 3
+            s["dy"] = inner_radius / 4
+            s["dz"] = dz / 2
             for z in zs:
                 s_ = s.copy()
                 s_["z"] = z + mbz
@@ -710,12 +745,12 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s = np.array(0, dtype=fv.Shape)
             s["type"] = fv._dict_shape_name_to_type_num["Sphere"]  # noqa: SLF001
             s["rho"] = 0
-            r = min(0.0075 * inner_radius, mbh/4)
+            r = min(0.0075 * inner_radius, mbh / 4)
             s["r"] = r
-            numheight = min(7, max(1, mbh/(4*r)-2))
-            xs = (np.arange(25)-(25-1)/2)*4*r - inner_radius/7
-            ys = (np.arange(10)-(10-1)/2)*4*r - inner_radius/2
-            zs = (np.arange(numheight)-(numheight-1)/2)*4*r
+            numheight = min(7, max(1, mbh / (4 * r) - 2))
+            xs = (np.arange(25) - (25 - 1) / 2) * 4 * r - inner_radius / 7
+            ys = (np.arange(10) - (10 - 1) / 2) * 4 * r - inner_radius / 2
+            zs = (np.arange(numheight) - (numheight - 1) / 2) * 4 * r
             for x, y, z in itertools.product(xs, ys, zs):
                 s_ = s.copy()
                 s_["x"] = offset_x + x
@@ -728,7 +763,12 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         if num_knurls > 0:
             # Insert after the external container, but before the internal cylinder
             ch = caps_height or 0  # will null-coalesce to 0
-            zs = np.linspace(-h/2 + ch/2, h/2 - ch/2, endpoint=True, num=2+num_knurls)
+            zs = np.linspace(
+                -h / 2 + ch / 2,
+                h / 2 - ch / 2,
+                endpoint=True,
+                num=2 + num_knurls,
+            )
             dz = zs[1] - zs[0]
             # knurl_wid = dz
             zs = zs[1:-1]
@@ -737,25 +777,36 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s["rho"] = 0
             s["x"] = offset_x
             s["y"] = offset_y
-            s["l"] = dz/2
+            s["l"] = dz / 2
             for z in zs:
                 s_ = s.copy()
                 s_["r"] = outer_radius
-                s_["rho"] = outer_container_rho * (1 + 0.02*(1-2*rng_knurl.random()))
+                s_["rho"] = outer_container_rho * (
+                    1 + 0.02 * (1 - 2 * rng_knurl.random())
+                )
                 s_["z"] = z
                 shapes.insert(0, s_)
             # Now add the cylindrical cut-outs
-            r = 1/2 * (outer_radius - inner_radius)
-            num_cutouts = max(3, int(np.ceil(outer_radius * 2*np.pi / (2*r) / 2)))  # arbitrarily chosen
-            for theta in np.linspace(0, 2*np.pi, num=num_cutouts, endpoint=False):
+            r = 1 / 2 * (outer_radius - inner_radius)
+            num_cutouts = max(
+                3, int(np.ceil(outer_radius * 2 * np.pi / (2 * r) / 2))
+            )  # arbitrarily chosen
+            for theta in np.linspace(
+                0, 2 * np.pi, num=num_cutouts, endpoint=False
+            ):
                 s = np.array(0, dtype=fv.Shape)
                 s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
                 s["rho"] = 0
                 s["x"] = offset_x + outer_radius * np.cos(theta)
                 s["y"] = offset_y + outer_radius * np.sin(theta)
                 s["z"] = 0
-                s["l"] = h - ch  # have the cutouts go to half-way through the caps
+                s["l"] = (
+                    h - ch
+                )  # have the cutouts go to half-way through the caps
                 s["r"] = r
                 shapes.append(s)
 
         return FBVolume(np.array(shapes, dtype=fv.Shape))
+
+
+# ruff: enable[N802,D400]

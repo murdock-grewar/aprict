@@ -44,10 +44,10 @@ def main() -> None:  # noqa: D103
     D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle  # noqa: N806
     flattened_corner_width_mm: float = 440  # also the detector width
     det_aspect_ratio: float = 1  # how many times taller than wide
-    num_sources_per_side: int = 17 * 5
+    num_sources_per_side: int = 17 * 1
     pixwid_mm: float = 0.3
     curved_source_edges: bool = True
-    total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
+    total_clearfield_photons: float = 5e12  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     ###############################
 
     # Equilateral triangle
@@ -404,6 +404,7 @@ def main() -> None:  # noqa: D103
         config=snookerr.iterators.SIRT_flatpanel.Config(
             fast_backproject=fast_backproj,
             soft_from_cylinder_relrad=0.95,
+            bp_soft_from_detedge_relrad=0.95,
         ),
         volume=working_vol,
         projs=projs,
@@ -418,6 +419,10 @@ def main() -> None:  # noqa: D103
             ).get()
         )
     v = recon.volume.as_numpy()
+    snookerr.imview.plot_projections(
+        np.sum(v, axis=1)[np.newaxis, :, :],
+        title=s + " -- projection through y axis",
+    )
     snookerr.imview.plot_volume(v, title=s + " -- top-down")
     snookerr.imview.plot_volume(
         v.transpose((0, 2, 1)), title=s + " -- through y axis"

@@ -50,6 +50,9 @@ class SIRT_flatpanel:  # noqa: N801
         soft_from_cylinder_relrad: float | None = (
             0.95  # percentage of the cylinder radius from which softening will occur
         )
+        bp_soft_from_detedge_relrad: float | None = (
+            0.95  # percentage of the detector half-width from which to soften
+        )
         # These not implemented yet:
         # enforce_positivity_constraint: bool     = False
         # soften_to_cylinder_relhei: float | None = 0.05  # the height of the object to reserve for softening to zero. This is expressed as a proportion of the radius of the inscribed x/y cylinder.
@@ -63,10 +66,16 @@ class SIRT_flatpanel:  # noqa: N801
         self._vol = volume
         self._meas = projs
         self._config_fp = cbfp.ConfigProject()
+        soften_det_edges_proportion = (
+            0
+            if self._config.bp_soft_from_detedge_relrad is None
+            else (1 - self._config.bp_soft_from_detedge_relrad)
+        )
         self._config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
             apply_summand_multiplier=True,  # we'll multiply by the preconditioner
+            soften_det_edges_proportion=soften_det_edges_proportion,
         )
         if projs.data is None:
             msg = "The provided ProjectionSet object has no data."
@@ -94,6 +103,7 @@ class SIRT_flatpanel:  # noqa: N801
             fast_approx=self._config.fast_backproject,
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
             apply_summand_multiplier=False,  # Turn this off while we compute the preconditioner
+            soften_det_edges_proportion=soften_det_edges_proportion,
         )
         cbfp.backproject(
             config=non_multiply_config_bp, volume=M, projs=p, block=True

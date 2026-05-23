@@ -33,8 +33,9 @@ class config_cb_backproject(
         "mask_to_cylinder",
         "mask_to_cyl_rad",
         "apply_summand_multiplier",
+        "soften_edge_proportion",
     ],
-    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool],
+    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool, np.float32],
 ):
     pass  # ty:ignore[invalid-argument-type]
 

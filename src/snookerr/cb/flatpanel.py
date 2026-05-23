@@ -340,8 +340,10 @@ class ConfigBackproject:
         cyl_mask_rad_vox: float | int | None = None,
         backproject_1s: bool = False,
         apply_summand_multiplier: bool = False,
+        soften_det_edges_proportion: float | int | None = None,
     ) -> None:
         r = cyl_mask_rad_vox or 0  # coerce 'None' to 0
+        sep = soften_det_edges_proportion or 0  # corce 'None' to 0
         self._contents = np.array(  # ty:ignore[invalid-assignment]
             (
                 np.bool(
@@ -355,6 +357,7 @@ class ConfigBackproject:
                 np.bool(
                     apply_summand_multiplier
                 ),  # whether the kernel should use the summand_multiplier argument to multiply the backprojection before adding it to the volume
+                sep,
             ),
             dtype=structs.config_cb_backproject,
         )

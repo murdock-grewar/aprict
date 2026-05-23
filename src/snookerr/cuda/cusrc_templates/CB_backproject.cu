@@ -275,6 +275,7 @@ __device__ Tv _backproject_CB_getval(
         fvec3( 1./2.,  1./2.,  1./2.)
     };
     Tv accumulator = 0.;
+    Tv sub_accumulator = 0.;
     for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
         // Get the start point of the projection line
         //proj_spec projspec = proj_tex_chunk_spec.projspecs[proj_idx];
@@ -334,7 +335,7 @@ __device__ Tv _backproject_CB_getval(
                     */
 
                     // Compute the backprojection into this voxel
-                    accumulator += exact_line_integral_backproject<Tv, Tp>(
+                    sub_accumulator = exact_line_integral_backproject<Tv, Tp>(
                         det_value, source_pos, det_pos, vox_pos);
 
                 }
@@ -384,9 +385,31 @@ __device__ Tv _backproject_CB_getval(
             float mag = dist_to_det/dist_to_vox;
             float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
             Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
-            accumulator += fcast<Tv>(det_value * multiplier);
+            sub_accumulator = fcast<Tv>(det_value * multiplier);
         }
+
+        // Apply softening toward detector edges, if applicable
+        const float sep = config.soften_edge_proportion;
+        if ((sep > 0.f) && (sub_accumulator != (Tv)0)) {
+            // Define distances from center, from 0 to 1
+            // float udist = abs((det_coords_c.x - (projspec.dspec.nu-1)/2.)/(projspec.dspec.nu/2.f));
+            // float vdist = abs((det_coords_c.y - (projspec.dspec.nv-1)/2.)/(projspec.dspec.nv/2.f));
+            float udist = abs(det_coords_c.x)/(projspec.dspec.nu/2.f);
+            float vdist = abs(det_coords_c.y)/(projspec.dspec.nv/2.f);
+            // Scale each from 0 to 1, where 0 is completely softened (set to 0), and 1 is not softened at all
+            udist = max(0.f, min(1.f, (1.f - udist)/sep));
+            vdist = max(0.f, min(1.f, (1.f - vdist)/sep));
+            // Set each to the corresponding softening factor
+            udist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - udist)))/2.f));
+            vdist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - vdist)))/2.f));
+            // Apply the softening factors
+            sub_accumulator *= udist;
+            sub_accumulator *= vdist;
+        }
+
+        accumulator += sub_accumulator;
     }
+
 
     return accumulator;
 }
