@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
     # Do the test
     ncycles: int = 100
-    chunksize: int = 1
+    chunksize: int = 2
     # filt = RampFilterer(proj_2d_shape=(3001, 4000), projs_per_batch=3, stream=cp.cuda.Stream(non_blocking=True))
     from snookerr.cb.ramp_filter import FBPFilterer
 

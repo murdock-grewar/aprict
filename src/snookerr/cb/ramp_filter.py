@@ -325,7 +325,7 @@ class FBPFilterer:
                 i * self.chunk_shape[0],
                 min((i + 1) * self.chunk_shape[0], cparr_view.shape[0]),
             )
-            if sl.start == cparr_view.shape[0]:
+            if sl.start >= cparr_view.shape[0]:
                 break
             v = cparr_view[sl]
             v = cp.pad(v, ((0, 0), (padx, padx), (pady, pady)))
