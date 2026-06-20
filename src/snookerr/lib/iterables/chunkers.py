@@ -318,13 +318,18 @@ if __name__ == "__main__":
 
     # Do the test
     ncycles: int = 100
-    chunksize: int = 2
+    chunksize: int = 10
     # filt = RampFilterer(proj_2d_shape=(3001, 4000), projs_per_batch=3, stream=cp.cuda.Stream(non_blocking=True))
     from snookerr.cb.ramp_filter import FBPFilterer
 
-    cparr = cp.zeros((20, 4001, 4000), dtype=np.float32)
+    # shape = (20, 4001, 400)
+    shape = (200, 2001, 2000)
+    # arr = cp.zeros(shape, dtype=np.float32)
+    # arr = np.zeros(shape, dtype=np.float32)
+    arr = np.lib.format.open_memmap('tmp.npy', shape=shape, dtype=np.float32, mode='w+')
+    arr[...] = 0
     prefunc = FBPFilterer(
-        proj_2d_shape=cparr.shape[1:],
+        proj_2d_shape=arr.shape[1:],
         projs_per_batch=chunksize,
         L=300,
         physpixwid=0.1,
@@ -334,19 +339,19 @@ if __name__ == "__main__":
         # return prefunc(arr[None, ...])[0]
         return prefunc(arr)
 
-    filt = CuPyFilter(input_layer_shape=cparr.shape[1:], func=func)
+    filt = CuPyFilter(input_layer_shape=arr.shape[1:], func=func)
     # cparr = cp.random.randn(20, 3001, 4000).astype(cp.float32)
-    cparr[:, cparr.shape[1] // 2, :] = 1
+    arr[:, arr.shape[1] // 2, :] = 1
     t1 = time.time()
     for _ in range(ncycles):
         # x = filt._filter_bulk_axis1_concat(cparr)
         g = snookerr.lib.iterables.chunkers.ChunkedCuPy(
-            cparr, chunksize=chunksize, filterchain=[filt]
+            arr, chunksize=chunksize, filterchain=[filt]
         )
         x = list(g)
-        cp.cuda.get_current_stream().synchronize()
-        g._buffer_stream.synchronize()
+        # cp.cuda.get_current_stream().synchronize()
+        # g._buffer_stream.synchronize()
     t2 = time.time()
     print(
-        f"Milliseconds elapsed per cycle per projection: {1000 * (t2 - t1) / ncycles / cparr.shape[0]:.2f}"
+        f"Milliseconds elapsed per cycle per projection: {1000 * (t2 - t1) / ncycles / arr.shape[0]:.2f}"
     )
