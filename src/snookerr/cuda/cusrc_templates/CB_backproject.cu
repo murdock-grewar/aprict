@@ -335,7 +335,7 @@ __device__ Tv _backproject_CB_getval(
                     */
 
                     // Compute the backprojection into this voxel
-                    sub_accumulator = exact_line_integral_backproject<Tv, Tp>(
+                    sub_accumulator += exact_line_integral_backproject<Tv, Tp>(
                         det_value, source_pos, det_pos, vox_pos);
 
                 }
