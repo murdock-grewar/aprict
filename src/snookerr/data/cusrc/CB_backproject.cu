@@ -282,6 +282,8 @@ __device__ Tv _backproject_CB_getval(
         // the center of the voxel
         fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
 
+        sub_accumulator = (Tv)0;
+
         if (exact) {
             // Find the intersection with the detector of the ray passing through
             // each of the eight corners of the voxel. These will define the range
@@ -408,7 +410,6 @@ __device__ Tv _backproject_CB_getval(
         }
 
         accumulator += sub_accumulator;
-        sub_accumulator = (Tv)0;
     }
 
 
