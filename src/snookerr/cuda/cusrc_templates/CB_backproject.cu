@@ -72,11 +72,7 @@ __device__ half read_from_surf3D<half>(
 { return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
 
 
-template<
-    typename Tv,  // type of volume data. e.g. float or double.
-    typename Tp>  // type of projection data. e.g. float or double
-__device__ Tv exact_line_integral_backproject(
-        const Tp            value,
+__device__ Tv exact_line_integral_backproject_linelen(
         const fvec3         v1,
         const fvec3         v2,
         const fvec3         voxpos // position of the center of the voxel
@@ -96,7 +92,7 @@ __device__ Tv exact_line_integral_backproject(
     const float a1 = max(0.f, max_of_components(minstepxyz));
     const float a2 = max(a1,  min_of_components(maxstepxyz));
     const float c = a2 - a1;
-    return c * (float)value * norm_fvec3(dv); // Maybe add an extra quick return if c is zero? Maybe compiler does it automatically?
+    return c * norm_fvec3(dv); // Maybe add an extra quick return if c is zero? Maybe compiler does it automatically?
 }
 
 
@@ -312,31 +308,35 @@ __device__ Tv _backproject_CB_getval(
                         projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
                     );
 
-                    // Find the detector value there
-                    Tp det_value;
-                    if (config.backproject_all_1s) {
-                        det_value = 1.;
-                    } else {
-                        det_idx = (
-                            input_projs_strides.y * det_idx_x +
-                            input_projs_strides.z * det_idx_y +
-                            input_projs_strides.x * proj_idx
-                        )/sizeof(Tp);
-                        det_value = input_projs[det_idx];
+                    float intersect_linelen = exact_line_integral_backproject_linelen<Tv>(
+                        source_pos, det_pos, vox_pos);
+
+                    if (intersect_linelen != 0.f) {
+                        // Find the detector value there
+                        Tp det_value;
+                        if (config.backproject_all_1s) {
+                            det_value = 1.;
+                        } else {
+                            det_idx = (
+                                input_projs_strides.y * det_idx_x +
+                                input_projs_strides.z * det_idx_y +
+                                input_projs_strides.x * proj_idx
+                            )/sizeof(Tp);
+                            det_value = input_projs[det_idx];
+                        }
+
+                        /*
+                        float det_value = tex2DLayered<Tp>(
+                            detector_texture,
+                            det_idx_y + 1./2.f,
+                            det_idx_x + 1./2.f,
+                            proj_idx + tex_start_layer
+                        );
+                        */
+
+                        // Compute the backprojection into this voxel
+                        sub_accumulator += fcast<Tv>(det_value * intersect_linelen);
                     }
-
-                    /*
-                    float det_value = tex2DLayered<Tp>(
-                        detector_texture,
-                        det_idx_y + 1./2.f,
-                        det_idx_x + 1./2.f,
-                        proj_idx + tex_start_layer
-                    );
-                    */
-
-                    // Compute the backprojection into this voxel
-                    sub_accumulator += exact_line_integral_backproject<Tv, Tp>(
-                        det_value, source_pos, det_pos, vox_pos);
 
                 }
             }
