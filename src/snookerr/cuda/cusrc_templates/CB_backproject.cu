@@ -72,7 +72,7 @@ __device__ half read_from_surf3D<half>(
 { return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
 
 
-__device__ Tv exact_line_integral_backproject_linelen(
+__device__ float exact_line_integral_backproject_linelen(
         const fvec3         v1,
         const fvec3         v2,
         const fvec3         voxpos // position of the center of the voxel
@@ -282,6 +282,8 @@ __device__ Tv _backproject_CB_getval(
         // the center of the voxel
         fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
 
+        sub_accumulator = (Tv)0;
+
         if (exact) {
             // Find the intersection with the detector of the ray passing through
             // each of the eight corners of the voxel. These will define the range
@@ -308,7 +310,7 @@ __device__ Tv _backproject_CB_getval(
                         projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
                     );
 
-                    float intersect_linelen = exact_line_integral_backproject_linelen<Tv>(
+                    float intersect_linelen = exact_line_integral_backproject_linelen(
                         source_pos, det_pos, vox_pos);
 
                     if (intersect_linelen != 0.f) {
@@ -335,7 +337,7 @@ __device__ Tv _backproject_CB_getval(
                         */
 
                         // Compute the backprojection into this voxel
-                        sub_accumulator += fcast<Tv>(det_value * intersect_linelen);
+                        sub_accumulator += fcast<Tv>(fcast<float>(det_value) * intersect_linelen);
                     }
 
                 }
