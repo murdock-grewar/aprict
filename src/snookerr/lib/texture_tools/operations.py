@@ -66,6 +66,12 @@ def _get_module() -> cp.RawModule:
             "multiply_surface<float>",
         ]
         + [
+            f"inner_product_3D_surfaces<{t1},{t2}>"
+            for (t1, t2) in itertools.product(
+                *itertools.repeat(["half", "float"], 2)
+            )
+        ]
+        + [
             f"multiply_surfaces<{t1},{t2},{t3}>"
             for (t1, t2, t3) in itertools.product(
                 *itertools.repeat(["half", "float"], 3)
@@ -128,7 +134,7 @@ def fill(t: Texture, value: float) -> None:
 
 
 def multiply(t: Texture, value: float) -> None:
-    """Fill a Texture object with a constant value."""
+    """Multiply a Texture object in-place by a constant value."""
     if not t.is_surface_included:
         msg = "The input texture has no surface descriptor, and therefore cannot be written to."
         raise ValueError(msg)
@@ -144,6 +150,33 @@ def multiply(t: Texture, value: float) -> None:
     val = np.array(value).astype(t.dtype)  # convert to the correct datatype
     args = (val, t.surfobj, _shape_to_uint3(t.shape))  # ty:ignore[invalid-argument-type]
     kern(*_get_grid_block_dims(t), args)
+
+
+def inner_prod(t1: Texture, t2: Texture) -> float:
+    """Return the l^2 norm of the texture."""
+    if not t1.is_surface_included or not t2.is_surface_included:
+        msg = "This method is not currently implemented unless the textures each contain a surface descriptor."
+        raise NotImplementedError(msg)
+    # Check that it's a volume
+    if len(t1.shape) != 3 or len(t2.shape) != 3:
+        msg = "Input texture(s) was expected to be a volume, but it has an incorrect number of dimensions."
+        raise NotImplementedError(msg)
+
+    if not t1.shape == t2.shape:
+        msg = "Shape mismatch between input textures."
+        raise ValueError(msg)
+
+    output = cp.array([0], dtype=cp.float64)
+    args = (output, t1.surfobj, t2.surfobj, _shape_to_uint3(t1.shape))  # ty:ignore[invalid-argument-type]
+    ctype1 = _get_c_type_name(t1)
+    ctype2 = _get_c_type_name(t2)
+    kern = _module.get_function(f"inner_product_3D_surfaces<{ctype1:s},{ctype2:s}>")
+    kern(*_get_grid_block_dims(t1), args)
+    return float(output.get()[0])
+
+
+def norm(t: Texture) -> float:
+    return np.sqrt(inner_prod(t, t))
 
 
 def multiply_textures(t1: Texture, t2: Texture, tout: Texture) -> None:

@@ -15,4 +15,5 @@
 
 """Iterator reconstruction tools and objects."""
 
+from .landweber_vram import Landweber_flatpanel as Landweber_flatpanel
 from .sirt_vram import SIRT_flatpanel as SIRT_flatpanel

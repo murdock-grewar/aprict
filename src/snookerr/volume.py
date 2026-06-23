@@ -58,6 +58,11 @@ class Volume[
         return self._shape
 
     @property
+    def norm(self) -> float:
+        """Return the l2 norm of the volume."""
+        return tops.norm(self._texture)
+
+    @property
     def dtype(self) -> _DType:
         """Return the dtype of the volume array."""
         return self._dtype
@@ -94,6 +99,10 @@ class Volume[
     def __del__(self) -> None:
         """Object cleanup."""
         gpu_tools.clear_cache()  # Ensure that CuPy cleans up the used memory.
+
+    def multiply(self, f: float) -> None:
+        """Multiply the volume in-place by a value."""
+        tops.multiply(self._texture, f)
 
     def as_numpy(self, out: np.ndarray | None = None) -> np.ndarray:
         """Copy this volume's data into a numpy array."""

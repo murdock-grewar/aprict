@@ -1,3 +1,4 @@
+#include <cuda/atomic>
 #include <cuda_fp16.h>
 
 /* Note on the 'half' type, used for 16-bit floating point precision:
@@ -257,6 +258,26 @@ __global__ void sum_along_nth_axis_to_2d_array(
 }
 
 // Multi-surface operations
+template <typename T1, typename T2>
+__global__ void inner_product_3D_surfaces(
+    double*                     output,
+    cudaSurfaceObject_t         surface1,
+    cudaSurfaceObject_t         surface2,
+    uint3                       surfaceDimensions
+)
+{
+    const uint3 idx = get_vol_idx();
+    const bool is_block_leader = (threadIdx.x == 0) && (threadIdx.y == 0) && (threadIdx.z == 0);
+    cuda::atomic<double, cuda::thread_scope_block> dotprod;
+    __syncthreads();
+    if (!(out_of_max_bounds(idx, surfaceDimensions))) {
+        dotprod += (double)read_from_surf3D<T1>(surface1, idx) * (double)read_from_surf3D<T2>(surface2, idx);
+    }
+    if (is_block_leader) {
+        atomicAdd(output, dotprod);
+    }
+}
+
 template <typename T1, typename T2, typename TO>
 __global__ void multiply_surfaces(
     cudaSurfaceObject_t         surface1,
