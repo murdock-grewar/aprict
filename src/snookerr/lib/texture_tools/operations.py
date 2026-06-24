@@ -17,9 +17,11 @@
 
 __all__ = [
     "fill",
+    "inner_prod",
     "invert",
     "multiply",
     "multiply_textures",
+    "norm",
     "slice_nth_axis_to_3d_cupy_array",
     "softmask_to_cylinder_xy",
     "sum_along_nth_axis_to_2d_cupy_array",
@@ -153,7 +155,7 @@ def multiply(t: Texture, value: float) -> None:
 
 
 def inner_prod(t1: Texture, t2: Texture) -> float:
-    """Return the l^2 norm of the texture."""
+    """Return the inner product of two textures."""
     if not t1.is_surface_included or not t2.is_surface_included:
         msg = "This method is not currently implemented unless the textures each contain a surface descriptor."
         raise NotImplementedError(msg)
@@ -176,6 +178,7 @@ def inner_prod(t1: Texture, t2: Texture) -> float:
 
 
 def norm(t: Texture) -> float:
+    """Return the the l^2 norm of the texture."""
     return np.sqrt(inner_prod(t, t))
 
 

@@ -268,11 +268,15 @@ __global__ void inner_product_3D_surfaces(
 {
     const uint3 idx = get_vol_idx();
     const bool is_block_leader = (threadIdx.x == 0) && (threadIdx.y == 0) && (threadIdx.z == 0);
-    cuda::atomic<double, cuda::thread_scope_block> dotprod;
+    __shared__ cuda::atomic<double, cuda::thread_scope_block> dotprod;
+    if (is_block_leader) {
+        dotprod = 0.;
+    }
     __syncthreads();
     if (!(out_of_max_bounds(idx, surfaceDimensions))) {
         dotprod += (double)read_from_surf3D<T1>(surface1, idx) * (double)read_from_surf3D<T2>(surface2, idx);
     }
+    __syncthreads();
     if (is_block_leader) {
         atomicAdd(output, dotprod);
     }

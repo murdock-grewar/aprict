@@ -49,6 +49,7 @@ class Landweber_flatpanel:  # noqa: N801
     class Config:
         """Configuration dataclass for the Landweber iterator."""
 
+        rayleigh_quotient_num_iterations: int = 10
         acceleration_factor: float = 1
         fast_backproject: bool = True
         soft_from_cylinder_relrad: float | None = (
@@ -87,11 +88,11 @@ class Landweber_flatpanel:  # noqa: N801
                 raise ValueError(msg)
         # Make the projection scratch space. Equal in size to one ordered subset.
         self._proj_scratch_space = [projs.zeroed_copy() for projs in self._meas]
-        self._rayleigh_quotients = self.calculate_rayleigh_quotients(num_iterations=10)
+        self._rayleigh_quotients = self.calculate_rayleigh_quotients(num_iterations=self._config.rayleigh_quotient_num_iterations)
 
     def calculate_rayleigh_quotients(
             self,
-            num_iterations: int = 10
+            num_iterations: int
         ) -> list[float]:
         """Compute the list Rayleigh quotients of A^T A (one for each ordered subset) using the iterated power method."""
         fp_config: cbfp.ConfigProject = self._config_fp
@@ -124,11 +125,11 @@ class Landweber_flatpanel:  # noqa: N801
                 # Apply A^T A to the volume
                 scratch_projs.data.fill(0)
                 cbfp.project(config=fp_config, volume=scratch_volume, projs=scratch_projs, block=True)
+                rayleigh_quotient = cp.square(cp.linalg.norm(scratch_projs.data))
                 scratch_volume.fill(0)
                 cbfp.backproject(config=bp_config, volume=scratch_volume, projs=scratch_projs, block=True)
                 svn = scratch_volume.norm
-                # print("Rayleigh quotient: ", rayleigh_quotient)
-            rayleigh_quotient_list.append(svn)
+            rayleigh_quotient_list.append(rayleigh_quotient)  # Could also use svn instead of rayleigh_quotient
         if flag_using_existing_volume:
             self._vol.fill(0)  # reset the volume to 0
         del scratch_volume
