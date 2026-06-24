@@ -78,46 +78,56 @@ class Landweber_flatpanel:  # noqa: N801
         self._config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
             cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
-            apply_summand_multiplier=False,  # could include a constant later
+            apply_summand_multiplier=False,
             soften_det_edges_proportion=soften_det_edges_proportion,
         )
         if projs.data is None:
             msg = "The provided ProjectionSet object has no data."
             raise ValueError(msg)
+        self._proj_scratch_space = projs.zeroed_copy()
+        self._rayleigh_quotient = self.calculate_rayleigh_quotient(num_iterations=10)
 
-        # Compute the relaxation coefficient. First we need the Rayleight quotient
-        M: Volume = volume.zeroed_copy()  # noqa: N806
-        p: cbfp.ProjectionSet = projs.zeroed_copy()
-        assert p.data is not None
+    def calculate_rayleigh_quotient(
+            self,
+            num_iterations: int = 10
+        ) -> float:
+        """Compute the Rayleigh quotient of A^T A using the iterated power method."""
+        fp_config: cbfp.ConfigProject = self._config_fp
+        bp_config: cbfp.ConfigBackproject = self._config_bp
+        # Check if current volume is 0s. In that case, don't allocate new memory. Just use that one.
+        flag_using_existing_volume = self._vol.norm == 0
+        scratch_volume: Volume = self._vol if flag_using_existing_volume else self._vol.zeroed_copy()
+        scratch_projs: cbfp.ProjectionSet = self._proj_scratch_space
+        if scratch_projs.data is None:
+            msg = "ProjectionSet must have its data buffer initialised."
+            raise ValueError(msg)
+
         scale_factor: float = 1 / float(
-            np.mean(volume.shape)
+            np.mean(scratch_volume.shape)
         )  # a factor used to scale things to prevent overflow etc
         # Generate a random positive volume
-        v = np.abs(np.random.randn(*M.shape)*scale_factor).astype(np.float32)  # noqa: NPY002
-        M.copy_from(v)
+        v = np.abs(np.random.randn(*scratch_volume.shape)*scale_factor).astype(np.float32)  # noqa: NPY002
+        scratch_volume.copy_from(v)
         self._hardmask_vol(
-            M
+            scratch_volume
         )  # Note: not exactly the same as the cyl_mask_rad_vox offered by the backprojection. This may matter.
-        non_multiply_config_bp = cbfp.ConfigBackproject(
-            fast_approx=self._config.fast_backproject,
-            cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
-            apply_summand_multiplier=False,  # Turn this off while we compute the preconditioner
-            soften_det_edges_proportion=soften_det_edges_proportion,
-        )
-        for _ in range(10):  # Use N iterations of power method to find the rayleigh quotient
+        svn = scratch_volume.norm
+        for _ in range(num_iterations):  # Use N iterations of power method to find the rayleigh quotient
             # Normalize the volume
-            M.multiply(1/M.norm)
+            scratch_volume.multiply(1/svn)
             # Apply A^T A to the volume
-            p.data.fill(0)
-            cbfp.project(config=self._config_fp, volume=M, projs=p, block=True)
-            M.fill(0)
-            cbfp.backproject(config=non_multiply_config_bp, volume=M, projs=p, block=True)
-            rayleigh_quotient = M.norm
+            scratch_projs.data.fill(0)
+            cbfp.project(config=fp_config, volume=scratch_volume, projs=scratch_projs, block=True)
+            scratch_volume.fill(0)
+            cbfp.backproject(config=bp_config, volume=scratch_volume, projs=scratch_projs, block=True)
+            svn = scratch_volume.norm
             # print("Rayleigh quotient: ", rayleigh_quotient)
-        self._rayleigh_quotient = rayleigh_quotient
-        del M
-        gpu_tools.clear_cache()
-        self._proj_scratch_space = p
+        if flag_using_existing_volume:
+            self._vol.fill(0)  # reset the volume to 0
+        del scratch_volume
+        del scratch_projs
+        gpu_tools.clear_cache()  # If new memory was allocated for the scratch space, then it can be released now
+        return svn
 
     def _softmask_vol(self, v: Volume) -> None:
         rr = self._config.soft_from_cylinder_relrad
