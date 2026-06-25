@@ -65,11 +65,24 @@ class Landweber_flatpanel:  # noqa: N801
         # denoising: float | None = None  # Applies an approximate TV gradient descent between iterations. This is NOT accounted for in the calculation of the next step, nor the calculated and printed error metric. This denoising should be considered an approximate ad-hoc method. Suggested value range: 0 to 0.05.
 
     def __init__(
-        self, config: Config, volume: Volume, projs: cbfp.ProjectionSet | list[cbfp.ProjectionSet]
+        self, config: Config, volume: Volume, projs: cbfp.ProjectionSet | list[cbfp.ProjectionSet], *,
+        proj_zero_masks: cp.ndarray | list[cp.ndarray] | None = None,
     ) -> None:
         self._config = config
         self._vol = volume
         self._meas = projs if type(projs) is list else [projs]  # ty:ignore[invalid-assignment]  # ty is bugged
+        if proj_zero_masks is None:
+            self._proj_zero_masks = [None for p in self._meas]
+        elif type(projs) is list:
+            if type(proj_zero_masks) is not list:
+                msg = "The input measurements were a list, but only a single mask was provided."
+                raise ValueError(msg)
+            self._proj_zero_masks = proj_zero_masks
+        else:
+            if type(proj_zero_masks) is list:
+                msg = "The input measurements were not a list, but a list of masks was provided."
+                raise ValueError(msg)
+            self._proj_zero_masks = [proj_zero_masks]
         self._config_fp = cbfp.ConfigProject()
         soften_det_edges_proportion = (
             0
@@ -89,6 +102,11 @@ class Landweber_flatpanel:  # noqa: N801
         # Make the projection scratch space. Equal in size to one ordered subset.
         self._proj_scratch_space = [projs.zeroed_copy() for projs in self._meas]
         self._rayleigh_quotients = self.calculate_rayleigh_quotients(num_iterations=self._config.rayleigh_quotient_num_iterations)
+
+        # Apply zero masks to projection data
+        for proj, zm in zip(self._meas, self._proj_zero_masks):
+            if zm is not None:
+                cp.multiply(proj.data, zm, out=proj.data)
 
     def calculate_rayleigh_quotients(
             self,
@@ -152,7 +170,8 @@ class Landweber_flatpanel:  # noqa: N801
         # TODO: reduce memory usage by reusing the same projection data buffer as scratch space.  # noqa: FIX002
 
         # Loop over the ordered subsets
-        for meas, proj_scratch_space, rq in zip(self._meas, self._proj_scratch_space, self._rayleigh_quotients):
+        for meas, proj_scratch_space, rq, zm in zip(
+                self._meas, self._proj_scratch_space, self._rayleigh_quotients, self._proj_zero_masks):
             # Put the projection residual into the projection scratch space
             cp.copyto(src=meas.data, dst=proj_scratch_space.data)
             config_fp = cbfp.ConfigProject(multiply_before_adding=-1)
@@ -162,6 +181,8 @@ class Landweber_flatpanel:  # noqa: N801
                 projs=proj_scratch_space,
                 block=True,
             )
+            if zm is not None:
+                cp.multiply(proj_scratch_space.data, zm, out=proj_scratch_space.data)
             # Add the backprojection of the residual into the volume
             # Divide by relaxation factor first
             relaxation_factor = self._config.acceleration_factor/rq
