@@ -417,7 +417,7 @@ class FBPFilterer:
 
     def filter_bulk_axis1_stream(
         self,
-        cparr_view: cp.ndarray,
+        arr: cp.ndarray | np.ndarray | np.memmap,
         block: bool = True,
         clear_gpu_cache_regularly: bool = False,
         force_rotation_angle: float | None = None,
@@ -429,7 +429,7 @@ class FBPFilterer:
         ]
         # out_buffer = cp.zeros_like(chunkmem)
         # Check that input size is correct
-        if cparr_view.shape[1:] != self.proj_2d_shape:
+        if arr.shape[1:] != self.proj_2d_shape:
             msg = "Wrong input size."
             raise ValueError(msg)
         # Calculate padding amounts to pad the input data before rotating etc
@@ -445,11 +445,13 @@ class FBPFilterer:
         for i in itertools.count():
             sl = slice(
                 i * self.chunk_shape[0],
-                min((i + 1) * self.chunk_shape[0], cparr_view.shape[0]),
+                min((i + 1) * self.chunk_shape[0], arr.shape[0]),
             )
-            if sl.start >= cparr_view.shape[0]:
+            if sl.start >= arr.shape[0]:
                 break
-            v = cparr_view[sl]
+            v = arr[sl]
+            if type(arr) is not cp.ndarray:
+                v = cp.array(v)  # Convert to a cupy array if necessary
             v = cp.pad(v, ((0, 0), (padx, padx), (pady, pady)))
 
             # # Ensure that the memory is clear before rotating and copying the data in
@@ -638,19 +640,19 @@ class FBPFilterer:
 
     def filter_bulk_axis1_concat(
         self,
-        cparr_view: cp.ndarray,
+        arr: cp.ndarray | np.ndarray | np.memmap,
         clear_gpu_cache_regularly: bool = True,
         force_rotation_angle: float | None = None,
         block: bool = True,
     ) -> cp.ndarray:
-        """Create an output array of ramp-filtered projections, from an input array."""
+        """Create an output array of filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(
-            cparr_view,
+            arr,
             block=False,
             clear_gpu_cache_regularly=clear_gpu_cache_regularly,
             force_rotation_angle=force_rotation_angle,
         )
-        output = cp.zeros_like(cparr_view)
+        output = cp.zeros_like(arr)
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
