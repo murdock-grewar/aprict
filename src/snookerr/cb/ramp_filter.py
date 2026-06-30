@@ -310,7 +310,7 @@ class FBPFilterer:
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
             # This is weird. It seems like it should be physpixwid * R/L, because the algorithm for filtering the projections is properly normalised when the pixels are treated as if they reside in the midplane
-            physpixwid=physpixwid,
+            physpixwid=physpixwid * R/L,
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
         )
