@@ -77,7 +77,9 @@ class FBPFiltererCPU:
             proj_2d_shape, physpixwid, L
         )
         self.proj_2d_shape = proj_2d_shape
-        self._expanded_2d_shape = self.get_expanded_proj_2d_shape(proj_2d_shape, self._max_abs_rotation_angle)
+        self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
+            proj_2d_shape, self._max_abs_rotation_angle
+        )
         self.chunk_shape = (
             projs_per_batch,
             *self._expanded_2d_shape,
@@ -87,24 +89,44 @@ class FBPFiltererCPU:
         # NOTE: Y is the horizontal coordinate on the detector. X is the vertical.
         # Yarr = physpixwid*(np.arange(self._expanded_2d_shape[0], dtype=np.float32) - (self._expanded_2d_shape[0]-1)/2)  # noqa: N806
         # Xarr = physpixwid*(np.arange(self._expanded_2d_shape[1], dtype=np.float32) - (self._expanded_2d_shape[1]-1)/2)  # noqa: N806
-        Yarr = physpixwid*(np.arange(self.proj_2d_shape[0], dtype=np.float32) - (self.proj_2d_shape[0]-1)/2)  # noqa: N806
-        Xarr = physpixwid*(np.arange(self.proj_2d_shape[1], dtype=np.float32) - (self.proj_2d_shape[1]-1)/2)  # noqa: N806
-        self._multmask_prerotation_2d_broadcastable = (1/(
-            np.sqrt(1 + np.square(Xarr[np.newaxis, :]/L) + np.square(Yarr[:, np.newaxis]/L))
-        ))[np.newaxis, :, :].copy()
-        self._multmask_postrotation_vert_1d_broadcastable = (1/(
-            np.power(np.sqrt(1 + np.square(Xarr/L)), 3)
-        ))[np.newaxis, np.newaxis, :].copy()
+        Yarr = physpixwid * (
+            np.arange(self.proj_2d_shape[0], dtype=np.float32)
+            - (self.proj_2d_shape[0] - 1) / 2
+        )  # noqa: N806
+        Xarr = physpixwid * (
+            np.arange(self.proj_2d_shape[1], dtype=np.float32)
+            - (self.proj_2d_shape[1] - 1) / 2
+        )  # noqa: N806
+        self._multmask_prerotation_2d_broadcastable = (
+            1
+            / (
+                np.sqrt(
+                    1
+                    + np.square(Xarr[np.newaxis, :] / L)
+                    + np.square(Yarr[:, np.newaxis] / L)
+                )
+            )
+        )[np.newaxis, :, :].copy()
+        self._multmask_postrotation_vert_1d_broadcastable = (
+            1 / (np.power(np.sqrt(1 + np.square(Xarr / L)), 3))
+        )[np.newaxis, np.newaxis, :].copy()
 
         # Allocate memory which will be reused.
-        self._mem_prerotation = np.zeros((self.chunk_shape[0], *self._expanded_2d_shape), dtype=np.float32)
+        self._mem_prerotation = np.zeros(
+            (self.chunk_shape[0], *self._expanded_2d_shape), dtype=np.float32
+        )
         # The post-rotation memory will be passed to the ramp filter. It is best to use a horizontal length that is efficient for scipy.fft, so we'll expand the horizontal axis appropriately.
-        h: int = fft.next_fast_len(self.chunk_shape[1]*2, real=True)
-        self._mem_postrotation = np.zeros((self.chunk_shape[0], h, self.chunk_shape[2]), dtype=self._mem_prerotation.dtype)
+        h: int = fft.next_fast_len(self.chunk_shape[1] * 2, real=True)
+        self._mem_postrotation = np.zeros(
+            (self.chunk_shape[0], h, self.chunk_shape[2]),
+            dtype=self._mem_prerotation.dtype,
+        )
         self._output_buffer_postrotation = np.zeros_like(self._mem_prerotation)
 
         # Allocate memory and whatnot for ramp filtering
-        hk = h + (1 - h%2)  # must produce an odd number greater than h to produce the initial kernel
+        hk = (
+            h + (1 - h % 2)
+        )  # must produce an odd number greater than h to produce the initial kernel
         kern_horz: np.ndarray = (
             ramp_kernels.ramp_kernel_ramlak(
                 hk,  # must be odd for this function
@@ -113,7 +135,9 @@ class FBPFiltererCPU:
         )[:h].copy()  # may crop last element
         # Roll the kernel so that the middle coefficient is at the beginning
         kern_horz = np.roll(kern_horz, shift=-(hk // 2), axis=0)
-        self._fft_mult_horz_broadcastable = fft.rfft(kern_horz, norm="backward")[np.newaxis, :, np.newaxis].copy()
+        self._fft_mult_horz_broadcastable = fft.rfft(
+            kern_horz, norm="backward"
+        )[np.newaxis, :, np.newaxis].copy()
 
         # Reserve memory and plans for FFT stuff
         # Scipy does not currently implement any method to get FFT plans, even though there is a plan=... argument to fft etc.
@@ -135,7 +159,9 @@ class FBPFiltererCPU:
         #     value_type="C2R",
         # )
 
-    def get_letterbox_slice(self, rotation_angle: float) -> slice[float, float]:
+    def get_letterbox_slice(
+        self, rotation_angle: float
+    ) -> slice[float, float]:
         """Return the slice in fractional indices corresponding to the nonzero parts of the vertical range of the rotated detector."""
         # Solve: X^2/L^2 = (cos^2 \theta / cos^2 \zeta - 1)
         # Solution: X/L = +- \sqrt{cos^2 \theta / \cos^2 \zeta - 1}
@@ -145,40 +171,55 @@ class FBPFiltererCPU:
         if abs(rotation_angle) > self._max_abs_rotation_angle:
             msg = "Invalid rotation angle entered."
             raise ValueError(msg)
-        mid_index: float = (self._expanded_2d_shape[1]-1)/2
-        disc: float = self.L/self.physpixwid * np.sqrt(np.square(
-            np.maximum(0, np.cos(rotation_angle)/np.cos(self._max_abs_rotation_angle))
-        )-1)
+        mid_index: float = (self._expanded_2d_shape[1] - 1) / 2
+        disc: float = (
+            self.L
+            / self.physpixwid
+            * np.sqrt(
+                np.square(
+                    np.maximum(
+                        0,
+                        np.cos(rotation_angle)
+                        / np.cos(self._max_abs_rotation_angle),
+                    )
+                )
+                - 1
+            )
+        )
         return slice(mid_index - disc, mid_index + disc)
 
-    def _apply_letterboxing(self, rot_ang_rad: float, np_padded_arr_3d: np.ndarray) -> None:
+    def _apply_letterboxing(
+        self, rot_ang_rad: float, np_padded_arr_3d: np.ndarray
+    ) -> None:
         sl = self.get_letterbox_slice(rot_ang_rad)
-        idx_1 = math.floor(sl.start + 1/2)
-        idx_2 = math.ceil(sl.stop - 1/2)
+        idx_1 = math.floor(sl.start + 1 / 2)
+        idx_2 = math.ceil(sl.stop - 1 / 2)
         if idx_1 == idx_2:
             # Multiply the single nonzero row by a number in [0,1] according to how much is included in the letterbox
             vo = np_padded_arr_3d[:, :, idx_1]
             mult = sl.stop - sl.start  # noqa: F841
-            ne.evaluate('vo * mult', out=vo)
+            ne.evaluate("vo * mult", out=vo)
             # Mask out all other rows
             vo = np_padded_arr_3d[:, :, :idx_1]
-            ne.evaluate('0*vo', out=vo)
-            vo = np_padded_arr_3d[:, :, idx_1+1:]
-            ne.evaluate('0*vo', out=vo)
+            ne.evaluate("0*vo", out=vo)
+            vo = np_padded_arr_3d[:, :, idx_1 + 1 :]
+            ne.evaluate("0*vo", out=vo)
         else:
             # Multiply the first nonzero row by a number between 0 and 1
-            mult_1 = 1 - (sl.start + 1/2 - idx_1)  # noqa: F841
+            mult_1 = 1 - (sl.start + 1 / 2 - idx_1)  # noqa: F841
             v = np_padded_arr_3d[:, :, idx_1]
-            ne.evaluate('v * mult_1', out=v)
+            ne.evaluate("v * mult_1", out=v)
             # Multiply the last nonzero row by a number between 0 and 1
-            mult_2 = 1 - (idx_2 - (sl.stop - 1/2))  # TODO: check this  # noqa: F841
+            mult_2 = 1 - (
+                idx_2 - (sl.stop - 1 / 2)
+            )  # TODO: check this  # noqa: F841
             v = np_padded_arr_3d[:, :, idx_2]
-            ne.evaluate('v * mult_2', out=v)
+            ne.evaluate("v * mult_2", out=v)
             # Mask out the top and bottom
             v = np_padded_arr_3d[:, :, :idx_1]
-            ne.evaluate('0*v', out=v)
-            v = np_padded_arr_3d[:, :, idx_2+1:]
-            ne.evaluate('0*v', out=v)
+            ne.evaluate("0*v", out=v)
+            v = np_padded_arr_3d[:, :, idx_2 + 1 :]
+            ne.evaluate("0*v", out=v)
 
     @property
     def zeta(self) -> float:
@@ -186,7 +227,10 @@ class FBPFiltererCPU:
 
     @classmethod
     def get_max_abs_rotation_angle(
-        cls, proj_2d_shape: tuple[int, int], physpixwid: float, L: float  # noqa: N803
+        cls,
+        proj_2d_shape: tuple[int, int],
+        physpixwid: float,
+        L: float,  # noqa: N803
     ) -> float:
         # Compute the maximum rotation angle.
         # cone_angle_horz: float = 2*np.arctan2(proj_2d_shape[0]*physpixwid/2, L)
@@ -263,41 +307,57 @@ class FBPFiltererCPU:
             if padx > 0 and pady > 0:
                 # Set left to zero
                 mem_prerot_outofview = self._mem_prerotation[:sl_len, :padx, :]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
                 # Set right to zero
-                mem_prerot_outofview = self._mem_prerotation[:sl_len, -padx:, :]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                mem_prerot_outofview = self._mem_prerotation[
+                    :sl_len, -padx:, :
+                ]
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
                 # Set top to zero
-                mem_prerot_outofview = self._mem_prerotation[:sl_len, padx:-padx, :pady]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                mem_prerot_outofview = self._mem_prerotation[
+                    :sl_len, padx:-padx, :pady
+                ]
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
                 # Set bottom to zero
-                mem_prerot_outofview = self._mem_prerotation[:sl_len, padx:-padx, -pady:]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                mem_prerot_outofview = self._mem_prerotation[
+                    :sl_len, padx:-padx, -pady:
+                ]
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
             elif padx > 0:
                 # Set left to zero
                 mem_prerot_outofview = self._mem_prerotation[:sl_len, :padx, :]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
                 # Set right to zero
-                mem_prerot_outofview = self._mem_prerotation[:sl_len, -padx:, :]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                mem_prerot_outofview = self._mem_prerotation[
+                    :sl_len, -padx:, :
+                ]
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
             elif pady > 0:
                 # Set top to zero
                 mem_prerot_outofview = self._mem_prerotation[:sl_len, :, :pady]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
                 # Set bottom to zero
-                mem_prerot_outofview = self._mem_prerotation[:sl_len, :, -pady:]
-                ne.evaluate('0*mem_prerot_outofview', out=mem_prerot_outofview)
+                mem_prerot_outofview = self._mem_prerotation[
+                    :sl_len, :, -pady:
+                ]
+                ne.evaluate("0*mem_prerot_outofview", out=mem_prerot_outofview)
             nparr_sliced_view = nparr_view[sl]  # noqa: F841
             # print("padx: ", padx)
-            mem_prerot_view = self._mem_prerotation[:sl_len, padx:((-padx) or None), pady:((-pady) or None)]
+            mem_prerot_view = self._mem_prerotation[
+                :sl_len, padx : ((-padx) or None), pady : ((-pady) or None)
+            ]
             # print("mem_prerot_view shape: ", mem_prerot_view.shape)
             prerot_factor = self._multmask_prerotation_2d_broadcastable  # noqa: F841
-            ne.evaluate('nparr_sliced_view * prerot_factor', out=mem_prerot_view)  # multi-threaded copy of chunk into 'v'. At the same time, apply the pre-filter multiplication factor, which commutes with the rotation.
+            ne.evaluate(
+                "nparr_sliced_view * prerot_factor", out=mem_prerot_view
+            )  # multi-threaded copy of chunk into 'v'. At the same time, apply the pre-filter multiplication factor, which commutes with the rotation.
 
             # Rotations are not multithreaded, so we'll launch a separate thread for each layer we want to rotate.
             def do_inverse_rotation(layer_index: int, rot_ang: float) -> None:
                 scipy.ndimage.rotate(
-                    input=ramp_filtered_data[layer_index, :self._mem_prerotation.shape[1], :],
+                    input=ramp_filtered_data[
+                        layer_index, : self._mem_prerotation.shape[1], :
+                    ],
                     angle=180 / np.pi * rot_ang,
                     axes=(1, 0),
                     reshape=False,
@@ -308,7 +368,9 @@ class FBPFiltererCPU:
                     prefilter=False,  # Has no effect when order = 1. OK if it blurs a little with prefilter=False for order > 1
                 )
 
-            def do_rotation_then_letterbox(layer_index: int, rot_ang: float) -> None:
+            def do_rotation_then_letterbox(
+                layer_index: int, rot_ang: float
+            ) -> None:
                 """Do a rotation on the given layer index, at a given rotation angle. Outputs a 2D array."""
                 if True:
                     return
@@ -317,13 +379,17 @@ class FBPFiltererCPU:
                     angle=-180 / np.pi * rot_ang,
                     axes=(1, 0),
                     reshape=False,
-                    output=self._mem_postrotation[layer_index, :self._mem_prerotation.shape[1], :],
+                    output=self._mem_postrotation[
+                        layer_index, : self._mem_prerotation.shape[1], :
+                    ],
                     order=1,
                     mode="grid-constant",
                     cval=0,
                     prefilter=False,  # Has no effect when order = 1. OK if it blurs a little with prefilter=False for order > 1
                 )
-                self._apply_letterboxing(rot_ang, self._mem_postrotation[[layer_index]])
+                self._apply_letterboxing(
+                    rot_ang, self._mem_postrotation[[layer_index]]
+                )
 
             # Determine the rotatian angles. It could be different angles for each layer, or a uniform rotation.
             # Rotate and copy into the memory buffer
@@ -334,14 +400,21 @@ class FBPFiltererCPU:
                     size=(sl_len,),
                 )
             else:
-                rotang_rads_list = force_rotation_angle * np.ones((sl_len,), dtype=np.float32)
+                rotang_rads_list = force_rotation_angle * np.ones(
+                    (sl_len,), dtype=np.float32
+                )
             # Clear the post-rotation memory
             v = self._mem_postrotation
-            ne.evaluate('0*v', out=self._mem_postrotation)  # clear the post-rotation memory
+            ne.evaluate(
+                "0*v", out=self._mem_postrotation
+            )  # clear the post-rotation memory
             # Launch threads to rotate each layer and apply the letterboxing to each layer
             threads = []
             for proj_index, rot_ang in enumerate(rotang_rads_list):
-                t = threading.Thread(target=do_rotation_then_letterbox, args=(proj_index, rot_ang))
+                t = threading.Thread(
+                    target=do_rotation_then_letterbox,
+                    args=(proj_index, rot_ang),
+                )
                 threads.append(t)
                 t.start()
             [t.join() for t in threads]
@@ -349,7 +422,7 @@ class FBPFiltererCPU:
             # Apply the post-rotation multiplier. This commutes withe the ramp filter.
             m = self._multmask_postrotation_vert_1d_broadcastable  # noqa: F841
             v = self._mem_postrotation[:sl_len]
-            ne.evaluate('v * m', out=v)
+            ne.evaluate("v * m", out=v)
 
             ## Apply the ramp filter
             fft_out = fft.rfft(
@@ -361,7 +434,7 @@ class FBPFiltererCPU:
                 # plan=self._fft_plan_forward,
             )
             fft_mult = self._fft_mult_horz_broadcastable  # noqa: F841
-            ne.evaluate('fft_out * fft_mult', out=fft_out)
+            ne.evaluate("fft_out * fft_mult", out=fft_out)
             ramp_filtered_data = fft.irfft(
                 fft_out,
                 n=self._mem_postrotation.shape[1],
@@ -376,24 +449,35 @@ class FBPFiltererCPU:
             # Launch threads to rotate each layer and apply the letterboxing to each layer
             threads = []
             for proj_index, rot_ang in enumerate(rotang_rads_list):
-                t = threading.Thread(target=do_inverse_rotation, args=(proj_index, rot_ang))
+                t = threading.Thread(
+                    target=do_inverse_rotation, args=(proj_index, rot_ang)
+                )
                 threads.append(t)
                 t.start()
             [t.join() for t in threads]
 
             # Copy to an appropriately-sized array with numexpr
             # This makes concatenating faster.
-            output = np.zeros((sl_len, self._output_buffer_postrotation.shape[1]-2*padx, self._output_buffer_postrotation.shape[2]-2*pady), dtype=self._output_buffer_postrotation.dtype)
+            output = np.zeros(
+                (
+                    sl_len,
+                    self._output_buffer_postrotation.shape[1] - 2 * padx,
+                    self._output_buffer_postrotation.shape[2] - 2 * pady,
+                ),
+                dtype=self._output_buffer_postrotation.dtype,
+            )
             out_view = self._output_buffer_postrotation[  # noqa: F841
                 :sl_len,
-                padx:((-padx) or None),
-                pady:((-pady) or None),
+                padx : ((-padx) or None),
+                pady : ((-pady) or None),
             ]
-            ne.evaluate('out_view', out=output)
+            ne.evaluate("out_view", out=output)
             yield output
 
     def _filter_bulk_axis1_concat(
-        self, nparr_view: np.ndarray | np.memmap, force_rotation_angle: float | None = None
+        self,
+        nparr_view: np.ndarray | np.memmap,
+        force_rotation_angle: float | None = None,
     ) -> np.ndarray:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_arrs: list[np.ndarray] = list(

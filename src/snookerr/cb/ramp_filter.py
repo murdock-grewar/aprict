@@ -73,15 +73,13 @@ class RampFilterer:
             chunk_shape = self.chunk_shape
             physpixwid = self.physpixwid
             # Find the first fast size for the filtration axis
-            h = cufft.next_fast_len(2*self.chunk_shape[1] - 1)
+            h = cufft.next_fast_len(2 * self.chunk_shape[1] - 1)
             self._fft_2d_shape = (h, self.chunk_shape[2])
             # Get the horz kernel as a multiplier in Fourier space
             # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel(2*chunk_shape[1] - 1, physpixsize=physpixwid))
-            hk = h + (1 - (h%2))
+            hk = h + (1 - (h % 2))
             kern_horz: cp.ndarray = cp.array(
-                ramp_kernels.ramp_kernel_ramlak(
-                    hk, physpixsize=physpixwid
-                )
+                ramp_kernels.ramp_kernel_ramlak(hk, physpixsize=physpixwid)
             )[:h]
             # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel_softened(2*chunk_shape[1] - 1, inv_soften_strength=0.9, physpixsize=physpixwid))
             kern_horz = cp.roll(kern_horz, shift=-(hk // 2), axis=0)
@@ -115,7 +113,10 @@ class RampFilterer:
             self._e_mem2_free = None
 
     def _filter_chunk_axis1(
-        self, cparr_view: cp.ndarray, input_in_mem1: bool = False, wait_on_events: list[cp.cuda.Event] | None = None
+        self,
+        cparr_view: cp.ndarray,
+        input_in_mem1: bool = False,
+        wait_on_events: list[cp.cuda.Event] | None = None,
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Filter an input cp.ndarray (can be a view) and produce a view into a newly allocated cupy array as output."""
         with self.stream as stream:
@@ -236,7 +237,9 @@ class RampFilterer:
             with cp.cuda.Stream(non_blocking=True) as stream:
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
-                ev = cp.cuda.Event(block=False, disable_timing=True, interprocess=False)
+                ev = cp.cuda.Event(
+                    block=False, disable_timing=True, interprocess=False
+                )
                 stream.record(ev)
                 events.append(ev)
             sl_start += out_arr.shape[0]
@@ -244,7 +247,9 @@ class RampFilterer:
         with cp.cuda.Stream(non_blocking=True) as stream:
             for e in events:
                 stream.wait_event(e)
-            completed_event = cp.cuda.Event(block=True, disable_timing=True, interprocess=False)
+            completed_event = cp.cuda.Event(
+                block=True, disable_timing=True, interprocess=False
+            )
             stream.record(completed_event)
 
         if block:
@@ -292,7 +297,9 @@ class FBPFilterer:
             proj_2d_shape, physpixwid, L
         )
         self.proj_2d_shape = proj_2d_shape
-        self._expanded_2d_shape = self.get_expanded_proj_2d_shape(proj_2d_shape, self._max_abs_rotation_angle)
+        self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
+            proj_2d_shape, self._max_abs_rotation_angle
+        )
         # FFT is more efficient with certain sizes.
         self.chunk_shape = (
             projs_per_batch,
@@ -310,14 +317,29 @@ class FBPFilterer:
 
         # Construct the multiplicative mask
         # NOTE: Y is the horizontal coordinate on the detector. X is the vertical.
-        Yarr = physpixwid*(np.arange(self._expanded_2d_shape[0], dtype=np.float32) - (self._expanded_2d_shape[0]-1)/2)  # noqa: N806
-        Xarr = physpixwid*(np.arange(self._expanded_2d_shape[1], dtype=np.float32) - (self._expanded_2d_shape[1]-1)/2)  # noqa: N806
-        self._multmask_2d = cp.array(1/(
-            np.power(np.sqrt(1 + np.square(Xarr[np.newaxis, :]/L)), 3)
-            * np.sqrt(1 + np.square(Xarr[np.newaxis, :]/L) + np.square(Yarr[:, np.newaxis]/L))
-        ))
+        Yarr = physpixwid * (
+            np.arange(self._expanded_2d_shape[0], dtype=np.float32)
+            - (self._expanded_2d_shape[0] - 1) / 2
+        )  # noqa: N806
+        Xarr = physpixwid * (
+            np.arange(self._expanded_2d_shape[1], dtype=np.float32)
+            - (self._expanded_2d_shape[1] - 1) / 2
+        )  # noqa: N806
+        self._multmask_2d = cp.array(
+            1
+            / (
+                np.power(np.sqrt(1 + np.square(Xarr[np.newaxis, :] / L)), 3)
+                * np.sqrt(
+                    1
+                    + np.square(Xarr[np.newaxis, :] / L)
+                    + np.square(Yarr[:, np.newaxis] / L)
+                )
+            )
+        )
 
-    def get_letterbox_slice(self, rotation_angle: float) -> slice[float, float]:
+    def get_letterbox_slice(
+        self, rotation_angle: float
+    ) -> slice[float, float]:
         """Return the slice in fractional indices corresponding to the nonzero parts of the vertical range of the rotated detector."""
         # Solve: X^2/L^2 = (cos^2 \theta / cos^2 \zeta - 1)
         # Solution: X/L = +- \sqrt{cos^2 \theta / \cos^2 \zeta - 1}
@@ -327,10 +349,21 @@ class FBPFilterer:
         if abs(rotation_angle) > self._max_abs_rotation_angle:
             msg = "Invalid rotation angle entered."
             raise ValueError(msg)
-        mid_index: float = (self._expanded_2d_shape[1]-1)/2
-        disc: float = self.L/self.physpixwid * np.sqrt(np.square(
-            np.maximum(0, np.cos(rotation_angle)/np.cos(self._max_abs_rotation_angle))
-        )-1)
+        mid_index: float = (self._expanded_2d_shape[1] - 1) / 2
+        disc: float = (
+            self.L
+            / self.physpixwid
+            * np.sqrt(
+                np.square(
+                    np.maximum(
+                        0,
+                        np.cos(rotation_angle)
+                        / np.cos(self._max_abs_rotation_angle),
+                    )
+                )
+                - 1
+            )
+        )
         return slice(mid_index - disc, mid_index + disc)
 
     @property
@@ -339,7 +372,10 @@ class FBPFilterer:
 
     @classmethod
     def get_max_abs_rotation_angle(
-        cls, proj_2d_shape: tuple[int, int], physpixwid: float, L: float  # noqa: N803
+        cls,
+        proj_2d_shape: tuple[int, int],
+        physpixwid: float,
+        L: float,  # noqa: N803
     ) -> float:
         # Compute the maximum rotation angle.
         # cone_angle_horz: float = 2*np.arctan2(proj_2d_shape[0]*physpixwid/2, L)
@@ -402,8 +438,8 @@ class FBPFilterer:
         # padx_fft = (self._fft_2d_shape[0] - self._expanded_2d_shape[0])
         # pady_fft = (self._fft_2d_shape[1] - self._expanded_2d_shape[1])
 
-        #import time
-        #time.sleep(0.1)
+        # import time
+        # time.sleep(0.1)
 
         # Loop through chunks
         for i in itertools.count():
@@ -428,7 +464,9 @@ class FBPFilterer:
                     size=(v.shape[0],),
                 )
             else:
-                rotang_rads_list = force_rotation_angle * np.ones((v.shape[0],), dtype=np.float32)
+                rotang_rads_list = force_rotation_angle * np.ones(
+                    (v.shape[0],), dtype=np.float32
+                )
             events = [None for _ in range(v.shape[0])]
             for proj_index in range(v.shape[0]):
                 with cp.cuda.Stream(non_blocking=True) as stream:
@@ -445,7 +483,11 @@ class FBPFilterer:
                             stream.wait_event(e)
 
                     # HOTFIX: this line should not be necessary! But there are synchronicity issues without it. Bizarre. Unsure if it's a bug with my software or with cupy.
-                    cp.multiply(chunkmem[proj_index, ...], 0, out=chunkmem[proj_index, ...])
+                    cp.multiply(
+                        chunkmem[proj_index, ...],
+                        0,
+                        out=chunkmem[proj_index, ...],
+                    )
 
                     cupyx.scipy.ndimage.rotate(
                         input=v[proj_index],
@@ -459,22 +501,56 @@ class FBPFilterer:
                         prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
                     )
                     # Multiply by mask
-                    cp.multiply(chunkmem[proj_index, ...], self._multmask_2d, out=chunkmem[proj_index, ...])
+                    cp.multiply(
+                        chunkmem[proj_index, ...],
+                        self._multmask_2d,
+                        out=chunkmem[proj_index, ...],
+                    )
                     # Apply the letterbox
                     sl = self.get_letterbox_slice(rotang_rads_list[proj_index])
-                    idx_1 = math.floor(sl.start + 1/2)
-                    idx_2 = math.ceil(sl.stop - 1/2)
+                    idx_1 = math.floor(sl.start + 1 / 2)
+                    idx_2 = math.ceil(sl.stop - 1 / 2)
                     if idx_1 == idx_2:
-                        cp.multiply(chunkmem[proj_index, :, idx_1], sl.stop - sl.start, out=chunkmem[proj_index, :, idx_1])
-                        cp.multiply(chunkmem[proj_index, :, :idx_1], 0, out=chunkmem[proj_index, :, :idx_1])
-                        cp.multiply(chunkmem[proj_index, :, idx_1+1:], 0, out=chunkmem[proj_index, :, idx_1+1:])
+                        cp.multiply(
+                            chunkmem[proj_index, :, idx_1],
+                            sl.stop - sl.start,
+                            out=chunkmem[proj_index, :, idx_1],
+                        )
+                        cp.multiply(
+                            chunkmem[proj_index, :, :idx_1],
+                            0,
+                            out=chunkmem[proj_index, :, :idx_1],
+                        )
+                        cp.multiply(
+                            chunkmem[proj_index, :, idx_1 + 1 :],
+                            0,
+                            out=chunkmem[proj_index, :, idx_1 + 1 :],
+                        )
                     else:
-                        mult_1 = 1 - (sl.start + 1/2 - idx_1)
-                        cp.multiply(chunkmem[proj_index, :, idx_1], mult_1, out=chunkmem[proj_index, :, idx_1])
-                        mult_2 = 1 - (idx_2 - (sl.stop - 1/2))  # TODO: check this
-                        cp.multiply(chunkmem[proj_index, :, idx_2], mult_2, out=chunkmem[proj_index, :, idx_2])
-                        cp.multiply(chunkmem[proj_index, :, :idx_1], 0, out=chunkmem[proj_index, :, :idx_1])
-                        cp.multiply(chunkmem[proj_index, :, idx_2+1:], 0, out=chunkmem[proj_index, :, idx_2+1:])
+                        mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
+                        cp.multiply(
+                            chunkmem[proj_index, :, idx_1],
+                            mult_1,
+                            out=chunkmem[proj_index, :, idx_1],
+                        )
+                        mult_2 = 1 - (
+                            idx_2 - (sl.stop - 1 / 2)
+                        )  # TODO: check this
+                        cp.multiply(
+                            chunkmem[proj_index, :, idx_2],
+                            mult_2,
+                            out=chunkmem[proj_index, :, idx_2],
+                        )
+                        cp.multiply(
+                            chunkmem[proj_index, :, :idx_1],
+                            0,
+                            out=chunkmem[proj_index, :, :idx_1],
+                        )
+                        cp.multiply(
+                            chunkmem[proj_index, :, idx_2 + 1 :],
+                            0,
+                            out=chunkmem[proj_index, :, idx_2 + 1 :],
+                        )
                     # Create event to mark completion of the above steps
                     events[proj_index] = cp.cuda.Event(
                         block=False, disable_timing=True, interprocess=False
@@ -487,8 +563,10 @@ class FBPFilterer:
                     stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
                 if True:
-                    out, self.event_completed_ramp = self.rfilt._filter_chunk_axis1(  # noqa: SLF001
-                        chunkmem, input_in_mem1=True
+                    out, self.event_completed_ramp = (
+                        self.rfilt._filter_chunk_axis1(  # noqa: SLF001
+                            chunkmem, input_in_mem1=True
+                        )
                     )
                 else:
                     out = chunkmem.copy()
@@ -501,11 +579,14 @@ class FBPFilterer:
                     # Wait until output array is filled with correct answer before yielding it
                     self.event_completed_filter.synchronize()
                 # yield out_buffer
-                yield out_buffer[  # noqa: F821
-                    :,
-                    padx : ((-padx) or None),
-                    pady : ((-pady) or None),
-                ], self.event_completed_filter
+                yield (
+                    out_buffer[  # noqa: F821
+                        :,
+                        padx : ((-padx) or None),
+                        pady : ((-pady) or None),
+                    ],
+                    self.event_completed_filter,
+                )
                 out_buffer = None
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
@@ -543,17 +624,24 @@ class FBPFilterer:
             # Wait until output array is filled with correct answer before yielding it
             self.event_completed_filter.synchronize()
         # yield out_buffer
-        yield out_buffer[
-            :,
-            padx : ((-padx) or None),
-            pady : ((-pady) or None),
-        ], self.event_completed_filter
+        yield (
+            out_buffer[
+                :,
+                padx : ((-padx) or None),
+                pady : ((-pady) or None),
+            ],
+            self.event_completed_filter,
+        )
         out_buffer = None
         if clear_gpu_cache_regularly:
             gpu_tools.clear_cache()
 
     def filter_bulk_axis1_concat(
-        self, cparr_view: cp.ndarray, clear_gpu_cache_regularly: bool = True, force_rotation_angle: float | None = None, block: bool = True
+        self,
+        cparr_view: cp.ndarray,
+        clear_gpu_cache_regularly: bool = True,
+        force_rotation_angle: float | None = None,
+        block: bool = True,
     ) -> cp.ndarray:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(
@@ -570,7 +658,9 @@ class FBPFilterer:
             with cp.cuda.Stream(non_blocking=True) as stream:
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
-                ev = cp.cuda.Event(block=False, disable_timing=True, interprocess=False)
+                ev = cp.cuda.Event(
+                    block=False, disable_timing=True, interprocess=False
+                )
                 stream.record(ev)
                 events.append(ev)
             sl_start += out_arr.shape[0]
@@ -578,7 +668,9 @@ class FBPFilterer:
         with cp.cuda.Stream(non_blocking=True) as stream:
             for e in events:
                 stream.wait_event(e)
-            completed_event = cp.cuda.Event(block=True, disable_timing=True, interprocess=False)
+            completed_event = cp.cuda.Event(
+                block=True, disable_timing=True, interprocess=False
+            )
             stream.record(completed_event)
 
         if block:
@@ -603,7 +695,9 @@ if __name__ == "__main__":
     t1 = time.time()
     completed_events = []
     for _, rotang in zip(range(ncycles), rotangs):
-        x, e = filt.filter_bulk_axis1_concat(cparr, block=False, force_rotation_angle=rotang)
+        x, e = filt.filter_bulk_axis1_concat(
+            cparr, block=False, force_rotation_angle=rotang
+        )
         completed_events.append(e)
     for e in completed_events:
         e.synchronize()
