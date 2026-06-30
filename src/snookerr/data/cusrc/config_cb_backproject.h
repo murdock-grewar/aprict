@@ -5,5 +5,8 @@ struct config_CB_backproject {
     float mask_to_cyl_rad;
     bool apply_summand_multiplier;
     float soften_edge_proportion;
+    int Z_on_L_factor_power;
+    bool approx_mode_direct_raycast;
+    bool approx_mode_linear_interpolate;
 };
 

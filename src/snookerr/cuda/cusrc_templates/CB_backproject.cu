@@ -219,6 +219,23 @@ __device__ Tp get_bilinear_interp(
     return tmp1 * fcast<Tp>(1.f - fractional_remainders.y) + tmp2 * fcast<Tp>(fractional_remainders.y);
 }
 
+template<typename Tp>
+__device__ Tp get_zero_interp(
+        const float2 det_idx_f,  // measured from the centre of the corner pixel, in multiples of pixel-lengths
+        const uint2  shape,
+        const ulong2 strides,
+        const Tp*    data_2d
+)
+{
+    const int2 det_idx = int2({
+        (int)floor(det_idx_f.x + 0.5f),
+        (int)floor(det_idx_f.y + 0.5f)
+    });
+
+    return get_data_2d_guarded<Tp>(det_idx, shape, strides, data_2d);
+
+}
+
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
@@ -342,6 +359,12 @@ __device__ Tv _backproject_CB_getval(
 
                 }
             }
+            // Apply Z_factor_power, if applicable
+            if (config.Z_on_L_factor_power != 0) {
+                fvec3 Lvec = projspec.dspec.pos - source_pos;
+                float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
+                sub_accumulator *= fcast<Tv>(powint(Z_on_L, config.Z_on_L_factor_power));
+            }
         } else {
             // config.exact is FALSE
 
@@ -374,20 +397,44 @@ __device__ Tv _backproject_CB_getval(
             });
             uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
             ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
-            Tp det_value = get_bilinear_interp(
-                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+            Tp det_value;
+            if (config.approx_mode_linear_interpolate) {
+                det_value = get_bilinear_interp(
+                    det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+            } else {
+                det_value = get_zero_interp(
+                    det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+            }
 
-            // Compute the physical distance to the source
-            fvec3 det_pos      = projspec.dspec.pos + (
-                projspec.dspec.u * det_coords_c.x +
-                projspec.dspec.v * det_coords_c.y
-            );
-            float dist_to_det = norm_fvec3(det_pos - source_pos);
-            float dist_to_vox = norm_fvec3(vox_pos - source_pos);
-            float mag = dist_to_det/dist_to_vox;
-            float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
-            Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
-            sub_accumulator = fcast<Tv>(det_value * multiplier);
+            if (config.approx_mode_direct_raycast) {
+                if (config.Z_on_L_factor_power == 0) {
+                    sub_accumulator = fcast<Tv>(det_value);
+                } else {
+                    fvec3 Lvec = projspec.dspec.pos - source_pos;
+                    float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
+                    Tp multiplier = fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                    sub_accumulator = fcast<Tv>(det_value * multiplier);
+                }
+            } else {
+                // Compute the physical distance to the source
+                fvec3 det_pos      = projspec.dspec.pos + (
+                    projspec.dspec.u * det_coords_c.x +
+                    projspec.dspec.v * det_coords_c.y
+                );
+                float dist_to_det = norm_fvec3(det_pos - source_pos);
+                float dist_to_vox = norm_fvec3(vox_pos - source_pos);
+                float mag = dist_to_det/dist_to_vox;
+                float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
+                Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
+
+                if (config.Z_on_L_factor_power != 0) {
+                    fvec3 Lvec = projspec.dspec.pos - source_pos;
+                    float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
+                    multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                }
+
+                sub_accumulator = fcast<Tv>(det_value * multiplier);
+            }
         }
 
         // Apply softening toward detector edges, if applicable

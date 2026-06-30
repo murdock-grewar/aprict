@@ -34,8 +34,11 @@ class config_cb_backproject(
         "mask_to_cyl_rad",
         "apply_summand_multiplier",
         "soften_edge_proportion",
+        "Z_on_L_factor_power",
+        "approx_mode_direct_raycast",
+        "approx_mode_linear_interpolate",
     ],
-    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool, np.float32],
+    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool, np.float32, np.int32, np.bool, np.bool],
 ):
     pass  # ty:ignore[invalid-argument-type]
 

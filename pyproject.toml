@@ -27,6 +27,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "regex>=2026.4.4",
     "scipy>=1.17.1",
+    "tqdm>=4.68.3",
 ]
 dynamic = ['scripts', 'version']
 

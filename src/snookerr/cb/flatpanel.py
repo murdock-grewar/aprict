@@ -341,9 +341,12 @@ class ConfigBackproject:
         backproject_1s: bool = False,
         apply_summand_multiplier: bool = False,
         soften_det_edges_proportion: float | int | None = None,
+        Z_on_L_factor_power: int = 0,  # noqa: N803
+        approx_mode_direct_raycast: bool = False,
+        approx_mode_bilinear_interpolate: bool = False,
     ) -> None:
         r = cyl_mask_rad_vox or 0  # coerce 'None' to 0
-        sep = soften_det_edges_proportion or 0  # corce 'None' to 0
+        sep = soften_det_edges_proportion or 0  # coerce 'None' to 0
         self._contents = np.array(  # ty:ignore[invalid-assignment]
             (
                 np.bool(
@@ -358,6 +361,9 @@ class ConfigBackproject:
                     apply_summand_multiplier
                 ),  # whether the kernel should use the summand_multiplier argument to multiply the backprojection before adding it to the volume
                 sep,
+                np.int32(Z_on_L_factor_power),
+                np.bool(approx_mode_direct_raycast),
+                np.bool(approx_mode_bilinear_interpolate),
             ),
             dtype=structs.config_cb_backproject,
         )

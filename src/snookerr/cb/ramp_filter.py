@@ -264,6 +264,7 @@ class FBPFilterer:
     rfilt: RampFilterer
     proj_2d_shape: tuple[int, int]  # non-expanded shape
     chunk_shape: tuple[int, int, int]
+    R: float
     L: float
     physpixwid: float
     ss: SamplingStrategy
@@ -284,6 +285,7 @@ class FBPFilterer:
     def __init__(
         self,
         *,
+        R: float,  # noqa: N803
         L: float,  # noqa: N803
         physpixwid: float,
         proj_2d_shape: tuple[int, int],
@@ -307,6 +309,7 @@ class FBPFilterer:
         )
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
+            # This is weird. It seems like it should be physpixwid * R/L, because the algorithm for filtering the projections is properly normalised when the pixels are treated as if they reside in the midplane
             physpixwid=physpixwid,
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
@@ -316,23 +319,23 @@ class FBPFilterer:
         self.event_completed_ramp = None
 
         # Construct the multiplicative mask
-        # NOTE: Y is the horizontal coordinate on the detector. X is the vertical.
-        Yarr = physpixwid * (
+        # NOTE: Y is the horizontal coordinate on the detector midplane. X is the vertical.
+        Yarr = physpixwid * R / L * (  # noqa: N806
             np.arange(self._expanded_2d_shape[0], dtype=np.float32)
             - (self._expanded_2d_shape[0] - 1) / 2
-        )  # noqa: N806
-        Xarr = physpixwid * (
+        )
+        Xarr = physpixwid * R / L * (  # noqa: N806
             np.arange(self._expanded_2d_shape[1], dtype=np.float32)
             - (self._expanded_2d_shape[1] - 1) / 2
-        )  # noqa: N806
+        )
         self._multmask_2d = cp.array(
             1
             / (
-                np.power(np.sqrt(1 + np.square(Xarr[np.newaxis, :] / L)), 3)
+                np.float_power(np.sqrt(1 + np.square(Xarr[np.newaxis, :] / R)), 3)
                 * np.sqrt(
                     1
-                    + np.square(Xarr[np.newaxis, :] / L)
-                    + np.square(Yarr[:, np.newaxis] / L)
+                    + np.square(Xarr[np.newaxis, :] / R)
+                    + np.square(Yarr[:, np.newaxis] / R)
                 )
             )
         )
@@ -688,7 +691,7 @@ if __name__ == "__main__":
     # shape_2d = (4001, 4000)
     shape_2d = (752, 752)
     filt = FBPFilterer(
-        proj_2d_shape=shape_2d, projs_per_batch=3, L=300, physpixwid=0.1
+        proj_2d_shape=shape_2d, projs_per_batch=3, R=100, L=300, physpixwid=0.1
     )
     cparr = cp.zeros((64, *shape_2d), dtype=np.float32)
     cparr = cp.random.randn(*cparr.shape).astype(cp.float32)
