@@ -270,7 +270,7 @@ class FBPFiltererCPU:
 
         return tuple(expanded_proj_2d_shape)  # ty:ignore[invalid-return-type]
 
-    def _filter_bulk_axis1_stream(
+    def filter_bulk_axis1_stream(
         self,
         nparr_view: np.ndarray | np.memmap,
         force_rotation_angle: float | None = None,
@@ -372,8 +372,6 @@ class FBPFiltererCPU:
                 layer_index: int, rot_ang: float
             ) -> None:
                 """Do a rotation on the given layer index, at a given rotation angle. Outputs a 2D array."""
-                if True:
-                    return
                 scipy.ndimage.rotate(
                     input=self._mem_prerotation[layer_index],
                     angle=-180 / np.pi * rot_ang,
@@ -387,8 +385,11 @@ class FBPFiltererCPU:
                     cval=0,
                     prefilter=False,  # Has no effect when order = 1. OK if it blurs a little with prefilter=False for order > 1
                 )
+                # print("mean before masking bottom: ", self._mem_postrotation[[layer_index]].mean())
+                # print("mean after masking bottom: ", self._mem_postrotation[[layer_index]].mean())
+                # BEWARE: using indexing like arr[[idx]] creates a COPY instead of a view!
                 self._apply_letterboxing(
-                    rot_ang, self._mem_postrotation[[layer_index]]
+                    rot_ang, self._mem_postrotation[layer_index:layer_index+1]
                 )
 
             # Determine the rotatian angles. It could be different angles for each layer, or a uniform rotation.
@@ -474,14 +475,14 @@ class FBPFiltererCPU:
             ne.evaluate("out_view", out=output)
             yield output
 
-    def _filter_bulk_axis1_concat(
+    def filter_bulk_axis1_concat(
         self,
         nparr_view: np.ndarray | np.memmap,
         force_rotation_angle: float | None = None,
     ) -> np.ndarray:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_arrs: list[np.ndarray] = list(
-            self._filter_bulk_axis1_stream(
+            self.filter_bulk_axis1_stream(
                 nparr_view,
                 force_rotation_angle=force_rotation_angle,
             )
@@ -504,7 +505,7 @@ if __name__ == "__main__":
     # nparr[:, nparr.shape[1] // 2, :] = 1
     t1 = time.time()
     for _, rotang in zip(range(ncycles), rotangs):
-        x = filt._filter_bulk_axis1_concat(nparr, force_rotation_angle=rotang)
+        x = filt.filter_bulk_axis1_concat(nparr, force_rotation_angle=rotang)
     t2 = time.time()
     print(
         f"Milliseconds elapsed per cycle per projection: {1000 * (t2 - t1) / ncycles / nparr.shape[0]:.2f}"
