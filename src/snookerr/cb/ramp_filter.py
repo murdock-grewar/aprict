@@ -61,9 +61,6 @@ class RampFilterer:
         projs_per_batch: int = 2,  # not much benefit going above 3, I think. And it uses a lot of VRAM.
         stream: cp.cuda.Stream | None = None,
     ) -> None:
-        if projs_per_batch > 1:
-            msg = "There is a synchronicity-related bug preventing proper behaviour when projs_per_batch is above 1. I wasn't able to debug this. So for now, only use projs_per_batch=1 with this method."
-            raise NotImplementedError(msg)
         self.chunk_shape = (projs_per_batch, *proj_2d_shape)
         self.physpixwid = physpixwid
         self.stream = (
@@ -75,23 +72,25 @@ class RampFilterer:
         with self.stream:
             chunk_shape = self.chunk_shape
             physpixwid = self.physpixwid
+            # Find the first fast size for the filtration axis
+            h = cufft.next_fast_len(2*self.chunk_shape[1] - 1)
+            self._fft_2d_shape = (h, self.chunk_shape[2])
             # Get the horz kernel as a multiplier in Fourier space
             # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel(2*chunk_shape[1] - 1, physpixsize=physpixwid))
+            hk = h + (1 - (h%2))
             kern_horz: cp.ndarray = cp.array(
                 ramp_kernels.ramp_kernel_ramlak(
-                    2 * chunk_shape[1] - 1, physpixsize=physpixwid
+                    hk, physpixsize=physpixwid
                 )
-            )
+            )[:h]
             # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel_softened(2*chunk_shape[1] - 1, inv_soften_strength=0.9, physpixsize=physpixwid))
-            kern_horz = cp.pad(kern_horz, ((0, 1),), mode="constant")
-            kern_horz = cp.roll(
-                kern_horz, shift=1 - (kern_horz.shape[0] // 2), axis=0
-            )
+            kern_horz = cp.roll(kern_horz, shift=-(hk // 2), axis=0)
             self._fft_mult_horz = cufft.rfft(kern_horz, norm="backward")
+            fft_len = self._fft_mult_horz.shape[0]
 
             # Reserve memory and plans for FFT stuff
-            self._chunk_mem_horz_filter = cp.empty(
-                (chunk_shape[0], chunk_shape[1] * 2, chunk_shape[2]),
+            self._chunk_mem_horz_filter = cp.zeros(
+                (chunk_shape[0], h, chunk_shape[2]),
                 dtype=cp.float32,
             )
             self._cufft_plan_forward = cufft.get_fft_plan(
@@ -100,7 +99,7 @@ class RampFilterer:
             self._chunk_mem_horz_filter_after_fft: cp.ndarray = cp.zeros(
                 (
                     self._chunk_mem_horz_filter.shape[0],
-                    self._chunk_mem_horz_filter.shape[1] // 2 + 1,
+                    fft_len,
                     self._chunk_mem_horz_filter.shape[2],
                 ),
                 dtype=cp.complex64,
@@ -116,7 +115,7 @@ class RampFilterer:
             self._e_mem2_free = None
 
     def _filter_chunk_axis1(
-        self, cparr_view: cp.ndarray, input_in_mem1: bool = False
+        self, cparr_view: cp.ndarray, input_in_mem1: bool = False, wait_on_events: list[cp.cuda.Event] | None = None
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Filter an input cp.ndarray (can be a view) and produce a view into a newly allocated cupy array as output."""
         with self.stream as stream:
@@ -133,21 +132,36 @@ class RampFilterer:
                 raise ValueError(msg)
             # TODO check if this can be made more efficient by not filtering the unused projections at hte end of a chunk.  # noqa: FIX002
 
+            if wait_on_events is not None:
+                for e in wait_on_events:
+                    stream.wait_event(e)
             # Do the horizontal filtration
             # An optimisation: if the input array is the chunk memory, then we don't need to copy it in.
             if input_in_mem1:
-                self._chunk_mem_horz_filter[
+                # self._chunk_mem_horz_filter[
+                #     : cparr_view.shape[0], chunk_shape[1] :, :
+                # ] = 0
+                v = self._chunk_mem_horz_filter[
                     : cparr_view.shape[0], chunk_shape[1] :, :
-                ] = 0
+                ]
+                cp.multiply(v, 0, out=v)
             else:
                 if self._e_mem1_free is not None:
                     self._e_mem1_free.synchronize()
-                self._chunk_mem_horz_filter[
+                # self._chunk_mem_horz_filter[
+                #     : cparr_view.shape[0], chunk_shape[1] :, :
+                # ] = 0
+                v = self._chunk_mem_horz_filter[
                     : cparr_view.shape[0], chunk_shape[1] :, :
-                ] = 0
-                self._chunk_mem_horz_filter[
+                ]
+                cp.multiply(v, 0, out=v)
+                # self._chunk_mem_horz_filter[
+                #     : cparr_view.shape[0], : chunk_shape[1], :
+                # ] = cparr_view[...]
+                v = self._chunk_mem_horz_filter[
                     : cparr_view.shape[0], : chunk_shape[1], :
-                ] = cparr_view[...]
+                ]
+                cp.multiply(cparr_view, 1, out=v)
             out = cufft.rfft(
                 self._chunk_mem_horz_filter,
                 axis=1,
@@ -210,25 +224,33 @@ class RampFilterer:
             yield out, completion_event
 
     def filter_bulk_axis1_concat(
-        self, cparr_view: cp.ndarray
+        self, cparr_view: cp.ndarray, block: bool = True
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Create an output array of ramp-filtered projections, from an input array."""
-        out_lst: list[cp.ndarray] = list(
-            self.filter_bulk_axis1_stream(cparr_view, block=False)
-        )
-        out_arrs = [out_arr for out_arr, comp_event in out_lst]
-        completion_events = [comp_event for out_arr, comp_event in out_lst]
-        with cp.cuda.Stream(non_blocking=True) as stream:
-            for e in completion_events:
+        out_gen = self.filter_bulk_axis1_stream(cparr_view, block=False)
+        output = cp.zeros_like(cparr_view)
+        sl_start: int = 0
+        events = []
+        for index, (out_arr, e) in enumerate(out_gen):
+            sl = slice(sl_start, sl_start + out_arr.shape[0])
+            with cp.cuda.Stream(non_blocking=True) as stream:
                 stream.wait_event(e)
-            completion_event = cp.cuda.Event(block=True, disable_timing=True, interprocess=False)
-            stream.record(completion_event)
+                cp.multiply(out_arr, 1, out=output[sl])
+                ev = cp.cuda.Event(block=False, disable_timing=True, interprocess=False)
+                stream.record(ev)
+                events.append(ev)
+            sl_start += out_arr.shape[0]
 
-        # Concatenation produces a copy, so wait for the data to be produced first before producing a copy
-        completion_event.synchronize()
+        with cp.cuda.Stream(non_blocking=True) as stream:
+            for e in events:
+                stream.wait_event(e)
+            completed_event = cp.cuda.Event(block=True, disable_timing=True, interprocess=False)
+            stream.record(completed_event)
 
-        out = cp.concatenate(out_arrs, axis=0)
-        return out, completion_event
+        if block:
+            completed_event.synchronize()
+
+        return output, completed_event
 
 
 class FBPFilterer:
@@ -246,6 +268,7 @@ class FBPFilterer:
 
     _max_abs_rotation_angle: float
     _expanded_2d_shape: tuple[int, int]
+    _fft_2d_shape: tuple[int, int]
     _multmask_2d: cp.ndarray
 
     class SamplingStrategy(enum.Enum):
@@ -270,6 +293,7 @@ class FBPFilterer:
         )
         self.proj_2d_shape = proj_2d_shape
         self._expanded_2d_shape = self.get_expanded_proj_2d_shape(proj_2d_shape, self._max_abs_rotation_angle)
+        # FFT is more efficient with certain sizes.
         self.chunk_shape = (
             projs_per_batch,
             *self._expanded_2d_shape,
@@ -280,6 +304,7 @@ class FBPFilterer:
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
         )
+        # self._fft_2d_shape = self.rfilt._fft_2d_shape
         self.event_completed_filter = None
         self.event_completed_ramp = None
 
@@ -354,11 +379,11 @@ class FBPFilterer:
 
         return tuple(expanded_proj_2d_shape)  # ty:ignore[invalid-return-type]
 
-    def _filter_bulk_axis1_stream(
+    def filter_bulk_axis1_stream(
         self,
         cparr_view: cp.ndarray,
         block: bool = True,
-        clear_gpu_cache_regularly: bool = True,
+        clear_gpu_cache_regularly: bool = False,
         force_rotation_angle: float | None = None,
     ) -> typing.Generator[tuple[cp.ndarray, cp.cuda.Event]]:
         """Create a generator of filtered projection chunks, from an input array."""
@@ -372,8 +397,13 @@ class FBPFilterer:
             msg = "Wrong input size."
             raise ValueError(msg)
         # Calculate padding amounts to pad the input data before rotating etc
-        padx = (self.chunk_shape[1] - self.proj_2d_shape[0]) // 2
-        pady = (self.chunk_shape[2] - self.proj_2d_shape[1]) // 2
+        padx = (self._expanded_2d_shape[0] - self.proj_2d_shape[0]) // 2
+        pady = (self._expanded_2d_shape[1] - self.proj_2d_shape[1]) // 2
+        # padx_fft = (self._fft_2d_shape[0] - self._expanded_2d_shape[0])
+        # pady_fft = (self._fft_2d_shape[1] - self._expanded_2d_shape[1])
+
+        #import time
+        #time.sleep(0.1)
 
         # Loop through chunks
         for i in itertools.count():
@@ -409,6 +439,14 @@ class FBPFilterer:
                         stream.wait_event(self.rfilt._e_mem1_free)
                     if self.event_completed_ramp is not None:
                         stream.wait_event(self.event_completed_ramp)
+                    if i == 0:
+                        e = self.event_completed_filter
+                        if e is not None:
+                            stream.wait_event(e)
+
+                    # HOTFIX: this line should not be necessary! But there are synchronicity issues without it. Bizarre. Unsure if it's a bug with my software or with cupy.
+                    cp.multiply(chunkmem[proj_index, ...], 0, out=chunkmem[proj_index, ...])
+
                     cupyx.scipy.ndimage.rotate(
                         input=v[proj_index],
                         angle=-180 / np.pi * rotang_rads_list[proj_index],
@@ -440,7 +478,7 @@ class FBPFilterer:
                     # Create event to mark completion of the above steps
                     events[proj_index] = cp.cuda.Event(
                         block=False, disable_timing=True, interprocess=False
-                    )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU stream which waits on the event with e.synchronize()
+                    )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
             # Wait for all rotations to complete
             # with self.rfilt.stream as stream:
@@ -448,9 +486,14 @@ class FBPFilterer:
                 for e in events:
                     stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
-                out, self.event_completed_ramp = self.rfilt._filter_chunk_axis1(  # noqa: SLF001
-                    chunkmem, input_in_mem1=True
-                )
+                if True:
+                    out, self.event_completed_ramp = self.rfilt._filter_chunk_axis1(  # noqa: SLF001
+                        chunkmem, input_in_mem1=True
+                    )
+                else:
+                    out = chunkmem.copy()
+                    self.event_completed_ramp = cp.cuda.Event()
+                    stream.record(self.event_completed_ramp)
                 out = out[: v.shape[0], ...]
             # Before overwriting the output buffer with the next result, yield the previous answer
             if not i == 0:
@@ -494,6 +537,8 @@ class FBPFilterer:
                     block=True, disable_timing=True, interprocess=False
                 )
                 stream.record(self.event_completed_filter)
+        if i == 0:
+            return
         if block:
             # Wait until output array is filled with correct answer before yielding it
             self.event_completed_filter.synchronize()
@@ -507,46 +552,60 @@ class FBPFilterer:
         if clear_gpu_cache_regularly:
             gpu_tools.clear_cache()
 
-    def _filter_bulk_axis1_concat(
-        self, cparr_view: cp.ndarray, clear_gpu_cache_regularly: bool = True, force_rotation_angle: float | None = None
+    def filter_bulk_axis1_concat(
+        self, cparr_view: cp.ndarray, clear_gpu_cache_regularly: bool = True, force_rotation_angle: float | None = None, block: bool = True
     ) -> cp.ndarray:
         """Create an output array of ramp-filtered projections, from an input array."""
-        out_tup: list[tuple[cp.ndarray, cp.cuda.Event]] = list(
-            self._filter_bulk_axis1_stream(
-                cparr_view,
-                block=False,
-                clear_gpu_cache_regularly=clear_gpu_cache_regularly,
-                force_rotation_angle=force_rotation_angle,
-            )
+        out_gen = self.filter_bulk_axis1_stream(
+            cparr_view,
+            block=False,
+            clear_gpu_cache_regularly=clear_gpu_cache_regularly,
+            force_rotation_angle=force_rotation_angle,
         )
-        out_arrs = [out_arr for out_arr, e in out_tup]
-        events = [e for out_arr, e in out_tup]
+        output = cp.zeros_like(cparr_view)
+        sl_start: int = 0
+        events = []
+        for index, (out_arr, e) in enumerate(out_gen):
+            sl = slice(sl_start, sl_start + out_arr.shape[0])
+            with cp.cuda.Stream(non_blocking=True) as stream:
+                stream.wait_event(e)
+                cp.multiply(out_arr, 1, out=output[sl])
+                ev = cp.cuda.Event(block=False, disable_timing=True, interprocess=False)
+                stream.record(ev)
+                events.append(ev)
+            sl_start += out_arr.shape[0]
+
         with cp.cuda.Stream(non_blocking=True) as stream:
             for e in events:
                 stream.wait_event(e)
             completed_event = cp.cuda.Event(block=True, disable_timing=True, interprocess=False)
             stream.record(completed_event)
-        # Concatenating produces a copy, so wait for the writing of data to complete first, before copying
-        completed_event.synchronize()
-        out = cp.concatenate(out_arrs, axis=0)
-        return out  # noqa: RET504
+
+        if block:
+            completed_event.synchronize()
+
+        return output, completed_event
 
 
 if __name__ == "__main__":
     # Do the test
-    ncycles: int = 1000
+    ncycles: int = 100
     # filt = RampFilterer(proj_2d_shape=(3001, 4000), projs_per_batch=3, stream=cp.cuda.Stream(non_blocking=True))
     # shape_2d = (4001, 4000)
     shape_2d = (752, 752)
     filt = FBPFilterer(
-        proj_2d_shape=shape_2d, projs_per_batch=1, L=300, physpixwid=0.1
+        proj_2d_shape=shape_2d, projs_per_batch=3, L=300, physpixwid=0.1
     )
-    cparr = cp.zeros((20, *shape_2d), dtype=np.float32)
+    cparr = cp.zeros((64, *shape_2d), dtype=np.float32)
     cparr = cp.random.randn(*cparr.shape).astype(cp.float32)
+    rotangs = np.linspace(-0.1, 0.1, endpoint=True, num=ncycles)
     # cparr[:, cparr.shape[1] // 2, :] = 1
     t1 = time.time()
-    for _ in range(ncycles):
-        x, e = filt._filter_bulk_axis1_concat(cparr)
+    completed_events = []
+    for _, rotang in zip(range(ncycles), rotangs):
+        x, e = filt.filter_bulk_axis1_concat(cparr, block=False, force_rotation_angle=rotang)
+        completed_events.append(e)
+    for e in completed_events:
         e.synchronize()
     t2 = time.time()
     print(
