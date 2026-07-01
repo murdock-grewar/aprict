@@ -38,6 +38,7 @@ class FBPFiltererCPU:
     proj_2d_shape: tuple[int, int]  # non-expanded shape
     chunk_shape: tuple[int, int, int]
     L: float
+    R: float
     physpixwid: float
     ss: SamplingStrategy
 
@@ -45,6 +46,7 @@ class FBPFiltererCPU:
     _expanded_2d_shape: tuple[int, int]
     _multmask_prerotation_2d_broadcastable: np.ndarray  # 1/sqrt(1 + Y^2/R^2 + X^2/R^2) where Y,X are the horz, vert coords in the detector midplane.
     _multmask_postrotation_vert_1d_broadcastable: np.ndarray
+    _multmask_allinone_postrotation_broadcastable: np.ndarray
 
     # Filtering-related allocations
     _fft_mult_horz_broadcastable: np.ndarray
@@ -62,6 +64,7 @@ class FBPFiltererCPU:
     def __init__(
         self,
         *,
+        R: float,
         L: float,  # noqa: N803
         physpixwid: float,
         proj_2d_shape: tuple[int, int],
@@ -70,6 +73,7 @@ class FBPFiltererCPU:
     ) -> None:
         if projs_per_batch is None:
             projs_per_batch = multiprocessing.cpu_count()
+        self.R = R
         self.L = L
         self.physpixwid = physpixwid
         self.ss = sampling_strategy
@@ -86,30 +90,51 @@ class FBPFiltererCPU:
         )
 
         # Construct the multiplicative mask
-        # NOTE: Y is the horizontal coordinate on the detector. X is the vertical.
-        # Yarr = physpixwid*(np.arange(self._expanded_2d_shape[0], dtype=np.float32) - (self._expanded_2d_shape[0]-1)/2)  # noqa: N806
-        # Xarr = physpixwid*(np.arange(self._expanded_2d_shape[1], dtype=np.float32) - (self._expanded_2d_shape[1]-1)/2)  # noqa: N806
-        Yarr = physpixwid * (
-            np.arange(self.proj_2d_shape[0], dtype=np.float32)
-            - (self.proj_2d_shape[0] - 1) / 2
-        )  # noqa: N806
-        Xarr = physpixwid * (
-            np.arange(self.proj_2d_shape[1], dtype=np.float32)
-            - (self.proj_2d_shape[1] - 1) / 2
-        )  # noqa: N806
-        self._multmask_prerotation_2d_broadcastable = (
+        # NOTE: Y is the horizontal coordinate on the detector midplane. X is the vertical.
+        if False:
+            Yarr = physpixwid * (R/L) * (
+                np.arange(self.proj_2d_shape[0], dtype=np.float32)
+                - (self.proj_2d_shape[0] - 1) / 2
+            )  # noqa: N806
+            Xarr = physpixwid * (R/L) * (
+                np.arange(self.proj_2d_shape[1], dtype=np.float32)
+                - (self.proj_2d_shape[1] - 1) / 2
+            )  # noqa: N806
+            self._multmask_prerotation_2d_broadcastable = (
+                1
+                / (
+                    np.sqrt(
+                        1
+                        + np.square(Xarr[np.newaxis, :] / R)
+                        + np.square(Yarr[:, np.newaxis] / R)
+                    )
+                )
+            )[np.newaxis, :, :].copy()
+            self._multmask_postrotation_vert_1d_broadcastable = (
+                1 / (np.power(np.sqrt(1 + np.square(Xarr / R)), 3))
+            )[np.newaxis, np.newaxis, :].copy()
+        else:
+            Yarr = physpixwid * (R/L) * (
+                np.arange(self._expanded_2d_shape[0], dtype=np.float32)
+                - (self._expanded_2d_shape[0] - 1) / 2
+            )  # noqa: N806
+            Xarr = physpixwid * (R/L) * (
+                np.arange(self._expanded_2d_shape[1], dtype=np.float32)
+                - (self._expanded_2d_shape[1] - 1) / 2
+            )  # noqa: N806
+
+
+        self._multmask_allinone_postrotation_broadcastable = (
             1
             / (
-                np.sqrt(
+                np.float_power(np.sqrt(1 + np.square(Xarr[np.newaxis, :] / R)), 3)
+                * np.sqrt(
                     1
-                    + np.square(Xarr[np.newaxis, :] / L)
-                    + np.square(Yarr[:, np.newaxis] / L)
+                    + np.square(Xarr[np.newaxis, :] / R)
+                    + np.square(Yarr[:, np.newaxis] / R)
                 )
             )
         )[np.newaxis, :, :].copy()
-        self._multmask_postrotation_vert_1d_broadcastable = (
-            1 / (np.power(np.sqrt(1 + np.square(Xarr / L)), 3))
-        )[np.newaxis, np.newaxis, :].copy()
 
         # Allocate memory which will be reused.
         self._mem_prerotation = np.zeros(
@@ -130,7 +155,7 @@ class FBPFiltererCPU:
         kern_horz: np.ndarray = (
             ramp_kernels.ramp_kernel_ramlak(
                 hk,  # must be odd for this function
-                physpixsize=physpixwid,
+                physpixsize=physpixwid * (R/L),
             )
         )[:h].copy()  # may crop last element
         # Roll the kernel so that the middle coefficient is at the beginning
@@ -347,10 +372,13 @@ class FBPFiltererCPU:
                 :sl_len, padx : ((-padx) or None), pady : ((-pady) or None)
             ]
             # print("mem_prerot_view shape: ", mem_prerot_view.shape)
-            prerot_factor = self._multmask_prerotation_2d_broadcastable  # noqa: F841
-            ne.evaluate(
-                "nparr_sliced_view * prerot_factor", out=mem_prerot_view
-            )  # multi-threaded copy of chunk into 'v'. At the same time, apply the pre-filter multiplication factor, which commutes with the rotation.
+
+            # Commented out to do the factor all in one after the rotation
+            #prerot_factor = self._multmask_prerotation_2d_broadcastable  # noqa: F841
+            #ne.evaluate(
+            #    "nparr_sliced_view * prerot_factor", out=mem_prerot_view
+            #)  # multi-threaded copy of chunk into 'v'. At the same time, apply the pre-filter multiplication factor, which commutes with the rotation.
+            ne.evaluate("nparr_sliced_view", out=mem_prerot_view)
 
             # Rotations are not multithreaded, so we'll launch a separate thread for each layer we want to rotate.
             def do_inverse_rotation(layer_index: int, rot_ang: float) -> None:
@@ -421,8 +449,13 @@ class FBPFiltererCPU:
             [t.join() for t in threads]
 
             # Apply the post-rotation multiplier. This commutes withe the ramp filter.
-            m = self._multmask_postrotation_vert_1d_broadcastable  # noqa: F841
-            v = self._mem_postrotation[:sl_len]
+            # Commented out to do the whole mask all-in-one
+            # m = self._multmask_postrotation_vert_1d_broadcastable  # noqa: F841
+            # v = self._mem_postrotation[:sl_len]
+            # ne.evaluate("v * m", out=v)
+            # Doing this instead
+            m = self._multmask_allinone_postrotation_broadcastable
+            v = self._mem_postrotation[:sl_len, : self._mem_prerotation.shape[1], :]
             ne.evaluate("v * m", out=v)
 
             ## Apply the ramp filter
@@ -497,7 +530,7 @@ if __name__ == "__main__":
     # shape_2d = (4001, 4000)
     shape_2d = (752, 752)
     filt = FBPFiltererCPU(
-        proj_2d_shape=shape_2d, projs_per_batch=None, L=300, physpixwid=0.1
+        proj_2d_shape=shape_2d, projs_per_batch=None, R=100, L=300, physpixwid=0.1
     )
     nparr = np.zeros((64, *shape_2d), dtype=np.float32)
     nparr = np.random.randn(*nparr.shape).astype(np.float32)

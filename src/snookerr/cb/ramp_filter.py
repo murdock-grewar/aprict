@@ -229,12 +229,15 @@ class RampFilterer:
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(cparr_view, block=False)
-        output = cp.zeros_like(cparr_view)
+        with cp.cuda.Stream(non_blocking=True) as stream:
+            output = cp.zeros_like(cparr_view)
+            output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
             with cp.cuda.Stream(non_blocking=True) as stream:
+                stream.wait_event(output_created_event)
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
                 ev = cp.cuda.Event(
@@ -596,10 +599,13 @@ class FBPFilterer:
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
             # Rotate back to original orientation and place into output buffer
-            out_buffer = cp.zeros_like(out)
+            with cp.cuda.Stream(non_blocking=True) as stream:
+                out_buffer = cp.zeros_like(out)
+                event_out_buffer_created = stream.record()
             for proj_index in range(v.shape[0]):
                 with cp.cuda.Stream(non_blocking=True) as stream:
                     stream.wait_event(self.event_completed_ramp)
+                    stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
                     cupyx.scipy.ndimage.rotate(
                         input=out[proj_index],
@@ -655,13 +661,16 @@ class FBPFilterer:
             clear_gpu_cache_regularly=clear_gpu_cache_regularly,
             force_rotation_angle=force_rotation_angle,
         )
-        output = cp.zeros_like(arr)
+        with cp.cuda.Stream(non_blocking=True) as stream:
+            output = cp.zeros_like(arr)
+            output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
             with cp.cuda.Stream(non_blocking=True) as stream:
                 stream.wait_event(e)
+                stream.wait_event(output_created_event)
                 cp.multiply(out_arr, 1, out=output[sl])
                 ev = cp.cuda.Event(
                     block=False, disable_timing=True, interprocess=False
