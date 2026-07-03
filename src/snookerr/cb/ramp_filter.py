@@ -29,6 +29,9 @@ import numpy as np
 from .. import ramp_kernels
 from ..lib import gpu_tools
 
+# There is a pesky bug that I can't solve. This flag will apply a hotfix.
+_HOTFIX_DISABLE_ASYNCHRONICITY: bool = True
+
 
 class RampFilterer:
     """A class to facilitate repetitive 1D filtrations along axis 1 of a cupy projection array."""
@@ -229,14 +232,14 @@ class RampFilterer:
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(cparr_view, block=False)
-        with cp.cuda.Stream(non_blocking=True) as stream:
+        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
             output = cp.zeros_like(cparr_view)
             output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
-            with cp.cuda.Stream(non_blocking=True) as stream:
+            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                 stream.wait_event(output_created_event)
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
@@ -247,7 +250,7 @@ class RampFilterer:
                 events.append(ev)
             sl_start += out_arr.shape[0]
 
-        with cp.cuda.Stream(non_blocking=True) as stream:
+        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
             for e in events:
                 stream.wait_event(e)
             completed_event = cp.cuda.Event(
@@ -316,6 +319,7 @@ class FBPFilterer:
             physpixwid=physpixwid * R/L,
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
+            stream=cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY),
         )
         # self._fft_2d_shape = self.rfilt._fft_2d_shape
         self.event_completed_filter = None
@@ -477,7 +481,7 @@ class FBPFilterer:
                 )
             events = [None for _ in range(v.shape[0])]
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(non_blocking=True) as stream:
+                with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                     # The ramp filter uses the same memory we're about to write into.
                     # Wait for it to complete filtering and producing its output before
                     # we overwrite that memory.
@@ -599,11 +603,11 @@ class FBPFilterer:
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
             # Rotate back to original orientation and place into output buffer
-            with cp.cuda.Stream(non_blocking=True) as stream:
+            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                 out_buffer = cp.zeros_like(out)
                 event_out_buffer_created = stream.record()
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(non_blocking=True) as stream:
+                with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
@@ -622,7 +626,7 @@ class FBPFilterer:
                         block=False, disable_timing=True, interprocess=False
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU stream which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
-            with cp.cuda.Stream(non_blocking=True) as stream:
+            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                 for e in events:
                     stream.wait_event(e)
                 self.event_completed_filter = cp.cuda.Event(
@@ -661,14 +665,14 @@ class FBPFilterer:
             clear_gpu_cache_regularly=clear_gpu_cache_regularly,
             force_rotation_angle=force_rotation_angle,
         )
-        with cp.cuda.Stream(non_blocking=True) as stream:
+        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
             output = cp.zeros_like(arr)
             output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
-            with cp.cuda.Stream(non_blocking=True) as stream:
+            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
                 stream.wait_event(e)
                 stream.wait_event(output_created_event)
                 cp.multiply(out_arr, 1, out=output[sl])
@@ -679,7 +683,7 @@ class FBPFilterer:
                 events.append(ev)
             sl_start += out_arr.shape[0]
 
-        with cp.cuda.Stream(non_blocking=True) as stream:
+        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
             for e in events:
                 stream.wait_event(e)
             completed_event = cp.cuda.Event(
@@ -696,7 +700,7 @@ class FBPFilterer:
 if __name__ == "__main__":
     # Do the test
     ncycles: int = 100
-    # filt = RampFilterer(proj_2d_shape=(3001, 4000), projs_per_batch=3, stream=cp.cuda.Stream(non_blocking=True))
+    # filt = RampFilterer(proj_2d_shape=(3001, 4000), projs_per_batch=3, stream=cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY))
     # shape_2d = (4001, 4000)
     shape_2d = (752, 752)
     filt = FBPFilterer(
