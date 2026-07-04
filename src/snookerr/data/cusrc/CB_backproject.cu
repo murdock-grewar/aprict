@@ -72,7 +72,7 @@ __device__ half read_from_surf3D<half>(
 { return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
 
 
-__device__ float exact_line_integral_backproject_linelen(
+__device__ float exact_line_integral_backproject_linelen_unitvoxwid(
         const fvec3         v1,
         const fvec3         v2,
         const fvec3         voxpos // position of the center of the voxel
@@ -95,6 +95,19 @@ __device__ float exact_line_integral_backproject_linelen(
     return c * norm_fvec3(dv); // Maybe add an extra quick return if c is zero? Maybe compiler does it automatically?
 }
 
+__device__ float exact_line_integral_backproject_linelen(
+        const fvec3         v1,
+        const fvec3         v2,
+        const fvec3         voxpos, // position of the center of the voxel
+        const float         voxwid
+    )
+{
+    return voxwid * exact_line_integral_backproject_linelen_unitvoxwid(
+        v1 / voxwid,
+        v2 / voxwid,
+        voxpos / voxwid
+    );
+}
 
 template<
     typename Tv,  // type of volume data. e.g. float or double.
@@ -221,7 +234,7 @@ __device__ Tp get_bilinear_interp(
 
 template<typename Tp>
 __device__ Tp get_zero_interp(
-        const float2 det_idx_f,
+        const float2 det_idx_f,  // measured from the centre of the corner pixel, in multiples of pixel-lengths
         const uint2  shape,
         const ulong2 strides,
         const Tp*    data_2d
@@ -244,7 +257,8 @@ __device__ Tv _backproject_CB_getval(
         const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
         const uivec3                    vol_chunk_shape,
         const proj_chunk_spec_maxlen10  proj_chunk_spec,
-        const uivec3                    vol_idx          // index of the voxel within the chunk, beginning from 0,0,0
+        const uivec3                    vol_idx,          // index of the voxel within the chunk, beginning from 0,0,0
+        const float                     voxwid
 )
 {
 
@@ -256,7 +270,7 @@ __device__ Tv _backproject_CB_getval(
     }
 
     // Get the center position of this voxel
-    const fvec3 vox_pos = pos_000_c + vol_idx;
+    const fvec3 vox_pos = pos_000_c + (vol_idx * voxwid);
 
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
@@ -275,17 +289,18 @@ __device__ Tv _backproject_CB_getval(
     unsigned long det_idx;
 
     const bool exact = config.exact_line_integ_backproj;
+    const Tv voxwid_Tv = fcast<Tv>(voxwid);
 
     // Loop over all detector pixels and add the backprojection
     const fvec3 _vox_corner_offsets[8] = {
-        fvec3(-1./2., -1./2., -1./2.),
-        fvec3(-1./2., -1./2.,  1./2.),
-        fvec3(-1./2.,  1./2., -1./2.),
-        fvec3(-1./2.,  1./2.,  1./2.),
-        fvec3( 1./2., -1./2., -1./2.),
-        fvec3( 1./2., -1./2.,  1./2.),
-        fvec3( 1./2.,  1./2., -1./2.),
-        fvec3( 1./2.,  1./2.,  1./2.)
+        fvec3(-1./2., -1./2., -1./2.) * voxwid,
+        fvec3(-1./2., -1./2.,  1./2.) * voxwid,
+        fvec3(-1./2.,  1./2., -1./2.) * voxwid,
+        fvec3(-1./2.,  1./2.,  1./2.) * voxwid,
+        fvec3( 1./2., -1./2., -1./2.) * voxwid,
+        fvec3( 1./2., -1./2.,  1./2.) * voxwid,
+        fvec3( 1./2.,  1./2., -1./2.) * voxwid,
+        fvec3( 1./2.,  1./2.,  1./2.) * voxwid
     };
     Tv accumulator = 0.;
     Tv sub_accumulator = 0.;
@@ -328,7 +343,7 @@ __device__ Tv _backproject_CB_getval(
                     );
 
                     float intersect_linelen = exact_line_integral_backproject_linelen(
-                        source_pos, det_pos, vox_pos);
+                        source_pos, det_pos, vox_pos, voxwid);
 
                     if (intersect_linelen != 0.f) {
                         // Find the detector value there
@@ -423,7 +438,7 @@ __device__ Tv _backproject_CB_getval(
                 );
                 float dist_to_det = norm_fvec3(det_pos - source_pos);
                 float dist_to_vox = norm_fvec3(vox_pos - source_pos);
-                float mag = dist_to_det/dist_to_vox;
+                float mag = dist_to_det/dist_to_vox*voxwid;  // Need to divide by voxwid here
                 float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
                 Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
 
@@ -433,8 +448,9 @@ __device__ Tv _backproject_CB_getval(
                     multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
                 }
 
-                sub_accumulator = fcast<Tv>(det_value * multiplier);
+                sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
             }
+
         }
 
         // Apply softening toward detector edges, if applicable
@@ -481,14 +497,15 @@ __global__ void backproject_CB_volmem(
         threadIdx.z + blockIdx.z * blockDim.z
     );
     const uivec3 vol_chunk_shape = volchunkspec.shape;
-    const fvec3  pos_000_c       = volchunkspec.pos_000;
+    const fvec3  pos_000_c       = volchunkspec.os_000;
 
     const Tv value = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
         proj_chunk_spec,
-        vol_idx
+        vol_idx,
+        1.f
     );
 
     // Write the value to the surface memory and leave
@@ -524,14 +541,17 @@ __global__ void backproject_CB_voltex(
         threadIdx.z + blockIdx.z * blockDim.z
     );
     const uivec3 vol_chunk_shape = voltexchunkspec.shape;
-    const fvec3  pos_000_c       = voltexchunkspec.texpos + fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets;
+    const float voxwid = voltexchunkspec.voxwid;
+    const fvec3  pos_000_c       = voltexchunkspec.texpos + (
+            fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets)*voxwid;
 
     Tv value = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
         proj_chunk_spec,
-        vol_idx
+        vol_idx,
+        voxwid
     );
 
     // Write the value to the surface memory and leave

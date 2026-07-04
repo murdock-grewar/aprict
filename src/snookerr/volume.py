@@ -51,6 +51,12 @@ class Volume[
     _pos_c: np.ndarray[
         tuple[typing.Literal[3],], np.dtype[np.float32]
     ]  # location of the centre of the volume, in space
+    _voxwid: float
+
+    @property
+    def voxwid(self) -> float:
+        """Return the width of each voxel, in arbitrary units of distance."""
+        return self._voxwid
 
     @property
     def shape(self) -> _ShapeType:
@@ -84,16 +90,19 @@ class Volume[
         arr: np.ndarray[
             Shape, DType
         ],  # this typing ensures the correct dimensions (3) and a supported numpy dtype
+        *,
+        voxwid: float,
         pos_c: np.ndarray[
             tuple[typing.Literal[3]], np.dtype[np.float32]
-        ] = np.array((0, 0, 0), dtype=np.float32),
+        ] | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
     ) -> None:
         # Essentially, we are storing the resolved types of the TypeVars
         self._dtype = arr.dtype
         self._shape = arr.shape
         # Create the texture and load the data
         self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
-        self._pos_c = pos_c
+        self._voxwid = voxwid
+        self._pos_c = np.array(pos_c)
         self.copy_from(arr)
 
     def __del__(self) -> None:
@@ -157,27 +166,29 @@ class Volume[
     def zeros(
         cls,
         shape: _ShapeType,
-        dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
         *,
+        voxwid: float,
+        dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
         pos_c: np.ndarray[
             tuple[typing.Literal[3]], np.dtype[np.float32]
-        ] = np.array((0, 0, 0), dtype=np.float32),
+        ] | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
     ) -> Volume:
         """Initialise a new volume, filled with zeros."""
         if type(shape) is not tuple or len(shape) != 3:
             msg = "Invalid shape provided. It should be a tuple of three positive integers."
             raise ValueError(msg)
         self: Volume = cls.__new__(cls)
+        self._voxwid = voxwid
         self._dtype = np.dtype(dtype)
         self._shape = shape
-        self._pos_c = pos_c
+        self._pos_c = np.array(pos_c)
         self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
         self.fill(0)
         return self
 
     def zeroed_copy(self) -> Volume:
         """Return a copy of this volume, but filled with zeros."""
-        return Volume.zeros(self._shape, self._dtype, pos_c=self.pos_c)
+        return Volume.zeros(self._shape, voxwid=self._voxwid, dtype=self._dtype, pos_c=self.pos_c)
 
     def fill(self, value: int | float) -> None:
         """Fill the volume with a constant value."""

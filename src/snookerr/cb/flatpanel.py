@@ -17,7 +17,11 @@
 
 """End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code."""
 
+import dataclasses
+import functools
 import itertools
+import json
+import pathlib
 
 import cupy as cp
 import numpy as np
@@ -138,7 +142,7 @@ def _select_backprojection_kernel(  # noqa: ANN202
     )
 
 
-def assert_flatpanel_geometry_consistency(
+def _assert_flatpanel_geometry_consistency(
     proj_specs: np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]],  # ty:ignore[invalid-type-arguments]
     projs: cp.ndarray[tuple[int, ...], cp.dtype[cp.float32 | cp.float64]]
     | None,
@@ -172,61 +176,292 @@ def assert_flatpanel_geometry_consistency(
     return data_shape
 
 
-def create_proj_spec_array(
-    source_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-    det_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-    det_uvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-    det_vvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-    nu: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
-    nv: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
-) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
-    """Create a proj_spec array for use in creating a ProjectionSet object."""
-    convert_to_fvec3 = lambda a: np.apply_along_axis(  # noqa: E731
-        lambda arr: np.array(tuple(arr), dtype=structs.fvec3),
-        axis=-1,
-        arr=a,
-    )
+@dataclasses.dataclass(kw_only=True)  # making it a dataclass is somewhat useful, despite implementing the __init__ method explicitly
+class ProjGeom:  # noqa: PLW1641
+    """A dataclass representing a geometry for a set of cone-beam projections."""
 
-    sps = convert_to_fvec3(source_pos)
-    dps = convert_to_fvec3(det_pos)
-    us = convert_to_fvec3(det_uvec)
-    vs = convert_to_fvec3(det_vvec)
-    nus = np.array(nu, dtype=np.uint16)
-    nvs = np.array(nv, dtype=np.uint16)
-    tps = np.array(np.uint(0), dtype=np.uint8)
+    source_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+    det_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+    det_uvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+    det_vvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]]
+    nu: np.ndarray[tuple[int, ...], np.dtype[np.integer]]
+    nv: np.ndarray[tuple[int, ...], np.dtype[np.integer]]
 
-    def func_det(*args):  # noqa: ANN002, ANN202
-        return np.array(tuple(args), dtype=structs.det_spec)
+    def __init__(
+        self,
+        *,
+        source_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+        det_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+        det_uvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+        det_vvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+        nu: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+        nv: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+        _skip_regularisation: bool = False,
+    ) -> None:
+        # Regularise the data structure by encoding then decoding from a serializable format
+        self.source_pos = source_pos
+        self.det_pos = det_pos
+        self.det_uvec = det_uvec
+        self.det_vvec = det_vvec
+        # Ignore bad typing because in that case, we're about to regularise the object anyway
+        self.nu = nu  # ty:ignore[invalid-assignment]
+        self.nv = nv  # ty:ignore[invalid-assignment]
+        # Regularising the format is important to get the object into a known format.
+        # It also makes the fields numpy arrays with expected shapes.
+        # This allows to e.g. slice the data by the projection index.
+        # We regularise so that the zeroth dimension of each array corresponds to the projection number,
+        # except where the zeroth dimension is allowed to have length 1 to indicate broadcasting across
+        # all projection indices.
+        if not _skip_regularisation:
+            pg = ProjGeom._load_from_serialized(self._pgserializable)
+            self.source_pos = pg.source_pos
+            self.det_pos = pg.det_pos
+            self.det_uvec = pg.det_uvec
+            self.det_vvec = pg.det_vvec
+            self.nu = pg.nu
+            self.nv = pg.nv
 
-    func_det_broadcastable = np.frompyfunc(func_det, nin=6, nout=1)
+    @property
+    def num_projs(self) -> int:
+        """Return the number of cone-beam projections."""
+        return self.source_pos.shape[0]
 
-    # func_det_broadcastable = np.vectorize(func_det)
-    def func_proj(*args):  # noqa: ANN002, ANN202
-        return np.array(tuple(args), dtype=structs.proj_spec)
+    def sliced(self, sl: slice[int | None, int | None, None] | list[int]) -> ProjGeom:
+        """Return a copy of this geometry, except with the projection index slice applied."""
+        if type(sl) not in (slice, list):
+            msg = f"Invalid type for slice object {sl}"
+            raise ValueError(msg)
+        # This assumes that this object has been correctly regularized, so that the zeroth dimension
+        # of each array corresponds to the projection index, except where it has length 1, which means
+        # it broadcasts across all.
+        numprojs: int = self.num_projs
 
-    func_proj_broadcastable = np.frompyfunc(func_proj, nin=2, nout=1)
-    # func_proj_broadcastable = np.vectorize(func_proj)
-    return np.array(
-        func_proj_broadcastable(
-            sps, func_det_broadcastable(dps, us, vs, nus, nvs, tps)
-        ),
-        dtype=structs.proj_spec,
-    )
+        def copied_slice_maybe_broadcast(arr: np.ndarray, sl: slice | list[int]) -> np.ndarray:
+            if numprojs == 1:
+                # Forget about broadcasting. Treat them like arrays of length 1.
+                # Maybe one day this will result in a very specific edge case. Oh well.
+                return arr[sl, ...].copy()
+            if arr.shape[0] == 1:
+                # Do broadcasting-- i.e. return the same array again
+                return arr.copy()
+            # Do a normal slicing
+            return arr[sl, ...].copy()
+        f = functools.partial(copied_slice_maybe_broadcast, sl=sl)
+
+        return ProjGeom(
+            source_pos=f(self.source_pos),
+            det_pos=f(self.det_pos),
+            det_uvec=f(self.det_uvec),
+            det_vvec=f(self.det_vvec),
+            nu=f(self.nu),
+            nv=f(self.nv),
+        )
+
+    def flipped(self, *, flip_x: bool, flip_y: bool, flip_z: bool) -> ProjGeom:
+        """Return a new ProjGeom which is flipped along one or more axes."""
+        # Assumes a regularised form of this object, for correct array broadcasting
+        fliparr = np.array([[-1 if flip_x else 1, -1 if flip_y else 1, -1 if flip_z else 1]], dtype=np.float32)
+        return ProjGeom(
+            source_pos=self.source_pos*fliparr,
+            det_pos=self.det_pos*fliparr,
+            det_uvec=self.det_uvec*fliparr,
+            det_vvec=self.det_vvec*fliparr,
+            nu=self.nu,
+            nv=self.nv,
+        )
+
+    def rotated(self, *, xy_rads: float) -> ProjGeom:
+        """Return a new ProjGeom which is rotated about the z axis."""
+        rotmat = np.array([
+            [np.cos(xy_rads), -np.sin(xy_rads), 0],
+            [np.sin(xy_rads), np.cos(xy_rads), 0],
+            [0, 0, 1]
+        ], dtype=np.float32)
+
+        return ProjGeom(
+            source_pos=np.tensordot(rotmat, self.source_pos, axes=(-1, -1)),
+            det_pos=np.tensordot(rotmat, self.det_pos, axes=(-1, -1)),
+            det_uvec=np.tensordot(rotmat, self.det_uvec, axes=(-1, -1)),
+            det_vvec=np.tensordot(rotmat, self.det_vvec, axes=(-1, -1)),
+            nu=self.nu,
+            nv=self.nv,
+        )
+
+    def translated(self, *, x: float, y: float, z: float) -> ProjGeom:
+        """Return a new ProjGeom which is translated by the specified amounts."""
+        trans = np.array([[x, y, z]], dtype=np.float32)
+        return ProjGeom(
+            source_pos=self.source_pos + trans,
+            det_pos=self.det_pos + trans,
+            det_uvec=self.det_uvec,
+            det_vvec=self.det_vvec,
+            nu=self.nu,
+            nv=self.nv,
+        )
+
+    def __eq__(self, other) -> bool:  # noqa: ANN001, C901, D105
+        if not isinstance(other, ProjGeom):
+            return False
+        d1 = dataclasses.asdict(self)
+        d2 = dataclasses.asdict(other)
+        for key in d1.keys():
+            if key not in d2.keys():
+                return False
+        for key in d2.keys():
+            if key not in d1.keys():
+                return False
+        for key in d1.keys():
+            v1 = d1[key]
+            v2 = d2[key]
+            if type(v1) is not type(v2):
+                return False
+            t = type(v1)
+            if t in (int, np.integer, float, np.floating):
+                if v1 != v2:
+                    return False
+            elif t in (np.ndarray,):
+                if not np.all(v1 == v2):
+                    return False
+            else:
+                msg = f"Unsupported datatype: {t!s}"
+                raise ValueError(msg)
+        return True
+
+    def __ne__(self, other) -> bool:  # noqa: ANN001, D105
+        if not isinstance(other, ProjGeom):
+            return True
+        return not self.__eq__(other)
+
+    @dataclasses.dataclass(kw_only=True)
+    class _ProjGeomSerializable:
+
+        source_pos: list[list | float]
+        det_pos: list[list | float]
+        det_uvec: list[list | float]
+        det_vvec: list[list | float]
+        nu: int | list[list | int]
+        nv: int | list[list | int]
+
+        def json(self) -> dict:
+            return dataclasses.asdict(self)
+
+        def json_str(self) -> str:
+            return json.dumps(self.json(), indent=2)
+
+        @staticmethod
+        def _load_from_dict(d: dict) -> ProjGeom._ProjGeomSerializable:
+            return ProjGeom._ProjGeomSerializable(**d)
+
+        def _save_to_dict(self) -> dict:
+            return dataclasses.asdict(self)
+
+    @property
+    def _pgserializable(self) -> _ProjGeomSerializable:
+        return self._ProjGeomSerializable(
+            source_pos=np.reshape(self.source_pos, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
+            det_pos=np.reshape(self.det_pos, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
+            det_uvec=np.reshape(self.det_uvec, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
+            det_vvec=np.reshape(self.det_vvec, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
+            nu=np.reshape(np.array(self.nu), shape=(-1,)).tolist(),
+            nv=np.reshape(np.array(self.nv), shape=(-1,)).tolist(),
+        )
+
+    def json(self) -> dict:
+        """Get a json dictionary representing this object."""
+        # return dataclasses.asdict(self)
+        pgs: ProjGeom._ProjGeomSerializable = self._pgserializable
+        return pgs._save_to_dict()  # noqa: SLF001
+
+    def json_str(self) -> str:
+        """Get a json string representing this object."""
+        return json.dumps(self.json(), indent=2)
+
+    @staticmethod
+    def _load_from_serialized(pgs: ProjGeom._ProjGeomSerializable) -> ProjGeom:
+        return ProjGeom(
+            source_pos=np.array(pgs.source_pos, dtype=np.float32),
+            det_pos=np.array(pgs.det_pos, dtype=np.float32),
+            det_uvec=np.array(pgs.det_uvec, dtype=np.float32),
+            det_vvec=np.array(pgs.det_vvec, dtype=np.float32),
+            nu=np.array(pgs.nu, dtype=np.int32),
+            nv=np.array(pgs.nv, dtype=np.int32),
+            _skip_regularisation=True,
+        )
+
+    @staticmethod
+    def load(fpath: pathlib.Path | str) -> ProjGeom:
+        """Load a ProjGeom from a file."""
+        fpath = pathlib.Path(fpath)
+        if not fpath.exists():
+            raise FileNotFoundError(fpath)
+        with open(fpath, mode='r', encoding='utf-8') as f:
+            pgs = ProjGeom._ProjGeomSerializable(**json.load(f))
+        return ProjGeom._load_from_serialized(pgs)
+
+    def save(self, fpath: pathlib.Path | str, *, allow_overwrite: bool = False) -> None:
+        """Save the ProjGeom to a file."""
+        fpath = pathlib.Path(fpath)
+        if not allow_overwrite and fpath.exists():
+            raise FileExistsError(fpath)
+        with open(fpath, mode='w+', encoding='utf-8') as f:
+            f.write(self.json_str())
+
+    def to_proj_spec_array(self) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
+        """Create a proj_spec array for use in creating a ProjectionSet object."""
+        convert_to_fvec3 = lambda a: np.apply_along_axis(  # noqa: E731
+            lambda arr: np.array(tuple(arr), dtype=structs.fvec3),
+            axis=-1,
+            arr=a,
+        )
+
+        pg = self
+
+        sps = convert_to_fvec3(pg.source_pos)
+        dps = convert_to_fvec3(pg.det_pos)
+        us = convert_to_fvec3(pg.det_uvec)
+        vs = convert_to_fvec3(pg.det_vvec)
+        nus = np.array(pg.nu, dtype=np.uint16)
+        nvs = np.array(pg.nv, dtype=np.uint16)
+        tps = np.array(np.uint(0), dtype=np.uint8)
+
+        def func_det(*args):  # noqa: ANN002, ANN202
+            return np.array(tuple(args), dtype=structs.det_spec)
+
+        func_det_broadcastable = np.frompyfunc(func_det, nin=6, nout=1)
+
+        # func_det_broadcastable = np.vectorize(func_det)
+        def func_proj(*args):  # noqa: ANN002, ANN202
+            return np.array(tuple(args), dtype=structs.proj_spec)
+
+        func_proj_broadcastable = np.frompyfunc(func_proj, nin=2, nout=1)
+        # func_proj_broadcastable = np.vectorize(func_proj)
+        return np.array(
+            func_proj_broadcastable(
+                sps, func_det_broadcastable(dps, us, vs, nus, nvs, tps)
+            ),
+            dtype=structs.proj_spec,
+        )
 
 
 class ProjectionSet:
     """A class to represent a projection geometry, and optionally the associated detector data."""
 
+    _proj_geom: ProjGeom
     _proj_specs: np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]  # ty:ignore[invalid-type-arguments]
     _data: (
         cp.ndarray[tuple[int, ...], cp.dtype[cp.float32 | cp.float64]] | None
     )
 
     @property
+    def proj_geom(self) -> ProjGeom:
+        """Return the underlying ProjGeom object."""
+        return self._proj_geom
+
+    @property
     def proj_specs(
         self,
     ) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
-        """Return the underlying proj_specs object."""
+        """Return the underlying proj_specs object, which is derived from the underlying ProjGeom object."""
         return self._proj_specs
 
     @property
@@ -243,12 +478,19 @@ class ProjectionSet:
 
     def __init__(
         self,
-        proj_specs: np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]],  # ty:ignore[invalid-type-arguments]
+        pg: ProjGeom,
         *,
         data: cp.ndarray[tuple[int, ...], cp.dtype[cp.float32 | cp.float64]]
+        | np.ndarray[tuple[int, ...], np.dtype[np.float32 | np.float64]]
+        | np.memmap[tuple[int, ...], np.dtype[np.float32 | np.float32]]
         | None,
     ) -> None:
-        _ = assert_flatpanel_geometry_consistency(proj_specs, data)
+        # Convert numpy input into a CuPy array
+        if type(data) in (np.ndarray, np.memmap):
+            data = cp.array(data)
+        proj_specs = pg.to_proj_spec_array()
+        _ = _assert_flatpanel_geometry_consistency(proj_specs, data)
+        self._proj_geom = pg
         self._proj_specs = proj_specs
         self._data = data
 
@@ -266,7 +508,7 @@ class ProjectionSet:
             msg = "Data buffer already exists. Pass 'existing_ok=True' to allow this to occur without raising an exception."
             raise RuntimeError(msg)
         # The data buffer does not exist. Create it now.
-        shape = assert_flatpanel_geometry_consistency(
+        shape = _assert_flatpanel_geometry_consistency(
             self._proj_specs, self._data
         )
         self._data = cp.zeros(shape, dtype=dtype)
@@ -279,14 +521,14 @@ class ProjectionSet:
             msg = "Cannot create a zeroed copy without an explicit 'dtype' argument, because the object you are trying to copy does not yet have a determined dtype."
             raise ValueError(msg)
         if self._data is None:
-            data_shape = assert_flatpanel_geometry_consistency(
+            data_shape = _assert_flatpanel_geometry_consistency(
                 self._proj_specs, self._data
             )
             return ProjectionSet(
-                self._proj_specs,
+                self._proj_geom,
                 data=cp.zeros(data_shape, dtype=dtype),  # ty:ignore[invalid-argument-type]
             )
-        return ProjectionSet(self._proj_specs, data=cp.zeros_like(self._data))
+        return ProjectionSet(self._proj_geom, data=cp.zeros_like(self._data))
 
 
 class ConfigProject:
@@ -337,7 +579,7 @@ class ConfigBackproject:
         self,
         *,
         fast_approx: bool = False,
-        cyl_mask_rad_vox: float | int | None = None,
+        cyl_mask_rad: float | int | None = None,
         backproject_1s: bool = False,
         apply_summand_multiplier: bool = False,
         soften_det_edges_proportion: float | int | None = None,
@@ -345,7 +587,7 @@ class ConfigBackproject:
         approx_mode_direct_raycast: bool = False,
         approx_mode_bilinear_interpolate: bool = False,
     ) -> None:
-        r = cyl_mask_rad_vox or 0  # coerce 'None' to 0
+        r = cyl_mask_rad or 0  # coerce 'None' to 0
         sep = soften_det_edges_proportion or 0  # coerce 'None' to 0
         self._contents = np.array(  # ty:ignore[invalid-assignment]
             (
@@ -399,12 +641,13 @@ def project(
         assert type(volume) is Volume
         texchunkspec = np.array(
             (
+                np.float32(volume.voxwid),  # voxwid
                 np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
                 np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
                 np.array(
                     tuple(
                         volume.pos_c
-                        - np.array(volume.shape, dtype=np.float32) / 2
+                        - volume.voxwid * np.array(volume.shape, dtype=np.float32) / 2
                     ),
                     dtype=structs.fvec3.dtype,
                 ),  # texpos
@@ -521,11 +764,12 @@ def backproject(
     )  # gridDims:  (x,y,z)
     texchunkspec = np.array(
         (
+            np.float32(volume.voxwid),  # voxwid
             np.array((0, 0, 0), dtype=structs.uivec3.dtype),  # offsets
             np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
             np.array(
                 tuple(
-                    volume.pos_c - np.array(volume.shape, dtype=np.float32) / 2
+                    volume.pos_c - volume.voxwid * np.array(volume.shape, dtype=np.float32) / 2
                 ),
                 dtype=structs.fvec3.dtype,
             ),  # texpos

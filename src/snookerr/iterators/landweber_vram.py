@@ -91,7 +91,7 @@ class Landweber_flatpanel:  # noqa: N801
         )
         self._config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
-            cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
+            cyl_mask_rad=min(*volume.shape[:2]) / 2 * volume.voxwid,
             apply_summand_multiplier=False,
             soften_det_edges_proportion=soften_det_edges_proportion,
         )
@@ -135,7 +135,7 @@ class Landweber_flatpanel:  # noqa: N801
             scratch_volume.copy_from(v)
             # self._hardmask_vol(
             #     scratch_volume
-            # )  # Note: not exactly the same as the cyl_mask_rad_vox offered by the backprojection. This may matter.
+            # )  # Note: not exactly the same as the cyl_mask_rad offered by the backprojection. This may matter.
             svn = scratch_volume.norm
             for _ in range(num_iterations):  # Use N iterations of power method to find the rayleigh quotient
                 # Normalize the volume

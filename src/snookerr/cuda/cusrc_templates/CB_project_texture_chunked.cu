@@ -19,6 +19,36 @@ typedef struct {
     float dz;
 } LineIntegState;
 
+template<typename T>
+__device__ T fcast(const half f)
+{
+    return (T)__half2float(f);
+}
+template<typename T>
+__device__ T fcast(const float f)
+{
+    return (T)f;
+}
+template<typename T>
+__device__ T fcast(const double f)
+{
+    return (T)f;
+}
+template<>
+__device__ half fcast<half>(const half f)
+{
+    return f;
+}
+template<>
+__device__ half fcast<half>(const float f)
+{
+    return __float2half(f);
+}
+template<>
+__device__ half fcast<half>(const double f)
+{
+    return __double2half(f);
+}
 
 /* Note on the 'half' type, used for 16-bit floating point precision:
  * The texture writing function, 'surf3Dwrite' or 'surf2Dwrite', doesn't support
@@ -98,7 +128,7 @@ __device__ half read_from_tex3D<half>(
 template<
     typename Tv,
     typename Tp>  // type of projection data. e.g. float or double
-__device__ Tp exact_line_integral(
+__device__ Tp exact_line_integral_unitvoxwid(
         const fvec3                 v1,
         const fvec3                 v2,
         const vol_tex_chunk_spec    texchunkspec,
@@ -255,6 +285,38 @@ __device__ Tp exact_line_integral(
         accum_val *= length_per_step;
     }
     return accum_val;
+}
+
+template<
+    typename Tv,
+    typename Tp>  // type of projection data. e.g. float or double
+__device__ Tp exact_line_integral(
+        const fvec3                 v1,
+        const fvec3                 v2,
+        const vol_tex_chunk_spec    texchunkspec,
+        cudaSurfaceObject_t         volume_surface,
+        // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
+        const bool                  return_false_steps = false)
+{
+
+    // To handle non-unit voxel widths, we will convert to an equivalent texchunkspec with a unit voxel width,
+    // then scale the result.
+
+    const float voxwid = texchunkspec.voxwid;
+
+    vol_tex_chunk_spec vtcs;
+    vtcs.voxwid = 1.f;
+    vtcs.offsets = texchunkspec.offsets;  // Measured in voxel-widths, so remains the same.
+    vtcs.shape = texchunkspec.shape;
+    vtcs.texpos = texchunkspec.texpos / voxwid;
+
+    return fcast<Tp>(voxwid) * exact_line_integral_unitvoxwid<Tv,Tp>(
+        v1 / voxwid,
+        v2 / voxwid,
+        vtcs,
+        volume_surface,
+        return_false_steps
+    );
 }
 
 __device__ fvec3 detpos(

@@ -76,6 +76,7 @@ struct vol_spec {
 };
 
 struct vol_tex_chunk_spec {
+    float voxwid;
     uivec3 offsets;
     uivec3 shape;
     fvec3 texpos;

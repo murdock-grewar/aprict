@@ -449,6 +449,7 @@ class TestCB_BACKPROJ_randomnoise:
         )
         texchunkspec = np.array(
             (
+                np.float32(1),  # voxwid
                 np.array(
                     (0, 0, 0),
                     dtype=ks_uivec3.dtype,

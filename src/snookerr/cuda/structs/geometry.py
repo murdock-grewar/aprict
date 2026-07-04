@@ -170,11 +170,12 @@ class vol_tex_chunk_spec(
     kern_structs.KernelStruct,
     struct_name="vol_tex_chunk_spec",
     names=[
-        "offsets",  # unsigned integer offsets from the 0,0,0 base of the texture
+        "voxwid",  # the width of a voxel, in arbitrary units of distance. Should match the distance of units used for measurement the projection geometry.
+        "offsets",  # unsigned integer offsets from the 0,0,0 base of the texture. These are measured in units of voxel-widths.
         "shape",  # unsigned shape of the chunk
-        "texpos",  # The 0,0,0 corner of the texture of which chunk is a part. NOTE: this is NOT the position of the center of the 0,0,0 voxel! It is the position of the corner of that voxel.
+        "texpos",  # The 0,0,0 corner of the texture of which chunk is a part. The position is measured in the same units of distance as the voxwid. E.g. mm or cm. NOT in voxel-widths. NOTE: this is NOT the position of the center of the 0,0,0 voxel! It is the position of the corner of that voxel.
     ],
-    dtypes=[uivec3, uivec3, fvec3],
+    dtypes=[np.float32, uivec3, uivec3, fvec3],
 ):
     pass  # ty:ignore[invalid-argument-type]
 
