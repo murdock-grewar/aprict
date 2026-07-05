@@ -21,12 +21,14 @@ import dataclasses
 import functools
 import itertools
 import json
+import logging  # noqa: TC003
 import pathlib
 
 import cupy as cp
 import numpy as np
 import numpy.typing as npt  # noqa: F401
 
+from .. import logtools
 from ..cuda import header_injection, structs
 from ..cuda.kern_structs import _np_dtype_to_c_type
 from ..volume import FBVolume, Volume
@@ -729,6 +731,8 @@ def backproject(
     projs: ProjectionSet,
     block: bool = False,
     summand_multiplier: Volume | None = None,
+    logger: logging.Logger | None = None,
+    enable_pbar: bool = False,
 ) -> Volume:
     """Add the backprojection of the projection array to the input volume."""
     # Assert that the projection data is supplied
@@ -781,52 +785,61 @@ def backproject(
         projs.data.strides[-3:], dtype=structs.uivec3
     )
     # Compute the projection. Loop through higher dimensions of the passed array, if applicable.
-    for index_tuple in itertools.product(
-        *map(range, projs.proj_specs.shape[:-1])
-    ):
-        # If a flat proj_specs was passed, then 'index_tuple' will only take on the value of an  empty tuple.
-        for i in range(int(np.ceil(projs.proj_specs.shape[-1] / 10))):
-            # Prepare a chunk of 10 projections
-            proj_specs_10chunk = list(
-                projs.proj_specs[index_tuple][i * 10 : (i + 1) * 10]
-            )
-            num_projs_in_chunk = len(proj_specs_10chunk)
-            proj_specs_10chunk.extend(
-                [proj_specs_10chunk[-1]] * (10 - num_projs_in_chunk)
-            )  # repeat the last projspec to fill up a whole chunk of 10.
-            #
-            input_proj_chunk_spec = np.array(
-                (
-                    np.array(
-                        proj_specs_10chunk, dtype=structs.proj_spec
-                    ),  # projspecs
-                    np.uint8(num_projs_in_chunk),  # numprojs
-                    np.uint64(
-                        projs.data.data.ptr
-                        + sum(
-                            map(
-                                lambda index, stride: index * stride,
-                                index_tuple,
-                                projs.data.strides[:-3],
-                            ),
-                            i * 10 * projs.data.strides[-3],
-                        )
-                    ),  # projmemaddr
-                    projs_3d_strides_bytes,  # projmemstrides
-                ),
-                dtype=structs.proj_chunk_spec_maxlen10,
-            )
-            # Launch the kernel
-            args = (  # input args
-                config.contents,
-                texchunkspec,
-                volume._texture.surfobj,  # noqa: SLF001
-                None
-                if summand_multiplier is None
-                else summand_multiplier._texture.surfobj,  # noqa: SLF001
-                input_proj_chunk_spec,
-            )
-            kern(grid_dims, block_dims, args)
-    if block:
-        cp.cuda.get_current_stream().synchronize()
+    index_tuple_list = list(itertools.product(*map(range, projs.proj_specs.shape[:-1])))
+    istop: int = int(np.ceil(projs.proj_specs.shape[-1] / 10))
+    with logtools.ProgressBar(
+            desc="backprojection:",
+            maxval=len(index_tuple_list)*projs.proj_specs.shape[-1],
+            valunit="proj",
+            logger=logger,
+            enable=enable_pbar,
+        ) as pbar:
+        for index_tuple_i, index_tuple in enumerate(index_tuple_list):
+            # If a flat proj_specs was passed, then 'index_tuple' will only take on the value of an  empty tuple.
+            for i in range(istop):
+                # Prepare a chunk of 10 projections
+                proj_spec_sl = slice(i* 10, min((i+1) * 10, projs.proj_specs.shape[-1]))
+                proj_specs_10chunk = list(
+                    projs.proj_specs[index_tuple][proj_spec_sl]  # [i * 10 : (i + 1) * 10]
+                )
+                num_projs_in_chunk = len(proj_specs_10chunk)
+                proj_specs_10chunk.extend(
+                    [proj_specs_10chunk[-1]] * (10 - num_projs_in_chunk)
+                )  # repeat the last projspec to fill up a whole chunk of 10.
+                #
+                input_proj_chunk_spec = np.array(
+                    (
+                        np.array(
+                            proj_specs_10chunk, dtype=structs.proj_spec
+                        ),  # projspecs
+                        np.uint8(num_projs_in_chunk),  # numprojs
+                        np.uint64(
+                            projs.data.data.ptr
+                            + sum(
+                                map(
+                                    lambda index, stride: index * stride,
+                                    index_tuple,
+                                    projs.data.strides[:-3],
+                                ),
+                                i * 10 * projs.data.strides[-3],
+                            )
+                        ),  # projmemaddr
+                        projs_3d_strides_bytes,  # projmemstrides
+                    ),
+                    dtype=structs.proj_chunk_spec_maxlen10,
+                )
+                # Launch the kernel
+                args = (  # input args
+                    config.contents,
+                    texchunkspec,
+                    volume._texture.surfobj,  # noqa: SLF001
+                    None
+                    if summand_multiplier is None
+                    else summand_multiplier._texture.surfobj,  # noqa: SLF001
+                    input_proj_chunk_spec,
+                )
+                kern(grid_dims, block_dims, args)
+                pbar.update_to(index_tuple_i*projs.proj_specs.shape[-1] + proj_spec_sl.stop)
+        if block:
+            cp.cuda.get_current_stream().synchronize()
     return volume

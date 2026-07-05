@@ -15,12 +15,14 @@
 
 """A module for an iterative Landweber reconstructor object applying to flat-panel cone-beam data."""
 
+import logging
 from typing import TYPE_CHECKING
 
 import cupy as cp
 import numpy as np
 import pydantic
 
+from .. import logtools
 from ..cb import flatpanel as cbfp
 from ..lib import gpu_tools
 
@@ -45,6 +47,8 @@ class Landweber_flatpanel:  # noqa: N801
     _config_bp: cbfp.ConfigBackproject
     _config_fp: cbfp.ConfigProject
 
+    _logger: logging.Logger
+
     @pydantic.dataclasses.dataclass(frozen=True, kw_only=True)
     class Config:
         """Configuration dataclass for the Landweber iterator."""
@@ -66,8 +70,9 @@ class Landweber_flatpanel:  # noqa: N801
 
     def __init__(
         self, config: Config, volume: Volume, projs: cbfp.ProjectionSet | list[cbfp.ProjectionSet], *,
-        proj_zero_masks: cp.ndarray | list[cp.ndarray] | None = None,
+        proj_zero_masks: cp.ndarray | list[cp.ndarray] | None = None, logger: logging.Logger | None
     ) -> None:
+        self._logger = logger if logger is not None else logging.getLogger()
         self._config = config
         self._vol = volume
         self._meas = projs if type(projs) is list else [projs]  # ty:ignore[invalid-assignment]  # ty is bugged
@@ -128,26 +133,35 @@ class Landweber_flatpanel:  # noqa: N801
         scale_factor: float = 1 / float(
             np.mean(scratch_volume.shape)
         )  # a factor used to scale things to prevent overflow etc
-        for scratch_projs in scratch_projs_list:
-            assert scratch_projs.data is not None  # useful assertion for type-checking
-            # Generate a random positive volume
-            v = np.abs(np.random.randn(*scratch_volume.shape)*scale_factor).astype(np.float32)  # noqa: NPY002
-            scratch_volume.copy_from(v)
-            # self._hardmask_vol(
-            #     scratch_volume
-            # )  # Note: not exactly the same as the cyl_mask_rad offered by the backprojection. This may matter.
-            svn = scratch_volume.norm
-            for _ in range(num_iterations):  # Use N iterations of power method to find the rayleigh quotient
-                # Normalize the volume
-                scratch_volume.multiply(1/svn)
-                # Apply A^T A to the volume
-                scratch_projs.data.fill(0)
-                cbfp.project(config=fp_config, volume=scratch_volume, projs=scratch_projs, block=True)
-                rayleigh_quotient = cp.square(cp.linalg.norm(scratch_projs.data))
-                scratch_volume.fill(0)
-                cbfp.backproject(config=bp_config, volume=scratch_volume, projs=scratch_projs, block=True)
+        self._logger.debug("Calculating Rayleigh quotient(s) for the ordered subset(s)...")
+        with logtools.ProgressBar(
+                desc="Calc. Rayleigh quot.:",
+                maxval=num_iterations * len(scratch_projs_list),
+                valunit="iteration",
+                logger=self._logger,
+            ) as pbar:
+            for scratch_projs_index, scratch_projs in enumerate(scratch_projs_list):
+                assert scratch_projs.data is not None  # useful assertion for type-checking
+                # Generate a random positive volume
+                v = np.abs(np.random.randn(*scratch_volume.shape)*scale_factor).astype(np.float32)  # noqa: NPY002
+                scratch_volume.copy_from(v)
+                # self._hardmask_vol(
+                #     scratch_volume
+                # )  # Note: not exactly the same as the cyl_mask_rad offered by the backprojection. This may matter.
                 svn = scratch_volume.norm
-            rayleigh_quotient_list.append(rayleigh_quotient)  # Could also use svn instead of rayleigh_quotient
+                for numit in range(1, num_iterations+1):  # Use N iterations of power method to find the rayleigh quotient
+                    # Normalize the volume
+                    scratch_volume.multiply(1/svn)
+                    # Apply A^T A to the volume
+                    scratch_projs.data.fill(0)
+                    cbfp.project(config=fp_config, volume=scratch_volume, projs=scratch_projs, block=True)
+                    rayleigh_quotient = cp.square(cp.linalg.norm(scratch_projs.data))
+                    scratch_volume.fill(0)
+                    cbfp.backproject(config=bp_config, volume=scratch_volume, projs=scratch_projs, block=True, logger=self._logger)
+                    svn = scratch_volume.norm
+                    pbar.update_to(numit + num_iterations*scratch_projs_index)
+                rayleigh_quotient_list.append(rayleigh_quotient)  # Could also use svn instead of rayleigh_quotient
+        self._logger.debug("...done calculating Rayleigh quotient(s).")
         if flag_using_existing_volume:
             self._vol.fill(0)  # reset the volume to 0
         del scratch_volume
@@ -193,6 +207,7 @@ class Landweber_flatpanel:  # noqa: N801
                 projs=proj_scratch_space,
                 summand_multiplier=None,
                 block=True,
+                logger=self._logger,
             )
 
     @property

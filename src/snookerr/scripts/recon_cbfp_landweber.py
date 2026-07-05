@@ -1,7 +1,5 @@
-
 import argparse
-
-# Import numexpr with the appropriate number of threads
+import logging
 import os
 import pathlib
 
@@ -21,7 +19,7 @@ try:
 except ModuleNotFoundError:
     mod_avail_liveplot: bool = False
 
-from .. import Volume, lib
+from .. import Volume, lib, logtools
 from ..cb import flatpanel as cbfp
 from ..iterators import Landweber_flatpanel
 
@@ -61,21 +59,39 @@ def _make_arg_parser() -> argparse.ArgumentParser:
     group_cyl_options = parser.add_argument_group(title="cylindrical trajectory options", description="These options are specific to the cylindrical trajectory. They will not make sense as options for arbitrary geometries.")
     group_cyl_options.add_argument('--cyl-confine-proj-lines-z', metavar="False", type=lib.argparse_tools.BoolArgType, default=False, help="A special option to mask out projection lines whose intersection with the solid cylinder is not completely contained in the reconstruction volume. This option assumes that the reconstruction volume has x,y = 0 at its centre.", required=False)
 
+    group_io_options = parser.add_argument_group(title="I/O options")
+    group_io_options.add_argument("--output", metavar="path/to/new/dir/", type=lib.argparse_tools.MaybeType(pathlib.Path), default=None, help="Path to a new directory to create and place output artefacts and log files.")
+    group_io_options.add_argument("--verbosity", metavar="INFO", type=logtools.LogLevel, action=lib.argparse_tools.EnumAction, default=logtools.LogLevel.INFO, help="The verbosity of output logging to stderr. Log files will not be affected by this setting.")
+
     return parser
 
 
 def main() -> None:
     """Run the script."""
-    # Set numexpr to have the appropriate number of threads
-    # This should have already worked at import time, but it doesn't for some reason
-    if 'NUMEXPR_MAX_THREADS' in os.environ:
-        ne.set_num_threads(min(2*os.cpu_count(), int(os.environ['NUMEXPR_MAX_THREADS'])))  # ty:ignore[unsupported-operator]
-    else:
-        ne.set_num_threads(2*os.cpu_count())  # ty:ignore[unsupported-operator]
-
     # Parse the input arguments
     parser = _make_arg_parser()
     args = parser.parse_args()
+
+    ##### Logging setup #####
+    if False:
+        log_path: pathlib.Path | None = args.output
+        logtools.config.init_logging_config(
+            log_path,
+            stderr_loglevel=args.verbosity,
+            create_dir=True
+        )
+    logging.root.setLevel(logging.NOTSET)  # This is necessary to prevent the root logger from squashing all the child loggers from outputting anything!
+    logger = logtools.make_logger(path=args.output, stderr_loglevel=args.verbosity, create_dir=True)
+    #########################
+
+    # Set numexpr to have the appropriate number of threads
+    # This should have already worked at import time, but it doesn't for some reason
+    if 'NUMEXPR_MAX_THREADS' in os.environ:
+        nthreads = min(2*os.cpu_count(), int(os.environ['NUMEXPR_MAX_THREADS']))  # ty:ignore[unsupported-operator]
+    else:
+        nthreads = 2*os.cpu_count()  # ty:ignore[unsupported-operator]
+    logger.debug(f"Setting numexpr num_threads to {nthreads:d}")
+    ne.set_num_threads(nthreads)
 
     # Create the ProjectionSet objects corresponding to each ordered subset
     pg: cbfp.ProjGeom = cbfp.ProjGeom.load(args.projgeom)
@@ -141,21 +157,29 @@ def main() -> None:
         soft_from_cylinder_relrad=1,  # Don't soften
         bp_soft_from_detedge_relrad=1,  # Don't soften
     )
-    print("Initializing Landweber iterator...")
+    logger.info("Initializing Landweber iterator...")
     recon = Landweber_flatpanel(
         config=recon_config,
+        logger=logger,
         volume=vol,
         projs=ps_lst,
         proj_zero_masks=masks,
     )
 
     numits: int = args.numits or 1
-    print("Beginning iterations...")
-    for itnum in range(1, 1+numits):
-        recon.iterate()
-        print(f"Completed iteration {itnum:04d}/{numits:04d}")
-    print("Done.")
+    logger.info("Beginning iterations...")
+    with logtools.ProgressBar(
+            desc="Landweber iteration:",
+            maxval=numits,
+            valunit="iteration",
+            logger=logger,
+        ) as pbar:
+        for itnum in range(1, 1+numits):
+            recon.iterate()
+            pbar.update_to(itnum)
+            logger.info(f"Completed iteration {itnum:04d}/{numits:04d}")
+    logger.info("Done.")
     x = recon.volume.as_numpy()
-    if mod_avail_imview:
+    if False and mod_avail_imview:
         imview.plot_volume(x[x.shape[0]//2-1: x.shape[0]//2+2, ...].transpose((1, 2, 0)).copy())
         imview.plot_volume(x[:, :, x.shape[2]//2-1: x.shape[2]//2+2, ...].copy())
