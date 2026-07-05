@@ -62,49 +62,48 @@ def _make_arg_parser() -> argparse.ArgumentParser:
     group_io_options = parser.add_argument_group(title="I/O options")
     group_io_options.add_argument("--output", metavar="path/to/new/dir/", type=lib.argparse_tools.MaybeType(pathlib.Path), default=None, help="Path to a new directory to create and place output artefacts and log files.")
     group_io_options.add_argument("--verbosity", metavar="INFO", type=logtools.LogLevel, action=lib.argparse_tools.EnumAction, default=logtools.LogLevel.INFO, help="The verbosity of output logging to stderr. Log files will not be affected by this setting.")
+    group_io_options.add_argument("--output-intermediates", metavar="False", type=lib.argparse_tools.BoolArgType, default=False, help="Whether to output intermediate reconstructions from each iteration.", required=False)
+    group_io_options.add_argument("--plotmin", "--pmin", metavar="0.0", type=lib.argparse_tools.MaybeType(float), default=None, required=False, help="The minimum for the plotting range. Set to None to select minimum value in each plot.")
+    group_io_options.add_argument("--plotmax", "--pmax", metavar="1.0", type=lib.argparse_tools.MaybeType(float), default=None, required=False, help="The maximum for the plotting range. Set to None to select maximum value in each plot.")
 
     return parser
 
 
-def main() -> None:
-    """Run the script."""
-    # Parse the input arguments
-    parser = _make_arg_parser()
-    args = parser.parse_args()
+def validate_args(args: argparse.Namespace) -> None:
+    """Validate a set of args."""
+    # Ensure that the output directory doesn't already exist
+    if args.output is not None and args.output.exists():
+        msg = f"Output path '{args.output!s}' already exists."
+        raise ValueError(msg)
 
-    ##### Logging setup #####
-    if False:
-        log_path: pathlib.Path | None = args.output
-        logtools.config.init_logging_config(
-            log_path,
-            stderr_loglevel=args.verbosity,
-            create_dir=True
-        )
-    logging.root.setLevel(logging.NOTSET)  # This is necessary to prevent the root logger from squashing all the child loggers from outputting anything!
-    logger = logtools.make_logger(path=args.output, stderr_loglevel=args.verbosity, create_dir=True)
-    #########################
+    # If outputting intermediates, then the user must also specify the --output directory
+    if args.output_intermediates and not args.output:
+        msg = "Cannot output intermediate tomograms when no output directory was specified. Specify an output directory with --output path/to/new/dir"
+        raise ValueError(msg)
 
-    # Set numexpr to have the appropriate number of threads
-    # This should have already worked at import time, but it doesn't for some reason
-    if 'NUMEXPR_MAX_THREADS' in os.environ:
-        nthreads = min(2*os.cpu_count(), int(os.environ['NUMEXPR_MAX_THREADS']))  # ty:ignore[unsupported-operator]
-    else:
-        nthreads = 2*os.cpu_count()  # ty:ignore[unsupported-operator]
-    logger.debug(f"Setting numexpr num_threads to {nthreads:d}")
-    ne.set_num_threads(nthreads)
 
-    # Create the ProjectionSet objects corresponding to each ordered subset
-    pg: cbfp.ProjGeom = cbfp.ProjGeom.load(args.projgeom)
-    if args.autorange_z:
+def get_ordered_subsets_and_masks(
+        projdata_path: pathlib.Path,
+        pg: cbfp.ProjGeom,
+        *,
+        slice_projs: slice[int | None, int | None, None] | None,
+        autorange_z: bool,
+        flip_x: bool,
+        flip_y: bool,
+        flip_z: bool,
+        os_size: int | None,
+        cyl_confine_proj_lines_z_zminmax: tuple[float, float] | None,
+    ) -> tuple[list[cbfp.ProjectionSet], list[cp.ndarray] | None]:
+    """Process input data and output something which can be given to a Landweber recon object."""
+    if autorange_z:
         pg = pg.translated(x=0, y=0, z=-(pg.source_pos[:, 2].max() + pg.source_pos[:, 2].min())/2)
-    pg = pg.sliced(args.slice_projs)
-    # if args.rot_xy is not None:
-    #     pg = pg.rotated(xy_rads=args.rot_xy)
-    if args.flip_x or args.flip_y or args.flip_z:
-        pg = pg.flipped(flip_x=args.flip_x, flip_y=args.flip_y, flip_z=args.flip_z)
-    data_mm = np.lib.format.open_memmap(args.projdata, mode='r')[args.slice_projs]  # Note: a contiguous slice is still a memmap object
+    if slice_projs is not None:
+        pg = pg.sliced(slice_projs)
+    if flip_x or flip_y or flip_z:
+        pg = pg.flipped(flip_x=flip_x, flip_y=flip_y, flip_z=flip_z)
+    data_mm: np.memmap = np.lib.format.open_memmap(projdata_path, mode='r')[slice_projs]  # Note: a contiguous slice is still a memmap object  # ty:ignore[invalid-assignment]
     ps_lst: list[cbfp.ProjectionSet] = []
-    os_size = args.os_size or pg.num_projs  # Null-coalesce 'None' to be pg.num_projs
+    os_size = os_size or pg.num_projs  # Null-coalesce 'None' to be pg.num_projs
     sls: list[slice] = []
     sl_start: int = 0
     while sl_start < pg.num_projs:
@@ -115,7 +114,7 @@ def main() -> None:
 
     # Make masks to zero out projection lines which do not intersect the cylinder twice
     masks = None
-    if args.cyl_confine_proj_lines_z:
+    if cyl_confine_proj_lines_z_zminmax is not None:
         masks = []
         # Step 1: compute the lateral chord length based on lateral position of detector pixel
         # Step 2: compute the dz from source to intersection with cylinder, as a 2D array
@@ -135,8 +134,7 @@ def main() -> None:
             * det_z[np.newaxis, :]
         )
         zs = pg.source_pos[..., 2]
-        zs_mask_min = -args.volshape[2]/2*args.voxwid + args.volpos[2]
-        zs_mask_max =  args.volshape[2]/2*args.voxwid + args.volpos[2]
+        zs_mask_min, zs_mask_max = cyl_confine_proj_lines_z_zminmax
         for sl in sls:
             z_of_cyl_intersection = zs[sl][:, np.newaxis, np.newaxis] + dz[np.newaxis, :, :]
             z_ = zs[sl][:, np.newaxis, np.newaxis]
@@ -145,11 +143,77 @@ def main() -> None:
             mask = np.logical_and(mask, mask2)
             mask_cp = cp.array(mask)
             masks.append(mask_cp)
+    return ps_lst, masks
+
+
+def main() -> None:
+    """Run the script."""
+    # Parse the input arguments
+    parser = _make_arg_parser()
+    args = parser.parse_args()
+    validate_args(args)
+
+    ##########################################################
+    ################ Create the output path ##################
+    ##########################################################
+    artefact_path: pathlib.Path | None = args.output
+    artefact_path and artefact_path.mkdir()
+    path_output: pathlib.Path | None = artefact_path and artefact_path.joinpath('output')
+    path_output and path_output.mkdir()
+    path_intms: pathlib.Path | None = artefact_path and args.output_intermediates and artefact_path.joinpath('intermediates')
+    path_intms and path_intms.mkdir()
+    path_intms_tomos: pathlib.Path | None = path_intms and path_intms.joinpath('tomograms')
+    path_intms_tomos and path_intms_tomos.mkdir()
+    path_intms_slx: pathlib.Path | None = path_intms and path_intms.joinpath('slices_x')
+    path_intms_slx and path_intms_slx.mkdir()
+    path_intms_sly: pathlib.Path | None = path_intms and path_intms.joinpath('slices_y')
+    path_intms_sly and path_intms_sly.mkdir()
+    path_intms_slz: pathlib.Path | None = path_intms and path_intms.joinpath('slices_z')
+    path_intms_slz and path_intms_slz.mkdir()
+
+    ##########################################################
+    ##################### Logging setup ######################
+    ##########################################################
+    logging.root.setLevel(logging.NOTSET)  # Prevent root logger from squashing child loggers from outputting
+    logger = logtools.make_logger(path=artefact_path, stderr_loglevel=args.verbosity)
+
+    ##########################################################
+    ##### Set numexpr to use as many threads as possible #####
+    ##########################################################
+    # Set numexpr to have the appropriate number of threads
+    # This should have already worked at import time, but it doesn't for some reason
+    preferred_thread_count: int = int(2*os.cpu_count())  # ty:ignore[unsupported-operator]
+    nthreads: int = int(os.environ.get('NUMEXPR_MAX_THREADS', default=None) or preferred_thread_count)
+    logger.debug(f"Setting numexpr num_threads to {nthreads:d}")
+    ne.set_num_threads(nthreads)
+
+    ##########################################################
+    ##### Prepare the input data for the Landweber recon #####
+    ##########################################################
+    # Create the ProjectionSet objects corresponding to each ordered subset
+    # pg: cbfp.ProjGeom = cbfp.ProjGeom.load(args.projgeom)
+    ps_lst, masks = get_ordered_subsets_and_masks(
+        projdata_path=args.projdata,
+        pg=cbfp.ProjGeom.load(args.projgeom),
+        slice_projs=args.slice_projs,
+        autorange_z=args.autorange_z,
+        flip_x=args.flip_x,
+        flip_y=args.flip_y,
+        flip_z=args.flip_z,
+        os_size=args.os_size,
+        cyl_confine_proj_lines_z_zminmax=(
+            None if args.cyl_confine_proj_lines_z is None
+            else (-args.volshape[2]/2*args.voxwid + args.volpos[2],
+                   args.volshape[2]/2*args.voxwid + args.volpos[2])
+        ),
+    )
 
     # Create the working volume
     vol = Volume.zeros(args.volshape, voxwid=args.voxwid, dtype=np.float32, pos_c=args.volpos)  # ty:ignore[invalid-argument-type]
 
-    # Create the Landweber iteration object
+    ##########################################################
+    ######### Create the Landweber iteration object ##########
+    ##########################################################
     recon_config = Landweber_flatpanel.Config(
         rayleigh_quotient_num_iterations=args.numits_for_rayleigh_quotient,
         acceleration_factor=args.relaxation_factor,
@@ -166,6 +230,43 @@ def main() -> None:
         proj_zero_masks=masks,
     )
 
+    ##########################################################
+    ################# Define helper methods ##################
+    ##########################################################
+    def save_current_volume(id_str: str, is_intermediate: bool) -> None:
+        # Do nothing if the output path is None.
+        if path_output is None:
+            return
+
+        # Get the current volume
+        x = recon.volume.as_numpy()
+
+        # Get the 'root' directory of where this volume will be saved
+        save_path = path_intms if is_intermediate else path_output
+
+        # Save the volume as a .npy file
+        tomo_path = save_path.joinpath('tomograms') if is_intermediate else save_path
+        tomo_path.mkdir(exist_ok=True)
+        lib.ne_tools.save(tomo_path.joinpath(id_str + '.npy'), x)
+
+        # Save midslices from volume as .png files
+        # The method used here can be a bit slow, because I get a full numpy array and process that.
+        # I've decided that I prefer the simplicity and robustness of this approach, instead of trying
+        # to squeeze optimal performance by directly extracting slices from cupy arrays.
+        for axis, axis_str in enumerate('xyz'):
+            if is_intermediate:
+                save_path_sl = save_path.joinpath('slices_' + axis_str)
+                save_path_sl.mkdir(exist_ok=True)
+            else:
+                save_path_sl = save_path
+            imview.save_volslice(
+                save_path_sl.joinpath('midslice_' + axis_str + '_' + id_str + '.png'), x,
+                axis=axis, index_of_slice=x.shape[axis]//2, pmin=args.plotmin, pmax=args.plotmax,
+            )
+
+    ##########################################################
+    ################# Begin reconstruction ###################
+    ##########################################################
     numits: int = args.numits or 1
     logger.info("Beginning iterations...")
     with logtools.ProgressBar(
@@ -175,11 +276,20 @@ def main() -> None:
             logger=logger,
         ) as pbar:
         for itnum in range(1, 1+numits):
+            # Perform a Landweber iteration
             recon.iterate()
+
+            # Save intermediate results
+            if path_intms and itnum < numits:
+                save_current_volume(id_str=f'itnum_{itnum:05d}', is_intermediate=True)
+
+            # Perform logging updates
             pbar.update_to(itnum)
             logger.info(f"Completed iteration {itnum:04d}/{numits:04d}")
+
+    # Save final output artefacts
+    if path_output:
+        save_current_volume(id_str='recon', is_intermediate=False)
+
+    # Perform logging updates
     logger.info("Done.")
-    x = recon.volume.as_numpy()
-    if False and mod_avail_imview:
-        imview.plot_volume(x[x.shape[0]//2-1: x.shape[0]//2+2, ...].transpose((1, 2, 0)).copy())
-        imview.plot_volume(x[:, :, x.shape[2]//2-1: x.shape[2]//2+2, ...].copy())

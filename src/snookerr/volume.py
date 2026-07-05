@@ -19,13 +19,16 @@
 # to the volume data. The user should not have to interact with internal
 # classes like texture_tools.Texture, and the like.
 
+import pathlib  # noqa: TC003
 import typing
 
 import cupy as cp
+import cupyx
+import numexpr as ne
 import numpy as np
 
 from .cuda.structs import FORBILD_volumes as fv
-from .lib import gpu_tools, sample_FORBILD, texture_tools
+from .lib import gpu_tools, ne_tools, sample_FORBILD, texture_tools
 from .lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
@@ -118,10 +121,15 @@ class Volume[
         x = (
             out
             if out is not None
-            else np.empty(self._shape, dtype=self._dtype)
+            else cupyx.empty_pinned(self._shape, dtype=self._dtype)
         )
         self._texture.cuda_array.copy_to(x)
         return x
+
+    def save(self, path: pathlib.Path) -> None:
+        """Save this volume into a numpy array on disk."""
+        x = self.as_numpy()
+        ne_tools.save(path, x)
 
     def as_cupy(self, out: cp.ndarray | None = None) -> cp.ndarray:
         """Copy this volume's data into a cupy array."""

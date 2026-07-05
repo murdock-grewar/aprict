@@ -15,8 +15,9 @@
 
 """Miscellaneous helper tools."""
 
-from . import iterables as iterables
-from . import lds as lds
 from . import argparse_tools as argparse_tools
 from . import gpu_tools as gpu_tools
+from . import iterables as iterables
+from . import lds as lds
+from . import ne_tools as ne_tools
 from .empty_context_manager import EmptyContextManager as EmptyContextManager
