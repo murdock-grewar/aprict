@@ -224,7 +224,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
 ) -> tuple[
-    typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]], float
+    cbfp.ProjGeom, typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]], float
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if autorange_z:
@@ -256,12 +256,12 @@ def get_filtered_projectionset_generator(  # noqa: C901
         raise NotImplementedError(msg)
     nv = pg.nv[0]
     pixwids = np.linalg.norm(pg.det_uvec, axis=1)
-    if not np.all(pixwids == pixwids[0]):
+    if not np.all(np.isclose(pixwids, pixwids[0])):
         msg = "Inconsistent pixel widths of detector."
         raise NotImplementedError(msg)
     pixwid = pixwids[0]
     pixheis = np.linalg.norm(pg.det_vvec, axis=1)
-    if not np.all(pixheis == pixheis[0]):
+    if not np.all(np.isclose(pixheis, pixheis[0])):
         msg = "Inconsistent pixel heights of detector."
         raise NotImplementedError(msg)
     pixhei = pixheis[0]
@@ -271,14 +271,14 @@ def get_filtered_projectionset_generator(  # noqa: C901
     Rs = np.sqrt(  # noqa: N806
         np.square(pg.source_pos[:, 0]) + np.square(pg.source_pos[:, 1])
     )
-    if not np.all(Rs == Rs[0]):
+    if not np.all(np.isclose(Rs, Rs[0])):
         msg = "Inconsistent source radius."
         raise NotImplementedError(msg)
     R = Rs[0]  # noqa: N806
     Ls = Rs + np.sqrt(  # noqa: N806
         np.square(pg.det_pos[:, 0]) + np.square(pg.det_pos[:, 1])
     )
-    if not np.all(Ls == Ls[0]):
+    if not np.all(np.isclose(Ls, Ls[0])):
         msg = "Inconsistent source-to-detector length."
         raise NotImplementedError(msg)
     L = Ls[0]  # noqa: N806
@@ -327,7 +327,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # Increment the slice
             sl_start += num_projs_per_chunk
 
-    return _gen(), final_multiplier
+    return pg, _gen(), final_multiplier
 
 
 def main() -> None:
@@ -396,10 +396,9 @@ def main() -> None:
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     # Create the ProjectionSet objects corresponding to each ordered subset
-    pg: cbfp.ProjGeom = cbfp.ProjGeom.load(args.projgeom)
-    sl_filtps_gen, final_multiplier = get_filtered_projectionset_generator(
+    pg, sl_filtps_gen, final_multiplier = get_filtered_projectionset_generator(
         projdata_path=args.projdata,
-        pg=pg,
+        pg=cbfp.ProjGeom.load(args.projgeom),
         slice_projs=args.slice_projs,
         autorange_z=args.autorange_z,
         flip_x=args.flip_x,
@@ -480,6 +479,7 @@ def main() -> None:
         maxval=pg.num_projs,
         valunit="proj",
         logger=logger,
+        persist=False,
     ) as pbar:
         for sl, ps in sl_filtps_gen:
             cbfp.backproject(config_backproject, vol, ps, block=True)
