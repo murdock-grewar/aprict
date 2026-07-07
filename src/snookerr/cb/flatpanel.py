@@ -359,13 +359,46 @@ class ProjGeom:  # noqa: PLW1641
 
     @property
     def _pgserializable(self) -> _ProjGeomSerializable:
+        source_pos = self.source_pos
+        det_pos = self.det_pos
+        det_uvec = self.det_uvec
+        det_vvec = self.det_vvec
+        nu = np.array(self.nu)
+        nv = np.array(self.nv)
+        projlistdim: int = max(
+            source_pos.ndim-1,
+            det_pos.ndim-1,
+            det_uvec.ndim-1,
+            det_vvec.ndim-1,
+            nu.ndim,
+            nv.ndim,
+        )
+        # Add dimensions of size 1 to the end of the projdims, to enable broadcasting
+        shape = source_pos.shape
+        shape = shape[:-1] + (1,)*(projlistdim-(source_pos.ndim-1)) + (3,)
+        source_pos = np.reshape(source_pos, shape)
+        shape = det_pos.shape
+        shape = shape[:-1] + (1,)*(projlistdim-(det_pos.ndim-1)) + (3,)
+        det_pos = np.reshape(det_pos, shape)
+        shape = det_uvec.shape
+        shape = shape[:-1] + (1,)*(projlistdim-(det_uvec.ndim-1)) + (3,)
+        det_uvec = np.reshape(det_uvec, shape)
+        shape = det_vvec.shape
+        shape = shape[:-1] + (1,)*(projlistdim-(det_vvec.ndim-1)) + (3,)
+        det_vvec = np.reshape(det_vvec, shape)
+        shape = nu.shape
+        shape = shape + (1,)*(projlistdim-nu.ndim)
+        nu = np.reshape(nu, shape)
+        shape = nv.shape
+        shape = shape + (1,)*(projlistdim-nv.ndim)
+        nv = np.reshape(nv, shape)
         return self._ProjGeomSerializable(
-            source_pos=np.reshape(self.source_pos, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
-            det_pos=np.reshape(self.det_pos, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
-            det_uvec=np.reshape(self.det_uvec, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
-            det_vvec=np.reshape(self.det_vvec, shape=(-1, 3)).tolist(),  # ty:ignore[invalid-argument-type]
-            nu=np.reshape(np.array(self.nu), shape=(-1,)).tolist(),
-            nv=np.reshape(np.array(self.nv), shape=(-1,)).tolist(),
+            source_pos=source_pos.tolist(),
+            det_pos=det_pos.tolist(),
+            det_uvec=det_uvec.tolist(),
+            det_vvec=det_vvec.tolist(),
+            nu=nu.tolist(),
+            nv=nv.tolist(),
         )
 
     def json(self) -> dict:
