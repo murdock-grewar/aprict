@@ -22,6 +22,7 @@ import functools
 import itertools
 import json
 import logging  # noqa: TC003
+import math
 import pathlib
 
 import cupy as cp
@@ -224,15 +225,31 @@ class ProjGeom:  # noqa: PLW1641
             self.nv = pg.nv
 
     @property
+    def projs_list_shape(self) -> tuple[int, ...]:
+        """Return the broadcast shape of the projection list. If a flat list was provided, then this will be a 1-tuple like (N,)."""
+        return np.broadcast_shapes(
+            self.source_pos.shape[:-1],
+            self.det_pos.shape[:-1],
+            self.det_uvec.shape[:-1],
+            self.det_vvec.shape[:-1],
+            self.nu.shape,
+            self.nv.shape,
+        )
+
+    @property
     def num_projs(self) -> int:
         """Return the number of cone-beam projections."""
-        return self.source_pos.shape[0]
+        return math.prod(self.projs_list_shape)
 
     def sliced(self, sl: slice[int | None, int | None, None] | list[int]) -> ProjGeom:
         """Return a copy of this geometry, except with the projection index slice applied."""
         if type(sl) not in (slice, list):
             msg = f"Invalid type for slice object {sl}"
             raise ValueError(msg)
+        if len(self.projs_list_shape) != 1:
+            msg = "Slicing has not been implemented for non-flat projection lists."
+            raise NotImplementedError(msg)
+
         # This assumes that this object has been correctly regularized, so that the zeroth dimension
         # of each array corresponds to the projection index, except where it has length 1, which means
         # it broadcasts across all.
@@ -262,7 +279,8 @@ class ProjGeom:  # noqa: PLW1641
     def flipped(self, *, flip_x: bool, flip_y: bool, flip_z: bool) -> ProjGeom:
         """Return a new ProjGeom which is flipped along one or more axes."""
         # Assumes a regularised form of this object, for correct array broadcasting
-        fliparr = np.array([[-1 if flip_x else 1, -1 if flip_y else 1, -1 if flip_z else 1]], dtype=np.float32)
+        fliparr = np.array([-1 if flip_x else 1, -1 if flip_y else 1, -1 if flip_z else 1], dtype=np.float32)
+        fliparr = np.reshape(fliparr, (1,)*len(self.projs_list_shape) + (3,))
         return ProjGeom(
             source_pos=self.source_pos*fliparr,
             det_pos=self.det_pos*fliparr,
@@ -281,17 +299,18 @@ class ProjGeom:  # noqa: PLW1641
         ], dtype=np.float32)
 
         return ProjGeom(
-            source_pos=np.tensordot(rotmat, self.source_pos, axes=(-1, -1)),
-            det_pos=np.tensordot(rotmat, self.det_pos, axes=(-1, -1)),
-            det_uvec=np.tensordot(rotmat, self.det_uvec, axes=(-1, -1)),
-            det_vvec=np.tensordot(rotmat, self.det_vvec, axes=(-1, -1)),
+            source_pos=np.tensordot(self.source_pos, rotmat, axes=(-1, -1)),
+            det_pos=np.tensordot(self.det_pos, rotmat, axes=(-1, -1)),
+            det_uvec=np.tensordot(self.det_uvec, rotmat, axes=(-1, -1)),
+            det_vvec=np.tensordot(self.det_vvec, rotmat, axes=(-1, -1)),
             nu=self.nu,
             nv=self.nv,
         )
 
     def translated(self, *, x: float, y: float, z: float) -> ProjGeom:
         """Return a new ProjGeom which is translated by the specified amounts."""
-        trans = np.array([[x, y, z]], dtype=np.float32)
+        trans = np.array([x, y, z], dtype=np.float32)
+        trans = np.reshape(trans, (1,)*len(self.projs_list_shape) + (3,))
         return ProjGeom(
             source_pos=self.source_pos + trans,
             det_pos=self.det_pos + trans,
