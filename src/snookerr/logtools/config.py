@@ -1,4 +1,4 @@
-# logging_config.py
+# config.py
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Tools to modify the logging config."""
 
 import enum
 import logging
@@ -42,7 +43,7 @@ def make_logger(  # noqa: C901
     stderr_loglevel: LogLevel = LogLevel.WARN,
     create_dir: bool = False,
     allow_append: bool = False,
-    ) -> logging.Logger:
+) -> logging.Logger:
     """Initialise logging configuration for the current process."""
     # Process argument 'stderr_loglevel'
     match stderr_loglevel:
@@ -58,17 +59,6 @@ def make_logger(  # noqa: C901
             raise ValueError()
     del stderr_loglevel
 
-    if False:
-        # Disable all the other loggers, like from matplotlib.
-        # We need to import problematic packages here first, so that their loggers are picked up and disabled here
-        import matplotlib.pyplot  # noqa: F401, ICN001, PLC0415
-        try:
-            from .. import image_view  # noqa: F401, PLC0415
-        except:  # noqa: E722
-            pass
-        for name, logger in logging.root.manager.loggerDict.items():  # noqa: PERF102
-            logger.disabled = True  # ty:ignore[invalid-assignment]
-
     ##### Logging setup #####
     logger = logging.getLogger(name)
     # logging.basicConfig(
@@ -79,22 +69,19 @@ def make_logger(  # noqa: C901
     #     style='{',
     # )
 
-    def filter(record: logging.LogRecord):
+    def filter(record: logging.LogRecord) -> logging.LogRecord:
+        """Use this function to add new fields to the namespace that the logging format string uses. However, custom fields seem to be incompatible with tqdm for some reason, so I haven't added any fields."""
         # record.name_ = record.name
         # This is not compatible with tqdm's redirection, apparently... sigh.
         return record
 
     formatter = logging.Formatter(
-        fmt='[[{levelname: <8}] [{name: <8}] {asctime:s}] {message:s}',
+        fmt="[[{levelname: <8}] [{name: <8}] {asctime:s}] {message:s}",
         style="{",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     # Adjust the stderr handler to the specified log level
-    # logging.root.handlers[0].setLevel(stderr_loglevel_)
-    # logging.root.handlers[0].setFormatter(formatter)
-    # logging.root.handlers[0].addFilter(filter)
-
     stderr_handler = logging.StreamHandler(stream=sys.stderr)
     stderr_handler.setLevel(stderr_loglevel_)
     stderr_handler.setFormatter(formatter)
@@ -110,8 +97,12 @@ def make_logger(  # noqa: C901
             if not os.path.isdir(path):
                 msg = f"The path '{path}' does not exist. Please create it first, or use the 'create_dir' option."
                 raise FileNotFoundError(msg)
-        log_info_path: pathlib.Path = pathlib.Path(path.joinpath('log_info.txt'))
-        log_debug_path: pathlib.Path = pathlib.Path(path.joinpath('log_debug.txt'))
+        log_info_path: pathlib.Path = pathlib.Path(
+            path.joinpath("log_info.txt")
+        )
+        log_debug_path: pathlib.Path = pathlib.Path(
+            path.joinpath("log_debug.txt")
+        )
         if not allow_append:
             if os.path.isfile(log_info_path):
                 msg = f"File already exists: {log_info_path}"
@@ -119,11 +110,11 @@ def make_logger(  # noqa: C901
             if os.path.isfile(log_debug_path):
                 msg = f"File already exists: {log_debug_path}"
                 raise ValueError(msg)
-        fh_info  = logging.FileHandler(log_info_path, mode='a')
+        fh_info = logging.FileHandler(log_info_path, mode="a")
         fh_info.setLevel(logging.INFO)
         fh_info.setFormatter(formatter)
         fh_info.addFilter(filter)
-        fh_debug = logging.FileHandler(log_debug_path, mode='a')
+        fh_debug = logging.FileHandler(log_debug_path, mode="a")
         fh_debug.setLevel(logging.DEBUG)
         fh_debug.setFormatter(formatter)
         fh_debug.addFilter(filter)
@@ -136,7 +127,9 @@ def make_logger(  # noqa: C901
     logger.info(time.strftime("Log start datetime: %Y-%d-%m %H:%M:%S %z"))
     logger.info(f"Current `{_module_name:s}` module version: {version:s}")
     logger.info(f"Current working directory: '{os.getcwd()}'")
-    logger.info("Script called with the following commandline program and arguments:")
+    logger.info(
+        "Script called with the following commandline program and arguments:"
+    )
     logger.info(f"{sys.argv}")
     logger.info("")
     #########################

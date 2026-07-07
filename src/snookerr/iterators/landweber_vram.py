@@ -42,7 +42,9 @@ class Landweber_flatpanel:  # noqa: N801
 
     _acceleration_factor: float
     _rayleigh_quotients: list[float]
-    _proj_scratch_space: list[cbfp.ProjectionSet]  # one for each ordered subset
+    _proj_scratch_space: list[
+        cbfp.ProjectionSet
+    ]  # one for each ordered subset
 
     _config_bp: cbfp.ConfigBackproject
     _config_fp: cbfp.ConfigProject
@@ -69,8 +71,13 @@ class Landweber_flatpanel:  # noqa: N801
         # denoising: float | None = None  # Applies an approximate TV gradient descent between iterations. This is NOT accounted for in the calculation of the next step, nor the calculated and printed error metric. This denoising should be considered an approximate ad-hoc method. Suggested value range: 0 to 0.05.
 
     def __init__(
-        self, config: Config, volume: Volume, projs: cbfp.ProjectionSet | list[cbfp.ProjectionSet], *,
-        proj_zero_masks: cp.ndarray | list[cp.ndarray] | None = None, logger: logging.Logger | None
+        self,
+        config: Config,
+        volume: Volume,
+        projs: cbfp.ProjectionSet | list[cbfp.ProjectionSet],
+        *,
+        proj_zero_masks: cp.ndarray | list[cp.ndarray] | None = None,
+        logger: logging.Logger | None,
     ) -> None:
         self._logger = logger if logger is not None else logging.getLogger()
         self._config = config
@@ -105,24 +112,29 @@ class Landweber_flatpanel:  # noqa: N801
                 msg = "A provided ProjectionSet object has no data."
                 raise ValueError(msg)
         # Make the projection scratch space. Equal in size to one ordered subset.
-        self._proj_scratch_space = [projs.zeroed_copy() for projs in self._meas]
-        self._rayleigh_quotients = self.calculate_rayleigh_quotients(num_iterations=self._config.rayleigh_quotient_num_iterations)
+        self._proj_scratch_space = [
+            projs.zeroed_copy() for projs in self._meas
+        ]
+        self._rayleigh_quotients = self.calculate_rayleigh_quotients(
+            num_iterations=self._config.rayleigh_quotient_num_iterations
+        )
 
         # Apply zero masks to projection data
         for proj, zm in zip(self._meas, self._proj_zero_masks):
             if zm is not None:
                 cp.multiply(proj.data, zm, out=proj.data)
 
-    def calculate_rayleigh_quotients(
-            self,
-            num_iterations: int
-        ) -> list[float]:
+    def calculate_rayleigh_quotients(self, num_iterations: int) -> list[float]:
         """Compute the list Rayleigh quotients of A^T A (one for each ordered subset) using the iterated power method."""
         fp_config: cbfp.ConfigProject = self._config_fp
         bp_config: cbfp.ConfigBackproject = self._config_bp
         # Check if current volume is 0s. In that case, don't allocate new memory. Just use that one.
         flag_using_existing_volume = self._vol.norm == 0
-        scratch_volume: Volume = self._vol if flag_using_existing_volume else self._vol.zeroed_copy()
+        scratch_volume: Volume = (
+            self._vol
+            if flag_using_existing_volume
+            else self._vol.zeroed_copy()
+        )
         scratch_projs_list: list[cbfp.ProjectionSet] = self._proj_scratch_space
         for scratch_projs in scratch_projs_list:
             if scratch_projs.data is None:
@@ -133,34 +145,61 @@ class Landweber_flatpanel:  # noqa: N801
         scale_factor: float = 1 / float(
             np.mean(scratch_volume.shape)
         )  # a factor used to scale things to prevent overflow etc
-        self._logger.debug("Calculating Rayleigh quotient(s) for the ordered subset(s)...")
+        self._logger.debug(
+            "Calculating Rayleigh quotient(s) for the ordered subset(s)..."
+        )
         with logtools.ProgressBar(
-                desc="Calc. Rayleigh quot.:",
-                maxval=num_iterations * len(scratch_projs_list),
-                valunit="iteration",
-                logger=self._logger,
-            ) as pbar:
-            for scratch_projs_index, scratch_projs in enumerate(scratch_projs_list):
-                assert scratch_projs.data is not None  # useful assertion for type-checking
+            desc="Calc. Rayleigh quot.:",
+            maxval=num_iterations * len(scratch_projs_list),
+            valunit="iteration",
+            logger=self._logger,
+        ) as pbar:
+            for scratch_projs_index, scratch_projs in enumerate(
+                scratch_projs_list
+            ):
+                assert (
+                    scratch_projs.data is not None
+                )  # useful assertion for type-checking
                 # Generate a random positive volume
-                v = np.abs(np.random.randn(*scratch_volume.shape)*scale_factor).astype(np.float32)  # noqa: NPY002
+                v = np.abs(
+                    np.random.randn(*scratch_volume.shape) * scale_factor  # noqa: NPY002
+                ).astype(np.float32)
                 scratch_volume.copy_from(v)
                 # self._hardmask_vol(
                 #     scratch_volume
                 # )  # Note: not exactly the same as the cyl_mask_rad offered by the backprojection. This may matter.
                 svn = scratch_volume.norm
-                for numit in range(1, num_iterations+1):  # Use N iterations of power method to find the rayleigh quotient
+                for numit in range(
+                    1, num_iterations + 1
+                ):  # Use N iterations of power method to find the rayleigh quotient
                     # Normalize the volume
-                    scratch_volume.multiply(1/svn)
+                    scratch_volume.multiply(1 / svn)
                     # Apply A^T A to the volume
                     scratch_projs.data.fill(0)
-                    cbfp.project(config=fp_config, volume=scratch_volume, projs=scratch_projs, block=True)
-                    rayleigh_quotient = cp.square(cp.linalg.norm(scratch_projs.data))
+                    cbfp.project(
+                        config=fp_config,
+                        volume=scratch_volume,
+                        projs=scratch_projs,
+                        block=True,
+                    )
+                    rayleigh_quotient = cp.square(
+                        cp.linalg.norm(scratch_projs.data)
+                    )
                     scratch_volume.fill(0)
-                    cbfp.backproject(config=bp_config, volume=scratch_volume, projs=scratch_projs, block=True, logger=self._logger)
+                    cbfp.backproject(
+                        config=bp_config,
+                        volume=scratch_volume,
+                        projs=scratch_projs,
+                        block=True,
+                        logger=self._logger,
+                    )
                     svn = scratch_volume.norm
-                    pbar.update_to(numit + num_iterations*scratch_projs_index)
-                rayleigh_quotient_list.append(rayleigh_quotient)  # Could also use svn instead of rayleigh_quotient
+                    pbar.update_to(
+                        numit + num_iterations * scratch_projs_index
+                    )
+                rayleigh_quotient_list.append(
+                    rayleigh_quotient
+                )  # Could also use svn instead of rayleigh_quotient
         self._logger.debug("...done calculating Rayleigh quotient(s).")
         if flag_using_existing_volume:
             self._vol.fill(0)  # reset the volume to 0
@@ -185,7 +224,11 @@ class Landweber_flatpanel:  # noqa: N801
 
         # Loop over the ordered subsets
         for meas, proj_scratch_space, rq, zm in zip(
-                self._meas, self._proj_scratch_space, self._rayleigh_quotients, self._proj_zero_masks):
+            self._meas,
+            self._proj_scratch_space,
+            self._rayleigh_quotients,
+            self._proj_zero_masks,
+        ):
             # Put the projection residual into the projection scratch space
             cp.copyto(src=meas.data, dst=proj_scratch_space.data)
             config_fp = cbfp.ConfigProject(multiply_before_adding=-1)
@@ -196,11 +239,17 @@ class Landweber_flatpanel:  # noqa: N801
                 block=True,
             )
             if zm is not None:
-                cp.multiply(proj_scratch_space.data, zm, out=proj_scratch_space.data)
+                cp.multiply(
+                    proj_scratch_space.data, zm, out=proj_scratch_space.data
+                )
             # Add the backprojection of the residual into the volume
             # Divide by relaxation factor first
-            relaxation_factor = self._config.acceleration_factor/rq
-            cp.multiply(proj_scratch_space.data, relaxation_factor, out=proj_scratch_space.data)
+            relaxation_factor = self._config.acceleration_factor / rq
+            cp.multiply(
+                proj_scratch_space.data,
+                relaxation_factor,
+                out=proj_scratch_space.data,
+            )
             cbfp.backproject(
                 config=self._config_bp,
                 volume=self._vol,

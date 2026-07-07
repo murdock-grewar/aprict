@@ -497,7 +497,7 @@ __global__ void backproject_CB_volmem(
         threadIdx.z + blockIdx.z * blockDim.z
     );
     const uivec3 vol_chunk_shape = volchunkspec.shape;
-    const fvec3  pos_000_c       = volchunkspec.os_000;
+    const fvec3  pos_000_c       = volchunkspec.pos_000;
 
     const Tv value = _backproject_CB_getval<Tv,Tp>(
         config,

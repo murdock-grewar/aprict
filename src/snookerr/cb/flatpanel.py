@@ -179,7 +179,9 @@ def _assert_flatpanel_geometry_consistency(
     return data_shape
 
 
-@dataclasses.dataclass(kw_only=True)  # making it a dataclass is somewhat useful, despite implementing the __init__ method explicitly
+@dataclasses.dataclass(
+    kw_only=True
+)  # making it a dataclass is somewhat useful, despite implementing the __init__ method explicitly
 class ProjGeom:  # noqa: PLW1641
     """A dataclass representing a geometry for a set of cone-beam projections."""
 
@@ -197,8 +199,12 @@ class ProjGeom:  # noqa: PLW1641
         det_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
         det_uvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
         det_vvec: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
-        nu: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
-        nv: int | np.integer | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+        nu: int
+        | np.integer
+        | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
+        nv: int
+        | np.integer
+        | np.ndarray[tuple[int, ...], np.dtype[np.integer]],
         _skip_regularisation: bool = False,
     ) -> None:
         # Regularise the data structure by encoding then decoding from a serializable format
@@ -241,7 +247,9 @@ class ProjGeom:  # noqa: PLW1641
         """Return the number of cone-beam projections."""
         return math.prod(self.projs_list_shape)
 
-    def sliced(self, sl: slice[int | None, int | None, None] | list[int]) -> ProjGeom:
+    def sliced(
+        self, sl: slice[int | None, int | None, None] | list[int]
+    ) -> ProjGeom:
         """Return a copy of this geometry, except with the projection index slice applied."""
         if type(sl) not in (slice, list):
             msg = f"Invalid type for slice object {sl}"
@@ -255,7 +263,9 @@ class ProjGeom:  # noqa: PLW1641
         # it broadcasts across all.
         numprojs: int = self.num_projs
 
-        def copied_slice_maybe_broadcast(arr: np.ndarray, sl: slice | list[int]) -> np.ndarray:
+        def copied_slice_maybe_broadcast(
+            arr: np.ndarray, sl: slice | list[int]
+        ) -> np.ndarray:
             if numprojs == 1:
                 # Forget about broadcasting. Treat them like arrays of length 1.
                 # Maybe one day this will result in a very specific edge case. Oh well.
@@ -265,6 +275,7 @@ class ProjGeom:  # noqa: PLW1641
                 return arr.copy()
             # Do a normal slicing
             return arr[sl, ...].copy()
+
         f = functools.partial(copied_slice_maybe_broadcast, sl=sl)
 
         return ProjGeom(
@@ -279,24 +290,30 @@ class ProjGeom:  # noqa: PLW1641
     def flipped(self, *, flip_x: bool, flip_y: bool, flip_z: bool) -> ProjGeom:
         """Return a new ProjGeom which is flipped along one or more axes."""
         # Assumes a regularised form of this object, for correct array broadcasting
-        fliparr = np.array([-1 if flip_x else 1, -1 if flip_y else 1, -1 if flip_z else 1], dtype=np.float32)
-        fliparr = np.reshape(fliparr, (1,)*len(self.projs_list_shape) + (3,))
+        fliparr = np.array(
+            [-1 if flip_x else 1, -1 if flip_y else 1, -1 if flip_z else 1],
+            dtype=np.float32,
+        )
+        fliparr = np.reshape(fliparr, (1,) * len(self.projs_list_shape) + (3,))
         return ProjGeom(
-            source_pos=self.source_pos*fliparr,
-            det_pos=self.det_pos*fliparr,
-            det_uvec=self.det_uvec*fliparr,
-            det_vvec=self.det_vvec*fliparr,
+            source_pos=self.source_pos * fliparr,
+            det_pos=self.det_pos * fliparr,
+            det_uvec=self.det_uvec * fliparr,
+            det_vvec=self.det_vvec * fliparr,
             nu=self.nu,
             nv=self.nv,
         )
 
     def rotated(self, *, xy_rads: float) -> ProjGeom:
         """Return a new ProjGeom which is rotated about the z axis."""
-        rotmat = np.array([
-            [np.cos(xy_rads), -np.sin(xy_rads), 0],
-            [np.sin(xy_rads), np.cos(xy_rads), 0],
-            [0, 0, 1]
-        ], dtype=np.float32)
+        rotmat = np.array(
+            [
+                [np.cos(xy_rads), -np.sin(xy_rads), 0],
+                [np.sin(xy_rads), np.cos(xy_rads), 0],
+                [0, 0, 1],
+            ],
+            dtype=np.float32,
+        )
 
         return ProjGeom(
             source_pos=np.tensordot(self.source_pos, rotmat, axes=(-1, -1)),
@@ -310,7 +327,7 @@ class ProjGeom:  # noqa: PLW1641
     def translated(self, *, x: float, y: float, z: float) -> ProjGeom:
         """Return a new ProjGeom which is translated by the specified amounts."""
         trans = np.array([x, y, z], dtype=np.float32)
-        trans = np.reshape(trans, (1,)*len(self.projs_list_shape) + (3,))
+        trans = np.reshape(trans, (1,) * len(self.projs_list_shape) + (3,))
         return ProjGeom(
             source_pos=self.source_pos + trans,
             det_pos=self.det_pos + trans,
@@ -355,7 +372,6 @@ class ProjGeom:  # noqa: PLW1641
 
     @dataclasses.dataclass(kw_only=True)
     class _ProjGeomSerializable:
-
         source_pos: list[list | float]
         det_pos: list[list | float]
         det_uvec: list[list | float]
@@ -385,31 +401,33 @@ class ProjGeom:  # noqa: PLW1641
         nu = np.array(self.nu)
         nv = np.array(self.nv)
         projlistdim: int = max(
-            source_pos.ndim-1,
-            det_pos.ndim-1,
-            det_uvec.ndim-1,
-            det_vvec.ndim-1,
+            source_pos.ndim - 1,
+            det_pos.ndim - 1,
+            det_uvec.ndim - 1,
+            det_vvec.ndim - 1,
             nu.ndim,
             nv.ndim,
         )
         # Add dimensions of size 1 to the end of the projdims, to enable broadcasting
         shape = source_pos.shape
-        shape = shape[:-1] + (1,)*(projlistdim-(source_pos.ndim-1)) + (3,)
+        shape = (
+            shape[:-1] + (1,) * (projlistdim - (source_pos.ndim - 1)) + (3,)
+        )
         source_pos = np.reshape(source_pos, shape)
         shape = det_pos.shape
-        shape = shape[:-1] + (1,)*(projlistdim-(det_pos.ndim-1)) + (3,)
+        shape = shape[:-1] + (1,) * (projlistdim - (det_pos.ndim - 1)) + (3,)
         det_pos = np.reshape(det_pos, shape)
         shape = det_uvec.shape
-        shape = shape[:-1] + (1,)*(projlistdim-(det_uvec.ndim-1)) + (3,)
+        shape = shape[:-1] + (1,) * (projlistdim - (det_uvec.ndim - 1)) + (3,)
         det_uvec = np.reshape(det_uvec, shape)
         shape = det_vvec.shape
-        shape = shape[:-1] + (1,)*(projlistdim-(det_vvec.ndim-1)) + (3,)
+        shape = shape[:-1] + (1,) * (projlistdim - (det_vvec.ndim - 1)) + (3,)
         det_vvec = np.reshape(det_vvec, shape)
         shape = nu.shape
-        shape = shape + (1,)*(projlistdim-nu.ndim)
+        shape = shape + (1,) * (projlistdim - nu.ndim)
         nu = np.reshape(nu, shape)
         shape = nv.shape
-        shape = shape + (1,)*(projlistdim-nv.ndim)
+        shape = shape + (1,) * (projlistdim - nv.ndim)
         nv = np.reshape(nv, shape)
         return self._ProjGeomSerializable(
             source_pos=source_pos.tolist(),
@@ -448,19 +466,23 @@ class ProjGeom:  # noqa: PLW1641
         fpath = pathlib.Path(fpath)
         if not fpath.exists():
             raise FileNotFoundError(fpath)
-        with open(fpath, mode='r', encoding='utf-8') as f:
+        with open(fpath, mode="r", encoding="utf-8") as f:
             pgs = ProjGeom._ProjGeomSerializable(**json.load(f))
         return ProjGeom._load_from_serialized(pgs)
 
-    def save(self, fpath: pathlib.Path | str, *, allow_overwrite: bool = False) -> None:
+    def save(
+        self, fpath: pathlib.Path | str, *, allow_overwrite: bool = False
+    ) -> None:
         """Save the ProjGeom to a file."""
         fpath = pathlib.Path(fpath)
         if not allow_overwrite and fpath.exists():
             raise FileExistsError(fpath)
-        with open(fpath, mode='w+', encoding='utf-8') as f:
+        with open(fpath, mode="w+", encoding="utf-8") as f:
             f.write(self.json_str())
 
-    def to_proj_spec_array(self) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
+    def to_proj_spec_array(
+        self,
+    ) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
         """Create a proj_spec array for use in creating a ProjectionSet object."""
         convert_to_fvec3 = lambda a: np.apply_along_axis(  # noqa: E731
             lambda arr: np.array(tuple(arr), dtype=structs.fvec3),
@@ -701,7 +723,9 @@ def project(
                 np.array(
                     tuple(
                         volume.pos_c
-                        - volume.voxwid * np.array(volume.shape, dtype=np.float32) / 2
+                        - volume.voxwid
+                        * np.array(volume.shape, dtype=np.float32)
+                        / 2
                     ),
                     dtype=structs.fvec3.dtype,
                 ),  # texpos
@@ -825,7 +849,10 @@ def backproject(
             np.array(volume.shape, dtype=structs.uivec3.dtype),  # shape
             np.array(
                 tuple(
-                    volume.pos_c - volume.voxwid * np.array(volume.shape, dtype=np.float32) / 2
+                    volume.pos_c
+                    - volume.voxwid
+                    * np.array(volume.shape, dtype=np.float32)
+                    / 2
                 ),
                 dtype=structs.fvec3.dtype,
             ),  # texpos
@@ -837,22 +864,28 @@ def backproject(
         projs.data.strides[-3:], dtype=structs.uivec3
     )
     # Compute the projection. Loop through higher dimensions of the passed array, if applicable.
-    index_tuple_list = list(itertools.product(*map(range, projs.proj_specs.shape[:-1])))
+    index_tuple_list = list(
+        itertools.product(*map(range, projs.proj_specs.shape[:-1]))
+    )
     istop: int = int(np.ceil(projs.proj_specs.shape[-1] / 10))
     with logtools.ProgressBar(
-            desc="backprojection:",
-            maxval=len(index_tuple_list)*projs.proj_specs.shape[-1],
-            valunit="proj",
-            logger=logger,
-            enable=enable_pbar,
-        ) as pbar:
+        desc="backprojection:",
+        maxval=len(index_tuple_list) * projs.proj_specs.shape[-1],
+        valunit="proj",
+        logger=logger,
+        enable=enable_pbar,
+    ) as pbar:
         for index_tuple_i, index_tuple in enumerate(index_tuple_list):
             # If a flat proj_specs was passed, then 'index_tuple' will only take on the value of an  empty tuple.
             for i in range(istop):
                 # Prepare a chunk of 10 projections
-                proj_spec_sl = slice(i* 10, min((i+1) * 10, projs.proj_specs.shape[-1]))
+                proj_spec_sl = slice(
+                    i * 10, min((i + 1) * 10, projs.proj_specs.shape[-1])
+                )
                 proj_specs_10chunk = list(
-                    projs.proj_specs[index_tuple][proj_spec_sl]  # [i * 10 : (i + 1) * 10]
+                    projs.proj_specs[index_tuple][
+                        proj_spec_sl
+                    ]  # [i * 10 : (i + 1) * 10]
                 )
                 num_projs_in_chunk = len(proj_specs_10chunk)
                 proj_specs_10chunk.extend(
@@ -891,7 +924,10 @@ def backproject(
                     input_proj_chunk_spec,
                 )
                 kern(grid_dims, block_dims, args)
-                pbar.update_to(index_tuple_i*projs.proj_specs.shape[-1] + proj_spec_sl.stop)
+                pbar.update_to(
+                    index_tuple_i * projs.proj_specs.shape[-1]
+                    + proj_spec_sl.stop
+                )
         if block:
             cp.cuda.get_current_stream().synchronize()
     return volume

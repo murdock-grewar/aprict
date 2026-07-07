@@ -32,7 +32,7 @@ def test_volume_create(dtype: np.dtype) -> None:
     rng = np.random.default_rng()
     a1 = rng.standard_normal((100, 121, 139)).astype(dtype)
     # Create the volume directly from a1
-    v = Volume(a1)
+    v = Volume(a1, voxwid=1)
     # Check shape and type
     assert v.dtype == np.dtype(dtype)
     assert v.shape == (100, 121, 139)
@@ -42,7 +42,7 @@ def test_volume_create(dtype: np.dtype) -> None:
     del v
     np.testing.assert_array_equal(a1, a2)
     # Creating the volume by copying in data
-    v = Volume.zeros(a1.shape, dtype)
+    v = Volume.zeros(a1.shape, voxwid=1, dtype=dtype)
     a1 = rng.standard_normal(v.shape).astype(v.dtype)
     v.copy_from(a1)
     v.copy_to(a2)
@@ -63,7 +63,7 @@ def test_volume_fill(dtype: np.dtype) -> None:
     a1 = rng.standard_normal((100, 121, 139)).astype(dtype)
     a2 = np.empty_like(a1)
     # Filling the array with data
-    v = Volume.zeros(a1.shape, dtype)
+    v = Volume.zeros(a1.shape, voxwid=1, dtype=dtype)
     v.fill(2.0)
     a1.fill(2)
     v.copy_to(a2)

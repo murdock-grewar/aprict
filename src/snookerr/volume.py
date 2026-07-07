@@ -24,7 +24,6 @@ import typing
 
 import cupy as cp
 import cupyx
-import numexpr as ne
 import numpy as np
 
 from .cuda.structs import FORBILD_volumes as fv
@@ -95,9 +94,8 @@ class Volume[
         ],  # this typing ensures the correct dimensions (3) and a supported numpy dtype
         *,
         voxwid: float,
-        pos_c: np.ndarray[
-            tuple[typing.Literal[3]], np.dtype[np.float32]
-        ] | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
+        pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
+        | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
     ) -> None:
         # Essentially, we are storing the resolved types of the TypeVars
         self._dtype = arr.dtype
@@ -177,9 +175,8 @@ class Volume[
         *,
         voxwid: float,
         dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
-        pos_c: np.ndarray[
-            tuple[typing.Literal[3]], np.dtype[np.float32]
-        ] | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
+        pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
+        | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
     ) -> Volume:
         """Initialise a new volume, filled with zeros."""
         if type(shape) is not tuple or len(shape) != 3:
@@ -196,7 +193,12 @@ class Volume[
 
     def zeroed_copy(self) -> Volume:
         """Return a copy of this volume, but filled with zeros."""
-        return Volume.zeros(self._shape, voxwid=self._voxwid, dtype=self._dtype, pos_c=self.pos_c)
+        return Volume.zeros(
+            self._shape,
+            voxwid=self._voxwid,
+            dtype=self._dtype,
+            pos_c=self.pos_c,
+        )
 
     def fill(self, value: int | float) -> None:
         """Fill the volume with a constant value."""

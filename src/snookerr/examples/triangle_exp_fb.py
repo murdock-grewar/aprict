@@ -220,7 +220,7 @@ def main() -> None:  # noqa: D103
     print("Photons (clearfield) per pixel: ", photons_per_pixel)
 
     # Construct the 'projection specification' array.
-    pss = cbfp.create_proj_spec_array(
+    pg: cbfp.ProjGeom = cbfp.ProjGeom(
         source_pos=sps,  # shape (3, N, 3) -- last axis is x,y,z
         det_pos=np.array(
             [[p1], [p2], [p3]]
@@ -234,7 +234,7 @@ def main() -> None:  # noqa: D103
         nu=nu,  # integer. Will be broadcast.
         nv=nv,  # integer. Will be broadcast.
     )
-    print("Number of cone-beam projections: ", pss.size)
+    print("Number of cone-beam projections: ", pg.num_projs)
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
@@ -315,7 +315,7 @@ def main() -> None:  # noqa: D103
         multiply_before_adding=voxwid_mm
         * 0.0184,  # attenuation of water ~ 0.0184 per mm
     )
-    projs = cbfp.ProjectionSet(pss, data=None)
+    projs = cbfp.ProjectionSet(pg, data=None)
     print("Generating the linearised projection data... ", end="", flush=True)
     t1 = time.time()
     _ = cbfp.project(
@@ -369,13 +369,14 @@ def main() -> None:  # noqa: D103
     vol_shape: tuple[int, int, int] = tuple(
         int(volwid_mm // voxwid_mm) for _ in range(3)
     )  # ty:ignore[invalid-assignment]  # ty is bugged here
-    working_vol = snookerr.Volume.zeros(vol_shape, dtype=np.float32)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=np.float32)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
-        fast_approx=fast_backproj, cyl_mask_rad_vox=working_vol.shape[0] / 2
+        fast_approx=fast_backproj,
+        cyl_mask_rad=working_vol.shape[0] / 2 * working_vol.voxwid,
     )
-    projs = cbfp.ProjectionSet(pss, data=proj_array)
+    projs = cbfp.ProjectionSet(pg, data=proj_array)
     t1 = time.time()
     working_vol = cbfp.backproject(
         config_backproject,

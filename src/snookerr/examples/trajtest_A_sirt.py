@@ -93,15 +93,15 @@ def main() -> None:  # noqa: D103
         ).transpose()
     )
     det_vvec_arr = pixel_wid_mm * np.array([[0, 0, 1]], dtype=np.float32)
-    pss = cbfp.create_proj_spec_array(
-        source_pos_arr / voxwid_mm,
-        det_pos_arr / voxwid_mm,
-        det_uvec_arr / voxwid_mm,
-        det_vvec_arr / voxwid_mm,
-        det_numpixwid,
-        det_numpixhei,
+    pg = cbfp.ProjGeom(
+        source_pos=source_pos_arr / voxwid_mm,
+        det_pos=det_pos_arr / voxwid_mm,
+        det_uvec=det_uvec_arr / voxwid_mm,
+        det_vvec=det_vvec_arr / voxwid_mm,
+        nu=det_numpixwid,
+        nv=det_numpixhei,
     )
-    print("Number of fan-beam projections: ", pss.size)
+    print("Number of fan-beam projections: ", pg.num_projs)
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
@@ -147,7 +147,7 @@ def main() -> None:  # noqa: D103
         multiply_before_adding=voxwid_mm
         * 0.0184,  # attenuation of water ~ 0.0184 per mm
     )
-    projs = cbfp.ProjectionSet(pss, data=None)
+    projs = cbfp.ProjectionSet(pg, data=None)
     projs.create_buffer(dtype=proj_dtype)
     print("Generating the linearised projection data... ", end="", flush=True)
     t1 = time.time()
@@ -202,14 +202,14 @@ def main() -> None:  # noqa: D103
         int(volwid_mm // voxwid_mm) for _ in range(3)
     )  # ty:ignore[invalid-assignment]  # ty is bugged here
     print("Working volume shape: ", vol_shape)
-    working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
         fast_approx=fast_approx_backprojection,
-        cyl_mask_rad_vox=working_vol.shape[0] / 2,
+        cyl_mask_rad=working_vol.shape[0] / 2 * working_vol.voxwid,
     )
-    projs = cbfp.ProjectionSet(pss, data=proj_array)
+    projs = cbfp.ProjectionSet(pg, data=proj_array)
     t1 = time.time()
     working_vol = cbfp.backproject(
         config_backproject,
@@ -223,7 +223,7 @@ def main() -> None:  # noqa: D103
     # snookerr.imview.plot_volume(working_vol.as_numpy())
 
     # Make a SIRT object
-    working_vol = snookerr.Volume.zeros(vol_shape, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
+    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
     working_vol.fill(0)
     recon = snookerr.iterators.SIRT_flatpanel(
         config=snookerr.iterators.SIRT_flatpanel.Config(

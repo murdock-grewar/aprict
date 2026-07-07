@@ -73,7 +73,7 @@ class SIRT_flatpanel:  # noqa: N801
         )
         self._config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
-            cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
+            cyl_mask_rad=min(*volume.shape[:2]) / 2 * volume.voxwid,
             apply_summand_multiplier=True,  # we'll multiply by the preconditioner
             soften_det_edges_proportion=soften_det_edges_proportion,
         )
@@ -101,7 +101,7 @@ class SIRT_flatpanel:  # noqa: N801
         M.fill(0)
         non_multiply_config_bp = cbfp.ConfigBackproject(
             fast_approx=self._config.fast_backproject,
-            cyl_mask_rad_vox=min(*volume.shape[:2]) / 2,
+            cyl_mask_rad=min(*volume.shape[:2]) / 2 * volume.voxwid,
             apply_summand_multiplier=False,  # Turn this off while we compute the preconditioner
             soften_det_edges_proportion=soften_det_edges_proportion,
         )

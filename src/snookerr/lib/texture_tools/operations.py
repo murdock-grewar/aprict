@@ -172,7 +172,9 @@ def inner_prod(t1: Texture, t2: Texture) -> float:
     args = (output, t1.surfobj, t2.surfobj, _shape_to_uint3(t1.shape))  # ty:ignore[invalid-argument-type]
     ctype1 = _get_c_type_name(t1)
     ctype2 = _get_c_type_name(t2)
-    kern = _module.get_function(f"inner_product_3D_surfaces<{ctype1:s},{ctype2:s}>")
+    kern = _module.get_function(
+        f"inner_product_3D_surfaces<{ctype1:s},{ctype2:s}>"
+    )
     kern(*_get_grid_block_dims(t1), args)
     return float(output.get()[0])
 

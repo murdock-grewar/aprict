@@ -206,7 +206,7 @@ class RampFilterer:
 
             out = out[:, : chunk_shape[1], :]
             out = out[: cparr_view.shape[0], ...]
-            return out, event_filter_complete  # noqa: RET504
+            return out, event_filter_complete
 
     def filter_bulk_axis1_stream(
         self, cparr_view: cp.ndarray, block: bool = True
@@ -232,14 +232,18 @@ class RampFilterer:
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Create an output array of ramp-filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(cparr_view, block=False)
-        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+        with cp.cuda.Stream(
+            non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+        ) as stream:
             output = cp.zeros_like(cparr_view)
             output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
-            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+            with cp.cuda.Stream(
+                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+            ) as stream:
                 stream.wait_event(output_created_event)
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
@@ -250,7 +254,9 @@ class RampFilterer:
                 events.append(ev)
             sl_start += out_arr.shape[0]
 
-        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+        with cp.cuda.Stream(
+            non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+        ) as stream:
             for e in events:
                 stream.wait_event(e)
             completed_event = cp.cuda.Event(
@@ -316,10 +322,12 @@ class FBPFilterer:
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
             # This is weird. It seems like it should be physpixwid * R/L, because the algorithm for filtering the projections is properly normalised when the pixels are treated as if they reside in the midplane
-            physpixwid=physpixwid * R/L,
+            physpixwid=physpixwid * R / L,
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
-            stream=cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY),
+            stream=cp.cuda.Stream(
+                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+            ),
         )
         # self._fft_2d_shape = self.rfilt._fft_2d_shape
         self.event_completed_filter = None
@@ -327,18 +335,30 @@ class FBPFilterer:
 
         # Construct the multiplicative mask
         # NOTE: Y is the horizontal coordinate on the detector midplane. X is the vertical.
-        Yarr = physpixwid * R / L * (  # noqa: N806
-            np.arange(self._expanded_2d_shape[0], dtype=np.float32)
-            - (self._expanded_2d_shape[0] - 1) / 2
+        Yarr = (  # noqa: N806
+            physpixwid
+            * R
+            / L
+            * (
+                np.arange(self._expanded_2d_shape[0], dtype=np.float32)
+                - (self._expanded_2d_shape[0] - 1) / 2
+            )
         )
-        Xarr = physpixwid * R / L * (  # noqa: N806
-            np.arange(self._expanded_2d_shape[1], dtype=np.float32)
-            - (self._expanded_2d_shape[1] - 1) / 2
+        Xarr = (  # noqa: N806
+            physpixwid
+            * R
+            / L
+            * (
+                np.arange(self._expanded_2d_shape[1], dtype=np.float32)
+                - (self._expanded_2d_shape[1] - 1) / 2
+            )
         )
         self._multmask_2d = cp.array(
             1
             / (
-                np.float_power(np.sqrt(1 + np.square(Xarr[np.newaxis, :] / R)), 3)
+                np.float_power(
+                    np.sqrt(1 + np.square(Xarr[np.newaxis, :] / R)), 3
+                )
                 * np.sqrt(
                     1
                     + np.square(Xarr[np.newaxis, :] / R)
@@ -378,6 +398,7 @@ class FBPFilterer:
 
     @property
     def zeta(self) -> float:
+        """Get the maximum rotation angle which can be accomodated by this object."""
         return self._max_abs_rotation_angle
 
     @classmethod
@@ -387,6 +408,7 @@ class FBPFilterer:
         physpixwid: float,
         L: float,  # noqa: N803
     ) -> float:
+        """Get the maximum rotation angle which can be accomodated by an instance of this object."""
         # Compute the maximum rotation angle.
         # cone_angle_horz: float = 2*np.arctan2(proj_2d_shape[0]*physpixwid/2, L)
         cone_angle_vert: float = 2 * np.arctan2(
@@ -401,6 +423,7 @@ class FBPFilterer:
     def get_expanded_proj_2d_shape(
         cls, proj_2d_shape: tuple[int, int], max_abs_rotation_angle: float
     ) -> tuple[int, int]:
+        """Get the 2D shape of the expanded shape of the arrays. They need to be expanded in order to accommodate a rotation."""
         # Compute the expanded projection shape. It needs to expand in the horizontal direction
         # in order to accomodate the rotation.
         sint, cost = (
@@ -425,7 +448,7 @@ class FBPFilterer:
 
         return tuple(expanded_proj_2d_shape)  # ty:ignore[invalid-return-type]
 
-    def filter_bulk_axis1_stream(
+    def filter_bulk_axis1_stream(  # noqa: C901
         self,
         arr: cp.ndarray | np.ndarray | np.memmap,
         block: bool = True,
@@ -434,7 +457,7 @@ class FBPFilterer:
     ) -> typing.Generator[tuple[cp.ndarray, cp.cuda.Event]]:
         """Create a generator of filtered projection chunks, from an input array."""
         # Place the rotated data directly into the memory of the rfilt object. This will result in a small optimisation by removing the need for an additional data copy.
-        chunkmem = self.rfilt._chunk_mem_horz_filter[
+        chunkmem = self.rfilt._chunk_mem_horz_filter[  # noqa: SLF001
             :, : self.chunk_shape[1], :
         ]
         # out_buffer = cp.zeros_like(chunkmem)
@@ -465,8 +488,8 @@ class FBPFilterer:
             v = cp.pad(v, ((0, 0), (padx, padx), (pady, pady)))
 
             # # Ensure that the memory is clear before rotating and copying the data in
-            # if self.rfilt._e_mem1_free is not None:  # noqa: SLF001
-            #     self.rfilt._e_mem1_free.synchronize()  # noqa: SLF001
+            # if self.rfilt._e_mem1_free is not None:
+            #     self.rfilt._e_mem1_free.synchronize()
 
             # Rotate and copy into the memory buffer
             if force_rotation_angle is None:
@@ -481,12 +504,14 @@ class FBPFilterer:
                 )
             events = [None for _ in range(v.shape[0])]
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+                with cp.cuda.Stream(
+                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                ) as stream:
                     # The ramp filter uses the same memory we're about to write into.
                     # Wait for it to complete filtering and producing its output before
                     # we overwrite that memory.
-                    if self.rfilt._e_mem1_free is not None:
-                        stream.wait_event(self.rfilt._e_mem1_free)
+                    if self.rfilt._e_mem1_free is not None:  # noqa: SLF001
+                        stream.wait_event(self.rfilt._e_mem1_free)  # noqa: SLF001
                     if self.event_completed_ramp is not None:
                         stream.wait_event(self.event_completed_ramp)
                     if i == 0:
@@ -547,7 +572,7 @@ class FBPFilterer:
                         )
                         mult_2 = 1 - (
                             idx_2 - (sl.stop - 1 / 2)
-                        )  # TODO: check this
+                        )  # TODO: check this  # noqa: FIX002
                         cp.multiply(
                             chunkmem[proj_index, :, idx_2],
                             mult_2,
@@ -603,11 +628,15 @@ class FBPFilterer:
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
             # Rotate back to original orientation and place into output buffer
-            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+            with cp.cuda.Stream(
+                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+            ) as stream:
                 out_buffer = cp.zeros_like(out)
                 event_out_buffer_created = stream.record()
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+                with cp.cuda.Stream(
+                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                ) as stream:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
@@ -626,7 +655,9 @@ class FBPFilterer:
                         block=False, disable_timing=True, interprocess=False
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU stream which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
-            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+            with cp.cuda.Stream(
+                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+            ) as stream:
                 for e in events:
                     stream.wait_event(e)
                 self.event_completed_filter = cp.cuda.Event(
@@ -665,14 +696,18 @@ class FBPFilterer:
             clear_gpu_cache_regularly=clear_gpu_cache_regularly,
             force_rotation_angle=force_rotation_angle,
         )
-        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+        with cp.cuda.Stream(
+            non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+        ) as stream:
             output = cp.zeros_like(arr)
             output_created_event = stream.record()
         sl_start: int = 0
         events = []
         for index, (out_arr, e) in enumerate(out_gen):
             sl = slice(sl_start, sl_start + out_arr.shape[0])
-            with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+            with cp.cuda.Stream(
+                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+            ) as stream:
                 stream.wait_event(e)
                 stream.wait_event(output_created_event)
                 cp.multiply(out_arr, 1, out=output[sl])
@@ -683,7 +718,9 @@ class FBPFilterer:
                 events.append(ev)
             sl_start += out_arr.shape[0]
 
-        with cp.cuda.Stream(non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY) as stream:
+        with cp.cuda.Stream(
+            non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+        ) as stream:
             for e in events:
                 stream.wait_event(e)
             completed_event = cp.cuda.Event(

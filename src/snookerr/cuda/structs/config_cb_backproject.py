@@ -38,7 +38,17 @@ class config_cb_backproject(
         "approx_mode_direct_raycast",
         "approx_mode_linear_interpolate",
     ],
-    dtypes=[np.bool, np.bool, np.bool, np.float32, np.bool, np.float32, np.int32, np.bool, np.bool],
+    dtypes=[
+        np.bool,
+        np.bool,
+        np.bool,
+        np.float32,
+        np.bool,
+        np.float32,
+        np.int32,
+        np.bool,
+        np.bool,
+    ],
 ):
     pass  # ty:ignore[invalid-argument-type]
 
