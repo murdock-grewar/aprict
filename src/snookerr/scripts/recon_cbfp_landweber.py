@@ -21,6 +21,7 @@ import os
 import pathlib
 
 import cupy as cp
+import cupyx
 import numexpr as ne
 import numpy as np
 
@@ -299,12 +300,44 @@ def get_ordered_subsets_and_masks(
         # Step 1: compute the lateral chord length based on lateral position of detector pixel
         # Step 2: compute the dz from source to intersection with cylinder, as a 2D array
         # Step 3: compute mask as min_z <= (source_z + dz_2D) <= max_z
-        pixel_wid = np.mean(np.linalg.norm(pg.det_uvec, axis=-1))
-        pixel_hei = np.mean(np.linalg.norm(pg.det_vvec, axis=-1))
+        unit = np.float64(1)
+        pixel_wid = np.mean(
+            np.sqrt(
+                ne.evaluate(
+                    "sum(unit*vec*vec, 1)",
+                    local_dict={"vec": pg.det_uvec, "unit": unit},
+                )
+            )
+        )
+        pixel_hei = np.mean(
+            np.sqrt(
+                ne.evaluate(
+                    "sum(unit*vec*vec, 1)",
+                    local_dict={"vec": pg.det_vvec, "unit": unit},
+                )
+            )
+        )
         det_numpixwid = pg.nu[0]
         det_numpixhei = pg.nv[0]
-        R = np.mean(np.linalg.norm(pg.source_pos, axis=-1))  # noqa: N806
-        L = np.mean(np.linalg.norm(pg.source_pos - pg.det_pos, axis=-1))  # noqa: N806
+        R = np.mean(  # noqa: N806
+            np.sqrt(
+                ne.evaluate(
+                    "sum(unit*vec*vec, 1)",
+                    local_dict={"vec": pg.source_pos, "unit": unit},
+                )
+            )
+        )
+        L = np.mean(  # noqa: N806
+            np.sqrt(
+                ne.evaluate(
+                    "sum(unit*vec*vec, 1)",
+                    local_dict={
+                        "vec": pg.source_pos - pg.det_pos,
+                        "unit": unit,
+                    },
+                )
+            )
+        )
         det_y = pixel_wid * (
             np.arange(det_numpixwid, dtype=np.float32)
             - ((det_numpixwid - 1) / 2)
@@ -317,22 +350,37 @@ def get_ordered_subsets_and_masks(
         lateral_length_source_to_detector = np.sqrt(
             np.square(L) + np.square(det_y)
         )
-        dz = (cl / lateral_length_source_to_detector)[:, np.newaxis] * det_z[
-            np.newaxis, :
-        ]
+        dz = ne.evaluate(
+            "a*b",
+            local_dict={
+                "a": (cl / lateral_length_source_to_detector)[:, np.newaxis],
+                "b": det_z[np.newaxis, :],
+            },
+        )
         zs = pg.source_pos[..., 2]
         zs_mask_min, zs_mask_max = cyl_confine_proj_lines_z_zminmax
         for sl in sls:
-            z_of_cyl_intersection = (
-                zs[sl][:, np.newaxis, np.newaxis] + dz[np.newaxis, :, :]
-            )
             z_ = zs[sl][:, np.newaxis, np.newaxis]
-            mask = np.logical_and(
-                zs_mask_min <= z_of_cyl_intersection,
-                z_of_cyl_intersection <= zs_mask_max,
+            z_of_cyl_intersection = ne.evaluate(
+                "a+b",
+                local_dict={
+                    "a": z_,
+                    "b": dz[np.newaxis, :, :],
+                },
             )
-            mask2 = np.logical_and(zs_mask_min <= z_, z_ <= zs_mask_max)
-            mask = np.logical_and(mask, mask2)
+            mask = cupyx.empty_pinned(
+                z_of_cyl_intersection.shape, dtype=np.bool
+            )
+            ne.evaluate(
+                "where(zmin <= zi, 1, 0) & where(zi <= zmax, 1, 0) & where(zmin <= z_, 1, ,0) & where(z_ <= zmax, 1, 0)",
+                out=mask,
+                local_dict={
+                    "zi": z_of_cyl_intersection,
+                    "z_": z_,
+                    "zmin": zs_mask_min,
+                    "zmax": zs_mask_max,
+                },
+            )
             mask_cp = cp.array(mask)
             masks.append(mask_cp)
     return ps_lst, masks
