@@ -145,6 +145,14 @@ def _make_arg_parser() -> argparse.ArgumentParser:
     #     help="The number of iterations to use. None = iterate indefinitely, until a SIGINT is sent.",
     # )
     group_fbp_options.add_argument(
+        "--num-rot-angs",
+        metavar="None",
+        type=lib.argparse_tools.MaybeType(int),
+        default=None,
+        required=False,
+        help="How many filtration directions to sample. Set to None to use a random single direction for each CB projection.",
+    )
+    group_fbp_options.add_argument(
         "--interpolate-measurements",
         metavar="True",
         type=lib.argparse_tools.BoolArgType,
@@ -215,6 +223,8 @@ def validate_args(args: argparse.Namespace) -> None:
 def get_filtered_projectionset_generator(  # noqa: C901
     projdata_path: pathlib.Path,
     pg: cbfp.ProjGeom,
+    num_rot_angs: int
+    | None,  # set to None to use a single random angle per CB projection
     *,
     slice_projs: slice[int | None, int | None, None] | None,
     autorange_z: bool,
@@ -224,7 +234,9 @@ def get_filtered_projectionset_generator(  # noqa: C901
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
 ) -> tuple[
-    cbfp.ProjGeom, typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]], float
+    cbfp.ProjGeom,
+    typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]],
+    float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if autorange_z:
@@ -303,25 +315,62 @@ def get_filtered_projectionset_generator(  # noqa: C901
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], cbfp.ProjectionSet]
     ]:
+        if num_rot_angs is not None:  # None means a single random angle.
+            if num_rot_angs == 1:
+                angs = np.array([0.0], dtype=np.float32)
+            else:
+                angs = np.linspace(
+                    -filt.zeta + (filt.zeta / num_rot_angs / 2),
+                    filt.zeta - (filt.zeta / num_rot_angs / 2),
+                    endpoint=True,
+                    num=num_rot_angs,
+                )
         sl_start: int = 0
         while sl_start < pg.num_projs:
             sl = slice(
                 sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk)
             )
-            # Create ProjectionSet with filtered data in buffer
-            with cp.cuda.Stream(non_blocking=False) as stream:
-                filt_arr, event_completed = filt.filter_bulk_axis1_concat(
-                    cp.array(data_mm[sl]),
-                    force_rotation_angle=None,
-                    block=True,
-                )
-                stream.wait_event(event_completed)
-                cp.multiply(
-                    filt_arr,
-                    2 * filt.zeta / np.float_power(np.sin(filt.zeta / 2), 2),
-                    out=filt_arr,
-                )
-            ps = cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
+            # Create ProjectionSet with filtered data in buffe
+            if num_rot_angs is None:
+                with cp.cuda.Stream(non_blocking=False) as stream:
+                    filt_arr, event_completed = filt.filter_bulk_axis1_concat(
+                        cp.array(data_mm[sl]),
+                        force_rotation_angle=None,
+                        block=True,
+                    )
+                    stream.wait_event(event_completed)
+                    cp.multiply(
+                        filt_arr,
+                        2
+                        * filt.zeta
+                        / np.float_power(np.sin(filt.zeta / 2), 2),
+                        out=filt_arr,
+                    )
+                ps = cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
+            else:
+                with cp.cuda.Stream(non_blocking=False) as stream:
+                    ps = cbfp.ProjectionSet(pg.sliced(sl), data=None)
+                    ps.create_buffer(dtype=cp.float32)
+                    assert ps.data is not None
+                    ps.data.fill(0)
+                    for ang in angs:
+                        filt_arr, event_completed = (
+                            filt.filter_bulk_axis1_concat(
+                                cp.array(data_mm[sl]),
+                                force_rotation_angle=ang,
+                                block=True,
+                            )
+                        )
+                        stream.wait_event(event_completed)
+                        cp.add(filt_arr, ps.data, out=ps.data)
+                    cp.multiply(
+                        ps.data,
+                        2
+                        * filt.zeta
+                        / np.float_power(np.sin(filt.zeta / 2), 2)
+                        / len(angs),
+                        out=ps.data,
+                    )
             # Yield
             yield sl, ps
             # Increment the slice
@@ -399,6 +448,7 @@ def main() -> None:
     pg, sl_filtps_gen, final_multiplier = get_filtered_projectionset_generator(
         projdata_path=args.projdata,
         pg=cbfp.ProjGeom.load(args.projgeom),
+        num_rot_angs=args.num_rot_angs,
         slice_projs=args.slice_projs,
         autorange_z=args.autorange_z,
         flip_x=args.flip_x,
