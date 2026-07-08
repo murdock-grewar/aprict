@@ -372,7 +372,7 @@ def get_ordered_subsets_and_masks(
                 z_of_cyl_intersection.shape, dtype=np.bool
             )
             ne.evaluate(
-                "where(zmin <= zi, 1, 0) & where(zi <= zmax, 1, 0) & where(zmin <= z_, 1, ,0) & where(z_ <= zmax, 1, 0)",
+                "where(zmin <= zi, 1, 0) & where(zi <= zmax, 1, 0) & where(zmin <= z_, 1, 0) & where(z_ <= zmax, 1, 0)",
                 out=mask,
                 local_dict={
                     "zi": z_of_cyl_intersection,
