@@ -316,7 +316,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             )
         ]
         if force_dependencies is not None:
-            cls.dependent_structs.extend([t for t in force_dependencies])  # noqa: C416
+            cls.dependent_structs.extend([t for t in force_dependencies])
         # Add the dependents of dependents. Make sure it's ordered, with base dependencies on the left.
         for i in list(reversed(range(len(cls.dependent_structs)))):
             ks: KernelStruct = cls.dependent_structs[i]
