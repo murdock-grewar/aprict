@@ -21,9 +21,9 @@ import io
 import itertools
 import multiprocessing
 import operator
+import pathlib  # noqa: TC003
 import re
 import sys
-from typing import TYPE_CHECKING
 
 import numexpr as ne
 import numpy as np
@@ -31,9 +31,6 @@ import pcpp
 import regex  # replaces standard 're' module. Needed for the ability to do balanced matching of parentheses
 
 from ..cuda.structs import FORBILD_volumes as fv
-
-if TYPE_CHECKING:
-    import pathlib
 
 _typedict = {
     "Sphere": fv.Sphere,
