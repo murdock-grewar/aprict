@@ -157,23 +157,34 @@ def _convert_preprocessed_ph_str_to_shapes(
     )
 
     objs = re_obj.findall(s)
-    nprocs = max(1, 2*int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
+    nprocs = max(1, 2 * int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
     # groupsize = (len(objs) + (nprocs - 1)) // nprocs
     groupsize = 300
     numobjs = len(objs)
     if len(objs) <= groupsize:
         shapes = _objs_to_shape(objs)
     else:
-        with multiprocessing.Pool(nprocs) as p, logtools.ProgressBar(
+        with (
+            multiprocessing.Pool(nprocs) as p,
+            logtools.ProgressBar(
                 desc="Processing shapes",
                 valunit="shape",
                 maxval=numobjs,
-                ) as pbar:
+            ) as pbar,
+        ):
             shapes_lists = []
             batches = itertools.batched(objs, groupsize)
-            for superbatchindex, superbatch in enumerate(itertools.batched(batches, nprocs)):
-                shapes_lists.extend(list(p.imap(_objs_to_shape, superbatch, chunksize=groupsize)))
-                pbar.update_to(min(numobjs, (superbatchindex+1)*groupsize*nprocs))
+            for superbatchindex, superbatch in enumerate(
+                itertools.batched(batches, nprocs)
+            ):
+                shapes_lists.extend(
+                    list(
+                        p.imap(_objs_to_shape, superbatch, chunksize=groupsize)
+                    )
+                )
+                pbar.update_to(
+                    min(numobjs, (superbatchindex + 1) * groupsize * nprocs)
+                )
         shapes = functools.reduce(
             operator.iadd,
             shapes_lists,

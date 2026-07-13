@@ -20,6 +20,7 @@
 # classes like texture_tools.Texture, and the like.
 
 import pathlib  # noqa: TC003
+import types
 import typing
 
 import cupy as cp
@@ -356,3 +357,262 @@ class FBVolume:
             ],
             dtype=fv.Shape,
         )
+
+    @classmethod
+    def _shape_FORBIRD_str(cls, shape) -> str:  # noqa: ANN001, C901, N802
+        type_int = shape["type"]
+        id_to_str = {v: k for k, v in fv._dict_shape_name_to_type_num.items()}  # noqa: SLF001
+        type_str = id_to_str[int(type_int)]
+        ns = types.SimpleNamespace(
+            {k: v for k, v in zip(shape.dtype.names, shape)}
+        )
+        cas1 = types.SimpleNamespace(
+            {k: v for k, v in zip(ns.cas1.dtype.names, ns.cas1)}
+        )
+        cas1_axis = types.SimpleNamespace(
+            {k: v for k, v in zip(cas1.axis.dtype.names, cas1.axis)}
+        )
+        cas2 = types.SimpleNamespace(
+            {k: v for k, v in zip(ns.cas2.dtype.names, ns.cas2)}
+        )
+        cas2_axis = types.SimpleNamespace(
+            {k: v for k, v in zip(cas2.axis.dtype.names, cas2.axis)}
+        )
+        cas3 = types.SimpleNamespace(
+            {k: v for k, v in zip(ns.cas3.dtype.names, ns.cas3)}
+        )
+        cas3_axis = types.SimpleNamespace(
+            {k: v for k, v in zip(cas3.axis.dtype.names, cas3.axis)}
+        )
+        cas_str = (
+            (
+                ""
+                if cas1.mode == 0
+                else (
+                    " r({x},{y},{z})".format(**cas1_axis.__dict__)
+                    + ("<" if cas1.mode == 1 else ">")
+                    + "{dotprod}".format(**cas1.__dict__)
+                )
+            )
+            + (
+                ""
+                if cas2.mode == 0
+                else (
+                    " r({x},{y},{z})".format(**cas2_axis.__dict__)
+                    + ("<" if cas2.mode == 1 else ">")
+                    + "{dotprod}".format(**cas2.__dict__)
+                )
+            )
+            + (
+                ""
+                if cas3.mode == 0
+                else (
+                    " r({x},{y},{z})".format(**cas3_axis.__dict__)
+                    + ("<" if cas3.mode == 1 else ">")
+                    + "{dotprod}".format(**cas3.__dict__)
+                )
+            )
+        )
+        match type_str:
+            case "Box":
+                out = (
+                    "{ [Box: "
+                    + "x={x} y={y} z={z} dx={dx} dy={dy} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cone":
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Cone: "
+                    + "x={x} y={y} z={z} l={l} r1={r1} r2={r2}".format(
+                        **ns.__dict__
+                    )
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cone_x":
+                out = (
+                    "{ [Cone_x: "
+                    + "x={x} y={y} z={z} l={l} r1={r1} r2={r2}".format(
+                        **ns.__dict__
+                    )
+                    + cas_str
+                    + " ] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cone_y":
+                out = (
+                    "{ [Cone_y: "
+                    + "x={x} y={y} z={z} l={l} r1={r1} r2={r2}".format(
+                        **ns.__dict__
+                    )
+                    + cas_str
+                    + " ] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cone_z":
+                out = (
+                    "{ [Cone_z: "
+                    + "x={x} y={y} z={z} l={l} r1={r1} r2={r2}".format(
+                        **ns.__dict__
+                    )
+                    + cas_str
+                    + " ] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cylinder":
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Cylinder: "
+                    + "x={x} y={y} z={z} l={l} r={r}".format(**ns.__dict__)
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cylinder_x":
+                out = (
+                    "{ [Cylinder_x: "
+                    + "x={x} y={y} z={z} l={l} r={r}".format(**ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cylinder_y":
+                out = (
+                    "{ [Cylinder_y: "
+                    + "x={x} y={y} z={z} l={l} r={r}".format(**ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Cylinder_z":
+                out = (
+                    "{ [Cylinder_z: "
+                    + "x={x} y={y} z={z} l={l} r={r}".format(**ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipsoid":
+                out = (
+                    "{ [Ellipsoid: "
+                    + "x={x} y={y} z={z} dx={dx} dy={dy} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipsoid_free":
+                a_x_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.a_x.dtype.names, ns.a_x)}
+                )
+                a_y_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.a_y.dtype.names, ns.a_y)}
+                )
+                a_z_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.a_z.dtype.names, ns.a_z)}
+                )
+                out = (
+                    "{ [Ellipsoid_free: "
+                    + "x={x} y={y} z={z} dx={dx} dy={dy} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + " a_x({x},{y},{z})".format(**a_x_ns.__dict__)
+                    + " a_y({x},{y},{z})".format(**a_y_ns.__dict__)
+                    + " a_z({x},{y},{z})".format(**a_z_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipt_Cyl":
+                a_x_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.a_x.dtype.names, ns.a_x)}
+                )
+                a_y_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.a_y.dtype.names, ns.a_y)}
+                )
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Ellipt_Cyl: "
+                    + "x={x} y={y} z={z} l={l} dx={dx} dy={dy} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + " a_x({x},{y},{z})".format(**a_x_ns.__dict__)
+                    + " a_y({x},{y},{z})".format(**a_y_ns.__dict__)
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Sphere":
+                out = (
+                    "{ [Sphere: "
+                    + "x={x} y={y} z={z} r={r}".format(**ns.__dict__)
+                    + cas_str
+                    + " ] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipt_Cyl_x":
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Ellipt_Cyl_x: "
+                    + "x={x} y={y} z={z} l={l} dy={dy} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipt_Cyl_y":
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Ellipt_Cyl_y: "
+                    + "x={x} y={y} z={z} l={l} dx={dx} dz={dz}".format(
+                        **ns.__dict__
+                    )
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case "Ellipt_Cyl_z":
+                axis_ns = types.SimpleNamespace(
+                    {k: v for k, v in zip(ns.axis.dtype.names, ns.axis)}
+                )
+                out = (
+                    "{ [Ellipt_Cyl_z: "
+                    + "x={x} y={y} z={z} l={l} dx={dx} dy={dy}".format(
+                        **ns.__dict__
+                    )
+                    + " axis({x},{y},{z})".format(**axis_ns.__dict__)
+                    + cas_str
+                    + "] rho={rho}".format(**ns.__dict__)
+                    + " }"
+                )
+            case _:
+                raise NotImplementedError()
+        return out
+
+    @property
+    def FORBILD_str(self) -> str:  # noqa: N802
+        """Return a string representing this volume in FORBILD format."""
+        return "\n".join([self._shape_FORBIRD_str(s) for s in self.shapes])
