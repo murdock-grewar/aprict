@@ -307,7 +307,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
     zs_max = pg.source_pos[:, 0].max()
     zs_min = pg.source_pos[:, 0].min()
     final_multiplier = (
-        np.float_power(R / L, 3)
+        np.float_power(R / L, 3)  # this extra factor is cancelled with L^3/Z^3 in the backprojection
         / (32 * np.float_power(np.pi, 3) * np.float_power(R, 2))
         * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
     )

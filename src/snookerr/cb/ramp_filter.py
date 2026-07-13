@@ -79,8 +79,8 @@ class RampFilterer:
             h = cufft.next_fast_len(2 * self.chunk_shape[1] - 1)
             self._fft_2d_shape = (h, self.chunk_shape[2])
             # Get the horz kernel as a multiplier in Fourier space
-            # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel(2*chunk_shape[1] - 1, physpixsize=physpixwid))
             hk = h + (1 - (h % 2))
+            # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel(hk, physpixsize=physpixwid))[:h]
             kern_horz: cp.ndarray = cp.array(
                 ramp_kernels.ramp_kernel_ramlak(hk, physpixsize=physpixwid)
             )[:h]
@@ -321,7 +321,6 @@ class FBPFilterer:
         )
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
-            # This is weird. It seems like it should be physpixwid * R/L, because the algorithm for filtering the projections is properly normalised when the pixels are treated as if they reside in the midplane
             physpixwid=physpixwid * R / L,
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
