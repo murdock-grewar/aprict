@@ -21,6 +21,7 @@ import io
 import itertools
 import multiprocessing
 import operator
+import os
 import pathlib  # noqa: TC003
 import re
 import sys
@@ -30,6 +31,7 @@ import numpy as np
 import pcpp
 import regex  # replaces standard 're' module. Needed for the ability to do balanced matching of parentheses
 
+from .. import logtools
 from ..cuda.structs import FORBILD_volumes as fv
 
 _typedict = {
@@ -155,20 +157,28 @@ def _convert_preprocessed_ph_str_to_shapes(
     )
 
     objs = re_obj.findall(s)
-    min_shapes_per_group: int = 300
-    nprocs = min(
-        (len(objs) + (min_shapes_per_group - 1)) // min_shapes_per_group, 64
-    )
-    groupsize = (len(objs) + (nprocs - 1)) // nprocs
+    nprocs = max(1, 2*int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
+    # groupsize = (len(objs) + (nprocs - 1)) // nprocs
+    groupsize = 300
+    numobjs = len(objs)
     if len(objs) <= groupsize:
         shapes = _objs_to_shape(objs)
     else:
-        with multiprocessing.Pool(nprocs) as p:
-            shapes = functools.reduce(
-                operator.iadd,
-                p.map(_objs_to_shape, itertools.batched(objs, groupsize)),
-                [],
-            )
+        with multiprocessing.Pool(nprocs) as p, logtools.ProgressBar(
+                desc="Processing shapes",
+                valunit="shape",
+                maxval=numobjs,
+                ) as pbar:
+            shapes_lists = []
+            batches = itertools.batched(objs, groupsize)
+            for superbatchindex, superbatch in enumerate(itertools.batched(batches, nprocs)):
+                shapes_lists.extend(list(p.imap(_objs_to_shape, superbatch, chunksize=groupsize)))
+                pbar.update_to(min(numobjs, (superbatchindex+1)*groupsize*nprocs))
+        shapes = functools.reduce(
+            operator.iadd,
+            shapes_lists,
+            [],
+        )
     return np.array(shapes, dtype=fv.Shape, ndmax=1)
 
 
