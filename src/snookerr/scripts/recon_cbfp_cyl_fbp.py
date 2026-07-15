@@ -233,6 +233,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
     flip_z: bool,
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
+    logger: logging.Logger,
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]],
@@ -294,6 +295,8 @@ def get_filtered_projectionset_generator(  # noqa: C901
         msg = "Inconsistent source-to-detector length."
         raise NotImplementedError(msg)
     L = Ls[0]  # noqa: N806
+    logger.info(f"R: {R!s:s}")
+    logger.info(f"L: {L!s:s}")
 
     # Set up the filtering object
     filt = cb.FBPFilterer(
@@ -311,6 +314,9 @@ def get_filtered_projectionset_generator(  # noqa: C901
         / (32 * np.float_power(np.pi, 3) * np.float_power(R, 2))
         * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
     )
+    # HOTFIX TODO
+    # I have no idea why this factor is necessary.
+    final_multiplier *= 5/R
 
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], cbfp.ProjectionSet]
@@ -330,7 +336,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
             sl = slice(
                 sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk)
             )
-            # Create ProjectionSet with filtered data in buffe
+            # Create ProjectionSet with filtered data in buffer
             if num_rot_angs is None:
                 with cp.cuda.Stream(non_blocking=False) as stream:
                     filt_arr, event_completed = filt.filter_bulk_axis1_concat(
@@ -454,6 +460,7 @@ def main() -> None:
         flip_x=args.flip_x,
         flip_y=args.flip_y,
         flip_z=args.flip_z,
+        logger=logger,
     )
 
     # Create the working volume

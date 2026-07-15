@@ -321,7 +321,7 @@ class FBPFilterer:
         )
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
-            physpixwid=physpixwid * R / L,
+            physpixwid=physpixwid * R / L,  # use the physical pixel width on the plane projected to be 1 unit in front of the source point. ALSO, add a factor of R so that the filtrations are divided by R. This is part of the definition of the filtered projections: to add a factor of 1/R. I've done that by inserting R here.
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
             stream=cp.cuda.Stream(
@@ -333,19 +333,17 @@ class FBPFilterer:
         self.event_completed_ramp = None
 
         # Construct the multiplicative mask
-        # NOTE: Y is the horizontal coordinate on the detector midplane. X is the vertical.
-        Yarr = (  # noqa: N806
+        # NOTE: u is the horizontal coordinate on the detector plane projected to be 1 unit in front of the source point. v is the vertical coordinate.
+        uarr = (
             physpixwid
-            * R
             / L
             * (
                 np.arange(self._expanded_2d_shape[0], dtype=np.float32)
                 - (self._expanded_2d_shape[0] - 1) / 2
             )
         )
-        Xarr = (  # noqa: N806
+        varr = (
             physpixwid
-            * R
             / L
             * (
                 np.arange(self._expanded_2d_shape[1], dtype=np.float32)
@@ -356,12 +354,12 @@ class FBPFilterer:
             1
             / (
                 np.float_power(
-                    np.sqrt(1 + np.square(Xarr[np.newaxis, :] / R)), 3
+                    np.sqrt(1 + np.square(varr[np.newaxis, :])), 3
                 )
                 * np.sqrt(
                     1
-                    + np.square(Xarr[np.newaxis, :] / R)
-                    + np.square(Yarr[:, np.newaxis] / R)
+                    + np.square(varr[np.newaxis, :])
+                    + np.square(uarr[:, np.newaxis])
                 )
             )
         )
