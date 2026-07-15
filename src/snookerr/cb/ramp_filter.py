@@ -231,7 +231,9 @@ class RampFilterer:
         self, cparr_view: cp.ndarray, block: bool = True
     ) -> tuple[cp.ndarray, cp.cuda.Event]:
         """Create an output array of ramp-filtered projections, from an input array."""
-        out_gen = self.filter_bulk_axis1_stream(cparr_view, block=False)
+        out_gen = self.filter_bulk_axis1_stream(
+            cparr_view, block=_HOTFIX_DISABLE_ASYNCHRONICITY
+        )
         with cp.cuda.Stream(
             non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
         ) as stream:
@@ -248,7 +250,9 @@ class RampFilterer:
                 stream.wait_event(e)
                 cp.multiply(out_arr, 1, out=output[sl])
                 ev = cp.cuda.Event(
-                    block=False, disable_timing=True, interprocess=False
+                    block=_HOTFIX_DISABLE_ASYNCHRONICITY,
+                    disable_timing=True,
+                    interprocess=False,
                 )
                 stream.record(ev)
                 events.append(ev)
@@ -281,6 +285,8 @@ class FBPFilterer:
     physpixwid: float
     ss: SamplingStrategy
 
+    _hacky_fan_beam_mode: bool
+
     event_completed_filter: cp.cuda.Event
     event_completed_ramp: cp.cuda.Event
 
@@ -303,13 +309,20 @@ class FBPFilterer:
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int = 3,
         sampling_strategy: SamplingStrategy = SamplingStrategy.SINGLE_ROTATION_RANDOM_UNIFORM,
+        limit_zeta: float | None,  # limit the maximum rotation angle zeta
+        _hacky_fan_beam_mode: bool = False,  # Modifies the behaviour to be compatible with a simple fan-beam
     ) -> None:
+        self.hacky_fan_beam_mode = _hacky_fan_beam_mode
         self.L = L
         self.physpixwid = physpixwid
         self.ss = sampling_strategy
         self._max_abs_rotation_angle = self.get_max_abs_rotation_angle(
             proj_2d_shape, physpixwid, L
         )
+        if limit_zeta is not None:
+            self._max_abs_rotation_angle = min(
+                self._max_abs_rotation_angle, limit_zeta
+            )
         self.proj_2d_shape = proj_2d_shape
         self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
             proj_2d_shape, self._max_abs_rotation_angle
@@ -321,7 +334,9 @@ class FBPFilterer:
         )
         # Construct the ramp-filtering object with memory buffers
         self.rfilt = RampFilterer(
-            physpixwid=physpixwid * R / L,  # use the physical pixel width on the plane projected to be 1 unit in front of the source point. ALSO, add a factor of R so that the filtrations are divided by R. This is part of the definition of the filtered projections: to add a factor of 1/R. I've done that by inserting R here.
+            physpixwid=physpixwid
+            * R
+            / L,  # use the physical pixel width on the plane projected to be 1 unit in front of the source point. ALSO, add a factor of R so that the filtrations are divided by R. This is part of the definition of the filtered projections: to add a factor of 1/R. I've done that by inserting R here.
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
             stream=cp.cuda.Stream(
@@ -353,9 +368,7 @@ class FBPFilterer:
         self._multmask_2d = cp.array(
             1
             / (
-                np.float_power(
-                    np.sqrt(1 + np.square(varr[np.newaxis, :])), 3
-                )
+                np.float_power(np.sqrt(1 + np.square(varr[np.newaxis, :])), 3)
                 * np.sqrt(
                     1
                     + np.square(varr[np.newaxis, :])
@@ -541,53 +554,58 @@ class FBPFilterer:
                         out=chunkmem[proj_index, ...],
                     )
                     # Apply the letterbox
-                    sl = self.get_letterbox_slice(rotang_rads_list[proj_index])
-                    idx_1 = math.floor(sl.start + 1 / 2)
-                    idx_2 = math.ceil(sl.stop - 1 / 2)
-                    if idx_1 == idx_2:
-                        cp.multiply(
-                            chunkmem[proj_index, :, idx_1],
-                            sl.stop - sl.start,
-                            out=chunkmem[proj_index, :, idx_1],
+                    if not self.hacky_fan_beam_mode:
+                        sl = self.get_letterbox_slice(
+                            rotang_rads_list[proj_index]
                         )
-                        cp.multiply(
-                            chunkmem[proj_index, :, :idx_1],
-                            0,
-                            out=chunkmem[proj_index, :, :idx_1],
-                        )
-                        cp.multiply(
-                            chunkmem[proj_index, :, idx_1 + 1 :],
-                            0,
-                            out=chunkmem[proj_index, :, idx_1 + 1 :],
-                        )
-                    else:
-                        mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
-                        cp.multiply(
-                            chunkmem[proj_index, :, idx_1],
-                            mult_1,
-                            out=chunkmem[proj_index, :, idx_1],
-                        )
-                        mult_2 = 1 - (
-                            idx_2 - (sl.stop - 1 / 2)
-                        )  # TODO: check this  # noqa: FIX002
-                        cp.multiply(
-                            chunkmem[proj_index, :, idx_2],
-                            mult_2,
-                            out=chunkmem[proj_index, :, idx_2],
-                        )
-                        cp.multiply(
-                            chunkmem[proj_index, :, :idx_1],
-                            0,
-                            out=chunkmem[proj_index, :, :idx_1],
-                        )
-                        cp.multiply(
-                            chunkmem[proj_index, :, idx_2 + 1 :],
-                            0,
-                            out=chunkmem[proj_index, :, idx_2 + 1 :],
-                        )
+                        idx_1 = math.floor(sl.start + 1 / 2)
+                        idx_2 = math.ceil(sl.stop - 1 / 2)
+                        if idx_1 == idx_2:
+                            cp.multiply(
+                                chunkmem[proj_index, :, idx_1],
+                                sl.stop - sl.start,
+                                out=chunkmem[proj_index, :, idx_1],
+                            )
+                            cp.multiply(
+                                chunkmem[proj_index, :, :idx_1],
+                                0,
+                                out=chunkmem[proj_index, :, :idx_1],
+                            )
+                            cp.multiply(
+                                chunkmem[proj_index, :, idx_1 + 1 :],
+                                0,
+                                out=chunkmem[proj_index, :, idx_1 + 1 :],
+                            )
+                        else:
+                            mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
+                            cp.multiply(
+                                chunkmem[proj_index, :, idx_1],
+                                mult_1,
+                                out=chunkmem[proj_index, :, idx_1],
+                            )
+                            mult_2 = 1 - (
+                                idx_2 - (sl.stop - 1 / 2)
+                            )  # TODO: check this  # noqa: FIX002
+                            cp.multiply(
+                                chunkmem[proj_index, :, idx_2],
+                                mult_2,
+                                out=chunkmem[proj_index, :, idx_2],
+                            )
+                            cp.multiply(
+                                chunkmem[proj_index, :, :idx_1],
+                                0,
+                                out=chunkmem[proj_index, :, :idx_1],
+                            )
+                            cp.multiply(
+                                chunkmem[proj_index, :, idx_2 + 1 :],
+                                0,
+                                out=chunkmem[proj_index, :, idx_2 + 1 :],
+                            )
                     # Create event to mark completion of the above steps
                     events[proj_index] = cp.cuda.Event(
-                        block=False, disable_timing=True, interprocess=False
+                        block=_HOTFIX_DISABLE_ASYNCHRONICITY,
+                        disable_timing=True,
+                        interprocess=False,
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
             # Wait for all rotations to complete
@@ -649,7 +667,9 @@ class FBPFilterer:
                         prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
                     )
                     events[proj_index] = cp.cuda.Event(
-                        block=False, disable_timing=True, interprocess=False
+                        block=_HOTFIX_DISABLE_ASYNCHRONICITY,
+                        disable_timing=True,
+                        interprocess=False,
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU stream which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
             with cp.cuda.Stream(
@@ -689,7 +709,7 @@ class FBPFilterer:
         """Create an output array of filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(
             arr,
-            block=False,
+            block=_HOTFIX_DISABLE_ASYNCHRONICITY,
             clear_gpu_cache_regularly=clear_gpu_cache_regularly,
             force_rotation_angle=force_rotation_angle,
         )
@@ -709,7 +729,9 @@ class FBPFilterer:
                 stream.wait_event(output_created_event)
                 cp.multiply(out_arr, 1, out=output[sl])
                 ev = cp.cuda.Event(
-                    block=False, disable_timing=True, interprocess=False
+                    block=_HOTFIX_DISABLE_ASYNCHRONICITY,
+                    disable_timing=True,
+                    interprocess=False,
                 )
                 stream.record(ev)
                 events.append(ev)
@@ -748,7 +770,9 @@ if __name__ == "__main__":
     completed_events = []
     for _, rotang in zip(range(ncycles), rotangs):
         x, e = filt.filter_bulk_axis1_concat(
-            cparr, block=False, force_rotation_angle=rotang
+            cparr,
+            block=_HOTFIX_DISABLE_ASYNCHRONICITY,
+            force_rotation_angle=rotang,
         )
         completed_events.append(e)
     for e in completed_events:
