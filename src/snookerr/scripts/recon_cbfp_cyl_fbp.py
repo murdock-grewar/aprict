@@ -145,6 +145,22 @@ def _make_arg_parser() -> argparse.ArgumentParser:
     #     help="The number of iterations to use. None = iterate indefinitely, until a SIGINT is sent.",
     # )
     group_fbp_options.add_argument(
+        "--fan-beam",
+        metavar="False",
+        type=lib.argparse_tools.BoolArgType,
+        default=False,
+        required=False,
+        help="Set to True to activate fan-beam reconstruction mode. This may avoid some other settings to make it work on 2D circular fan-beam data.",
+    )
+    group_fbp_options.add_argument(
+        "--limit-zeta",
+        metavar="1.23",
+        type=lib.argparse_tools.MaybeType(float),
+        default=None,
+        required=False,
+        help="Set this to impose a maximum value for zeta. This will limit the data used by this method.",
+    )
+    group_fbp_options.add_argument(
         "--num-rot-angs",
         metavar="None",
         type=lib.argparse_tools.MaybeType(int),
@@ -226,6 +242,8 @@ def get_filtered_projectionset_generator(  # noqa: C901
     num_rot_angs: int
     | None,  # set to None to use a single random angle per CB projection
     *,
+    fan_beam_mode: bool,
+    limit_zeta: float | None,
     slice_projs: slice[int | None, int | None, None] | None,
     autorange_z: bool,
     flip_x: bool,
@@ -240,6 +258,8 @@ def get_filtered_projectionset_generator(  # noqa: C901
     float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
+    if fan_beam_mode:
+        num_rot_angs = 1
     if autorange_z:
         pg = pg.translated(
             x=0,
@@ -305,18 +325,30 @@ def get_filtered_projectionset_generator(  # noqa: C901
         R=R,
         L=L,
         physpixwid=pixwid,
+        limit_zeta=limit_zeta,
     )
 
     zs_max = pg.source_pos[:, 0].max()
     zs_min = pg.source_pos[:, 0].min()
-    final_multiplier = (
-        np.float_power(R / L, 3)  # this extra factor is cancelled with L^3/Z^3 in the backprojection
-        / (32 * np.float_power(np.pi, 3) * np.float_power(R, 2))
-        * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
-    )
+    if fan_beam_mode:
+        final_multiplier = (
+            np.float_power(
+                R / L, 2
+            )  # this extra factor is cancelled with L^2/Z^2 in the backprojection
+            / (8 * np.square(np.pi) * R)
+            * (R * 2 * np.pi / pg.num_projs)
+        )
+    else:
+        final_multiplier = (
+            np.float_power(
+                R / L, 3
+            )  # this extra factor is cancelled with L^3/Z^3 in the backprojection
+            / (32 * np.float_power(np.pi, 3) * np.float_power(R, 2))
+            * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
+        )
     # HOTFIX TODO
-    # I have no idea why this factor is necessary.
-    final_multiplier *= 5/R
+    # I have no idea why this factor helps sometimes
+    # final_multiplier *= 5/R
 
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], cbfp.ProjectionSet]
@@ -345,6 +377,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
                         block=True,
                     )
                     stream.wait_event(event_completed)
+                    assert not fan_beam_mode
                     cp.multiply(
                         filt_arr,
                         2
@@ -369,14 +402,15 @@ def get_filtered_projectionset_generator(  # noqa: C901
                         )
                         stream.wait_event(event_completed)
                         cp.add(filt_arr, ps.data, out=ps.data)
-                    cp.multiply(
-                        ps.data,
-                        2
-                        * filt.zeta
-                        / np.float_power(np.sin(filt.zeta / 2), 2)
-                        / len(angs),
-                        out=ps.data,
-                    )
+                    if not fan_beam_mode:
+                        cp.multiply(
+                            ps.data,
+                            2
+                            * filt.zeta
+                            / np.float_power(np.sin(filt.zeta / 2), 2)
+                            / len(angs),
+                            out=ps.data,
+                        )
             # Yield
             yield sl, ps
             # Increment the slice
@@ -454,7 +488,9 @@ def main() -> None:
     pg, sl_filtps_gen, final_multiplier = get_filtered_projectionset_generator(
         projdata_path=args.projdata,
         pg=cbfp.ProjGeom.load(args.projgeom),
+        fan_beam_mode=args.fan_beam,
         num_rot_angs=args.num_rot_angs,
+        limit_zeta=args.limit_zeta,
         slice_projs=args.slice_projs,
         autorange_z=args.autorange_z,
         flip_x=args.flip_x,
@@ -475,7 +511,7 @@ def main() -> None:
     config_backproject = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
-        Z_on_L_factor_power=-3,
+        Z_on_L_factor_power=(-2 if args.fan_beam else -3),
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
@@ -484,6 +520,7 @@ def main() -> None:
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
     logger.info("Initializing FBP reconstruction...")
+    logger.info(f"voxel width: {vol.voxwid!s:s}")
 
     ##########################################################
     ################# Define helper methods ##################
