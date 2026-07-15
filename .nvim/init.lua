@@ -110,7 +110,7 @@ au({ 'CursorHold', 'InsertLeave' }, nil, function()
 end)
 
 ---- Customise the LSP autocompletion ----
-vim.lsp.inlay_hint.enable(true)
+vim.lsp.inlay_hint.enable(false)
 vim.keymap.set({ "n", "x" }, "<leader>ih", function()
     vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
 end, { noremap = true, silent = false })
