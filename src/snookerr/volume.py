@@ -122,7 +122,9 @@ class Volume[
             if out is not None
             else cupyx.empty_pinned(self._shape, dtype=self._dtype)
         )
-        self._texture.cuda_array.copy_to(x)  # Warning: this copies asynchronously!
+        self._texture.cuda_array.copy_to(
+            x
+        )  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
         return x
 
@@ -138,7 +140,9 @@ class Volume[
             if out is not None
             else cp.empty(self._shape, dtype=self._dtype)
         )
-        self._texture.cuda_array.copy_to(x)  # Warning: this copies asynchronously!
+        self._texture.cuda_array.copy_to(
+            x
+        )  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
         return x
 
@@ -209,12 +213,16 @@ class Volume[
 
     def copy_from(self, arr: np.ndarray[Shape, DType]) -> None:
         """Copy a numpy/cupy array into this Volume object."""
-        self._texture.cuda_array.copy_from(arr)  # Warning: this copies asynchronously!
+        self._texture.cuda_array.copy_from(
+            arr
+        )  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
 
     def copy_to(self, arr: np.ndarray[Shape, DType]) -> None:
         """Copy this Volume into a numpy/cupy array."""
-        self._texture.cuda_array.copy_to(arr)  # Warning: this copies asynchronously!
+        self._texture.cuda_array.copy_to(
+            arr
+        )  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
 
     def soften_to_xy_cylinder(
