@@ -256,6 +256,8 @@ def get_filtered_projectionset_generator(  # noqa: C901
     cbfp.ProjGeom,
     typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]],
     float,
+    float,
+    float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if fan_beam_mode:
@@ -326,29 +328,27 @@ def get_filtered_projectionset_generator(  # noqa: C901
         L=L,
         physpixwid=pixwid,
         limit_zeta=limit_zeta,
+        _hacky_fan_beam_mode=fan_beam_mode,
     )
 
-    zs_max = pg.source_pos[:, 0].max()
-    zs_min = pg.source_pos[:, 0].min()
+    zs_max = pg.source_pos[:, 2].max()
+    zs_min = pg.source_pos[:, 2].min()
     if fan_beam_mode:
         final_multiplier = (
-            np.float_power(
-                R / L, 2
-            )  # this extra factor is cancelled with L^2/Z^2 in the backprojection
-            / (8 * np.square(np.pi) * R)
-            * (R * 2 * np.pi / pg.num_projs)
+            # 1
+            # / (8 * np.square(np.pi) * R)
+            # * (R * 2 * np.pi / pg.num_projs)
+            1 / (4 * np.pi * pg.num_projs)
         )
     else:
         final_multiplier = (
-            np.float_power(
-                R / L, 3
-            )  # this extra factor is cancelled with L^3/Z^3 in the backprojection
-            / (32 * np.float_power(np.pi, 3) * np.float_power(R, 2))
-            * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
+            # R  # cancel the factor of R in the physpixwid of the ramp kernel
+            # / (32 * np.float_power(np.pi, 3) * np.float_power(R, 3))
+            # * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
+            (zs_max - zs_min)
+            / (16 * np.square(np.pi) * R * pg.num_projs)
         )
-    # HOTFIX TODO
-    # I have no idea why this factor helps sometimes
-    # final_multiplier *= 5/R
+    logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], cbfp.ProjectionSet]
@@ -416,7 +416,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # Increment the slice
             sl_start += num_projs_per_chunk
 
-    return pg, _gen(), final_multiplier
+    return pg, _gen(), R, L, final_multiplier
 
 
 def main() -> None:
@@ -485,7 +485,7 @@ def main() -> None:
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     # Create the ProjectionSet objects corresponding to each ordered subset
-    pg, sl_filtps_gen, final_multiplier = get_filtered_projectionset_generator(
+    pg, sl_filtps_gen, R, L, final_multiplier = get_filtered_projectionset_generator(  # noqa: N806, RUF059
         projdata_path=args.projdata,
         pg=cbfp.ProjGeom.load(args.projgeom),
         fan_beam_mode=args.fan_beam,
@@ -511,7 +511,8 @@ def main() -> None:
     config_backproject = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
-        Z_on_L_factor_power=(-2 if args.fan_beam else -3),
+        Z_on_val_factor_power=(-2 if args.fan_beam else -3),
+        Z_on_val_factor_val=R,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
@@ -519,8 +520,9 @@ def main() -> None:
     ##########################################################
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
-    logger.info("Initializing FBP reconstruction...")
     logger.info(f"voxel width: {vol.voxwid!s:s}")
+    logger.debug(f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}")
+    logger.info("Initializing FBP reconstruction...")
 
     ##########################################################
     ################# Define helper methods ##################
@@ -575,10 +577,18 @@ def main() -> None:
         logger=logger,
         persist=False,
     ) as pbar:
+        if args.fan_beam:
+            sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
         for sl, ps in sl_filtps_gen:
             cbfp.backproject(config_backproject, vol, ps, block=True)
+            assert ps.data is not None  # useful assertion for type-checking
+            if args.fan_beam:
+                sum_of_c += float(cp.sum(ps.data[:, ps.data.shape[1]//2, :]))
             # Perform logging updates
             pbar.update_to(sl.stop)
+
+    if args.fan_beam:
+        logger.debug(f"Approximate attenuation coefficient of middle voxel: {sum_of_c*final_multiplier:.5f}")
 
     # Scale the answer correctly
     vol.multiply(final_multiplier)
