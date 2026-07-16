@@ -539,7 +539,7 @@ class FBPFilterer:
                         out=chunkmem[proj_index, ...],
                     )
 
-                    if not self.hacky_fan_beam_mode:
+                    if rotang_rads_list[proj_index] != 0:
                         cupyx.scipy.ndimage.rotate(
                             input=v[proj_index],
                             angle=-180 / np.pi * rotang_rads_list[proj_index],
@@ -668,7 +668,7 @@ class FBPFilterer:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
-                    if not self.hacky_fan_beam_mode:
+                    if rotang_rads_list[proj_index] != 0:
                         cupyx.scipy.ndimage.rotate(
                             input=out[proj_index],
                             angle=180 / np.pi * rotang_rads_list[proj_index],
