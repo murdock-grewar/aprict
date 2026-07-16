@@ -380,6 +380,12 @@ __device__ Tv _backproject_CB_getval(
                 float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
                 sub_accumulator *= fcast<Tv>(powint(Z_on_L, config.Z_on_L_factor_power));
             }
+            if (config.Z_on_val_factor_power != 0) {
+                float val = config.Z_on_val_factor_val;
+                fvec3 Lvec = projspec.dspec.pos - source_pos;
+                float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
+                sub_accumulator *= fcast<Tv>(powint(Z_on_val, config.Z_on_val_factor_power));
+            }
         } else {
             // config.exact is FALSE
 
@@ -422,14 +428,19 @@ __device__ Tv _backproject_CB_getval(
             }
 
             if (config.approx_mode_direct_raycast) {
-                if (config.Z_on_L_factor_power == 0) {
-                    sub_accumulator = fcast<Tv>(det_value);
-                } else {
+                Tp multiplier = 1;
+                if (config.Z_on_L_factor_power != 0) {
                     fvec3 Lvec = projspec.dspec.pos - source_pos;
                     float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
-                    Tp multiplier = fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
-                    sub_accumulator = fcast<Tv>(det_value * multiplier);
+                    multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
                 }
+                if (config.Z_on_val_factor_power != 0) {
+                    float val = config.Z_on_val_factor_val;
+                    fvec3 Lvec = projspec.dspec.pos - source_pos;
+                    float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
+                    multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                }
+                sub_accumulator = fcast<Tv>(det_value * multiplier);
             } else {
                 // Compute the physical distance to the source
                 fvec3 det_pos      = projspec.dspec.pos + (
@@ -447,7 +458,12 @@ __device__ Tv _backproject_CB_getval(
                     float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
                     multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
                 }
-
+                if (config.Z_on_val_factor_power != 0) {
+                    float val = config.Z_on_val_factor_val;
+                    fvec3 Lvec = projspec.dspec.pos - source_pos;
+                    float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
+                    multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                }
                 sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
             }
 

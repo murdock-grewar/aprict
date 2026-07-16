@@ -6,6 +6,8 @@ struct config_CB_backproject {
     bool apply_summand_multiplier;
     float soften_edge_proportion;
     int Z_on_L_factor_power;
+    int Z_on_val_factor_power;
+    float Z_on_val_factor_val;
     bool approx_mode_direct_raycast;
     bool approx_mode_linear_interpolate;
 };

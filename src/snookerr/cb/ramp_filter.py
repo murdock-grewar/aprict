@@ -381,10 +381,13 @@ class FBPFilterer:
         self, rotation_angle: float
     ) -> slice[float, float]:
         """Return the slice in fractional indices corresponding to the nonzero parts of the vertical range of the rotated detector."""
-        # Solve: X^2/L^2 = (cos^2 \theta / cos^2 \zeta - 1)
-        # Solution: X/L = +- \sqrt{cos^2 \theta / \cos^2 \zeta - 1}
-        # Then, using X = physpixwid*(index-mid_index), we have
-        # index = X/physpixwid + mid_index
+        # v*L = physical displacement on detector, along vertical direction.
+        # Solve v^2 = sin^2 \theta - cos^2 \theta tan^2 \zeta = sin^2 \theta + cos^2 \theta - cos^2 \theta( 1 + \tan^2 \zeta)
+        #       v^2 = 1 - \cos^2 \theta (1 + \tan^2 \zeta)
+        #       v^2 = 1 - \cos^2 \theta \sec^2 \zeta
+        # Solution: v = +- \sqrt{\cos^2 \theta / \cos^2 \zeta - 1}
+        # Then, using v = physpixwid*(index - mid_index)/L, we have
+        # index = v*L/physpixwid + mid_index
         # --> index = mid_index +- (L/physpixwid) * sqrt{ ... }
         if abs(rotation_angle) > self._max_abs_rotation_angle:
             msg = "Invalid rotation angle entered."
@@ -394,14 +397,14 @@ class FBPFilterer:
             self.L
             / self.physpixwid
             * np.sqrt(
-                np.square(
-                    np.maximum(
-                        0,
+                np.maximum(
+                    np.square(
                         np.cos(rotation_angle)
                         / np.cos(self._max_abs_rotation_angle),
                     )
+                    - 1,
+                    0,
                 )
-                - 1
             )
         )
         return slice(mid_index - disc, mid_index + disc)
@@ -536,17 +539,20 @@ class FBPFilterer:
                         out=chunkmem[proj_index, ...],
                     )
 
-                    cupyx.scipy.ndimage.rotate(
-                        input=v[proj_index],
-                        angle=-180 / np.pi * rotang_rads_list[proj_index],
-                        axes=(1, 0),
-                        reshape=False,
-                        output=chunkmem[proj_index, ...],
-                        order=1,
-                        mode="grid-constant",
-                        cval=0,
-                        prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
-                    )
+                    if not self.hacky_fan_beam_mode:
+                        cupyx.scipy.ndimage.rotate(
+                            input=v[proj_index],
+                            angle=-180 / np.pi * rotang_rads_list[proj_index],
+                            axes=(1, 0),
+                            reshape=False,
+                            output=chunkmem[proj_index, ...],
+                            order=1,
+                            mode="grid-constant",
+                            cval=0,
+                            prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
+                        )
+                    else:
+                        chunkmem[proj_index, ...] = v[proj_index]
                     # Multiply by mask
                     cp.multiply(
                         chunkmem[proj_index, ...],
@@ -554,12 +560,16 @@ class FBPFilterer:
                         out=chunkmem[proj_index, ...],
                     )
                     # Apply the letterbox
+                    # NOTE: THIS IS A PROBBALE SOURCE OF ERROR FOR SMALL ZETA
+                    # TO TEST THIS, CONSIDER TESTING THE FAN BEAM RECON BUT ENABLE THE FOLLOWING LOGIC AND SEE WHAT HAPPENS
                     if not self.hacky_fan_beam_mode:
                         sl = self.get_letterbox_slice(
                             rotang_rads_list[proj_index]
                         )
-                        idx_1 = math.floor(sl.start + 1 / 2)
-                        idx_2 = math.ceil(sl.stop - 1 / 2)
+                        # idx_1 = math.floor(sl.start + 1 / 2)
+                        # idx_2 = math.ceil(sl.stop - 1 / 2)
+                        idx_1 = round(sl.start)
+                        idx_2 = round(sl.stop)
                         if idx_1 == idx_2:
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_1],
@@ -577,15 +587,17 @@ class FBPFilterer:
                                 out=chunkmem[proj_index, :, idx_1 + 1 :],
                             )
                         else:
-                            mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
+                            # mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
+                            mult_1 = (idx_1 + 1/2) - sl.start
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_1],
                                 mult_1,
                                 out=chunkmem[proj_index, :, idx_1],
                             )
-                            mult_2 = 1 - (
-                                idx_2 - (sl.stop - 1 / 2)
-                            )  # TODO: check this  # noqa: FIX002
+                            # mult_2 = 1 - (
+                            #     idx_2 - (sl.stop - 1 / 2)
+                            # )  # TODO: check this  # noqa: FIX002
+                            mult_2 = sl.stop - (idx_2 - 1/2)
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_2],
                                 mult_2,
@@ -622,6 +634,7 @@ class FBPFilterer:
                     )
                 else:
                     out = chunkmem.copy()
+                    # Weighted projection now has an incorrect factor...
                     self.event_completed_ramp = cp.cuda.Event()
                     stream.record(self.event_completed_ramp)
                 out = out[: v.shape[0], ...]
@@ -655,17 +668,20 @@ class FBPFilterer:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
-                    cupyx.scipy.ndimage.rotate(
-                        input=out[proj_index],
-                        angle=180 / np.pi * rotang_rads_list[proj_index],
-                        axes=(1, 0),
-                        reshape=False,
-                        output=out_buffer[proj_index, ...],
-                        order=1,
-                        mode="grid-constant",
-                        cval=0,
-                        prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
-                    )
+                    if not self.hacky_fan_beam_mode:
+                        cupyx.scipy.ndimage.rotate(
+                            input=out[proj_index],
+                            angle=180 / np.pi * rotang_rads_list[proj_index],
+                            axes=(1, 0),
+                            reshape=False,
+                            output=out_buffer[proj_index, ...],
+                            order=1,
+                            mode="grid-constant",
+                            cval=0,
+                            prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
+                        )
+                    else:
+                        out_buffer[proj_index, ...] = out[proj_index]
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                         disable_timing=True,
