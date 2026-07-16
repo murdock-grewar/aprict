@@ -836,9 +836,9 @@ def backproject(
         msg = "To prevent unintended behaviour, the config 'apply_summand_multiplier' must be true if and only if a summand_multiplier is included."
         raise ValueError(msg)
     # Prepare the kernel and the static kernel args
-    blockx = min(10, volume.shape[0])
-    blocky = min(10, volume.shape[1])
-    blockz = min(10, volume.shape[2])
+    blockx = min(9, volume.shape[0])
+    blocky = min(9, volume.shape[1])
+    blockz = min(9, volume.shape[2])
     kern = _select_backprojection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blockz)
     grid_dims = (
