@@ -17,7 +17,6 @@
 
 import enum
 import itertools
-import math
 import time
 import typing
 
@@ -309,7 +308,8 @@ class FBPFilterer:
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int = 3,
         sampling_strategy: SamplingStrategy = SamplingStrategy.SINGLE_ROTATION_RANDOM_UNIFORM,
-        limit_zeta: float | None,  # limit the maximum rotation angle zeta
+        limit_zeta: float
+        | None = None,  # limit the maximum rotation angle zeta
         _hacky_fan_beam_mode: bool = False,  # Modifies the behaviour to be compatible with a simple fan-beam
     ) -> None:
         self.hacky_fan_beam_mode = _hacky_fan_beam_mode
@@ -588,7 +588,7 @@ class FBPFilterer:
                             )
                         else:
                             # mult_1 = 1 - (sl.start + 1 / 2 - idx_1)
-                            mult_1 = (idx_1 + 1/2) - sl.start
+                            mult_1 = (idx_1 + 1 / 2) - sl.start
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_1],
                                 mult_1,
@@ -597,7 +597,7 @@ class FBPFilterer:
                             # mult_2 = 1 - (
                             #     idx_2 - (sl.stop - 1 / 2)
                             # )  # TODO: check this  # noqa: FIX002
-                            mult_2 = sl.stop - (idx_2 - 1/2)
+                            mult_2 = sl.stop - (idx_2 - 1 / 2)
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_2],
                                 mult_2,

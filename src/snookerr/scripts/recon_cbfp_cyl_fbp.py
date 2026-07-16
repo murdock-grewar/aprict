@@ -345,8 +345,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # R  # cancel the factor of R in the physpixwid of the ramp kernel
             # / (32 * np.float_power(np.pi, 3) * np.float_power(R, 3))
             # * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
-            (zs_max - zs_min)
-            / (16 * np.square(np.pi) * R * pg.num_projs)
+            (zs_max - zs_min) / (16 * np.square(np.pi) * R * pg.num_projs)
         )
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
@@ -485,18 +484,20 @@ def main() -> None:
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     # Create the ProjectionSet objects corresponding to each ordered subset
-    pg, sl_filtps_gen, R, L, final_multiplier = get_filtered_projectionset_generator(  # noqa: N806, RUF059
-        projdata_path=args.projdata,
-        pg=cbfp.ProjGeom.load(args.projgeom),
-        fan_beam_mode=args.fan_beam,
-        num_rot_angs=args.num_rot_angs,
-        limit_zeta=args.limit_zeta,
-        slice_projs=args.slice_projs,
-        autorange_z=args.autorange_z,
-        flip_x=args.flip_x,
-        flip_y=args.flip_y,
-        flip_z=args.flip_z,
-        logger=logger,
+    pg, sl_filtps_gen, R, L, final_multiplier = (  # noqa: N806, RUF059
+        get_filtered_projectionset_generator(
+            projdata_path=args.projdata,
+            pg=cbfp.ProjGeom.load(args.projgeom),
+            fan_beam_mode=args.fan_beam,
+            num_rot_angs=args.num_rot_angs,
+            limit_zeta=args.limit_zeta,
+            slice_projs=args.slice_projs,
+            autorange_z=args.autorange_z,
+            flip_x=args.flip_x,
+            flip_y=args.flip_y,
+            flip_z=args.flip_z,
+            logger=logger,
+        )
     )
 
     # Create the working volume
@@ -521,7 +522,9 @@ def main() -> None:
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
     logger.info(f"voxel width: {vol.voxwid!s:s}")
-    logger.debug(f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}")
+    logger.debug(
+        f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}"
+    )
     logger.info("Initializing FBP reconstruction...")
 
     ##########################################################
@@ -583,12 +586,14 @@ def main() -> None:
             cbfp.backproject(config_backproject, vol, ps, block=True)
             assert ps.data is not None  # useful assertion for type-checking
             if args.fan_beam:
-                sum_of_c += float(cp.sum(ps.data[:, ps.data.shape[1]//2, :]))
+                sum_of_c += float(cp.sum(ps.data[:, ps.data.shape[1] // 2, :]))
             # Perform logging updates
             pbar.update_to(sl.stop)
 
     if args.fan_beam:
-        logger.debug(f"Approximate attenuation coefficient of middle voxel: {sum_of_c*final_multiplier:.5f}")
+        logger.debug(
+            f"Approximate attenuation coefficient of middle voxel: {sum_of_c * final_multiplier:.5f}"
+        )
 
     # Scale the answer correctly
     vol.multiply(final_multiplier)

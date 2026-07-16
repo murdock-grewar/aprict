@@ -33,7 +33,9 @@ def ramp_kernel(
         msg = "Window length must be odd."
         raise ValueError(msg)
     halfn = (n + 1) // 2
-    arange: np.ndarray = np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1  # NOTE: np.float32 is not precise enough! Use np.float64
+    arange: np.ndarray = (
+        np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1
+    )  # NOTE: np.float32 is not precise enough! Use np.float64
     return 8 / (1 - 4 * np.square(arange)) / (physpixsize or 1)
 
 
@@ -47,7 +49,9 @@ def ramp_kernel_ramlak(
         msg = "Window length must be odd."
         raise ValueError(msg)
     halfn = (n + 1) // 2
-    arange: np.ndarray = np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1  # NOTE: np.float32 is not good enough for high-precision reconstruction! It results in tiny DC error! Using np.float64 here fixes it!
+    arange: np.ndarray = (
+        np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1
+    )  # NOTE: np.float32 is not good enough for high-precision reconstruction! It results in tiny DC error! Using np.float64 here fixes it!
     return (
         np.square(np.pi)
         * (2 * np.sinc(arange) - np.square(np.sinc(1 / 2 * arange)))

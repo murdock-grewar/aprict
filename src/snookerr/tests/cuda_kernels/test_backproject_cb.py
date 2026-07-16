@@ -323,6 +323,8 @@ class TestCB_BACKPROJ_randomnoise:
                 np.bool(False),
                 0,
                 0,
+                0,
+                1,
                 np.bool(False),
                 np.bool(True),
             ),
