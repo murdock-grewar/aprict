@@ -300,7 +300,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
         msg = "Inconsistent pixel heights of detector."
         raise NotImplementedError(msg)
     pixhei = pixheis[0]
-    if not pixwid == pixhei:
+    if not np.isclose(pixwid, pixhei):
         msg = "Non-square pixels of detector."
         raise NotImplementedError(msg)
     Rs = np.sqrt(  # noqa: N806
