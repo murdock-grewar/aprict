@@ -24,7 +24,9 @@ if _os.environ.get("SNOOKERR_BUILDMODE", ""):  # noqa: RUF067
     pass
 else:
     # Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.
-    _os.environ["NUMEXPR_MAX_THREADS"] = str(_os.process_cpu_count())
+    _nethreads_max_env = _os.environ.get("NUMEXPR_MAX_THREADS", None)
+    if _nethreads_max_env is None:
+        _os.environ["NUMEXPR_MAX_THREADS"] = str(_os.process_cpu_count())
 
     del _os
     from . import cb as cb
