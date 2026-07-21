@@ -17,27 +17,25 @@
 
 import argparse
 import logging
-import os
 import pathlib
 import typing
 
 import cupy as cp
-import numexpr as ne
 import numpy as np
 
 # Try to load some modules
 try:
     from .. import image_view as imview
 
-    mod_avail_imview: bool = True
+    _mod_avail_imview = True
 except ModuleNotFoundError:
-    mod_avail_imview: bool = False
+    _mod_avail_imview = False
 try:
     from .. import liveplot  # noqa: F401
 
-    mod_avail_liveplot: bool = True
+    _mod_avail_liveplot = True
 except ModuleNotFoundError:
-    mod_avail_liveplot: bool = False
+    _mod_avail_liveplot = False
 
 from .. import Volume, cb, lib, logtools
 from ..cb import flatpanel as cbfp
@@ -218,6 +216,18 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         default=None,
         required=False,
         help="The maximum for the plotting range. Set to None to select maximum value in each plot.",
+    )
+
+    group_resource_options = parser.add_argument_group(
+        title="resource options"
+    )
+    group_resource_options.add_argument(
+        "--ne-threads",
+        type=lib.ne_tools.NETHREADS,
+        action=lib.argparse_tools.EnumAction,
+        default=lib.ne_tools.NETHREADS.ALL_LOGICAL_CORES,
+        required=False,
+        help="Set the number of threads to be used by numexpr. This will attempt to override the env NUMEXPR_MAX_THREADS as necessary.",
     )
 
     return parser
@@ -460,9 +470,9 @@ def main() -> None:
     ##########################################################
     ##################### Logging setup ######################
     ##########################################################
-    logging.root.setLevel(
-        logging.NOTSET
-    )  # Prevent root logger from squashing child loggers from outputting
+    # Prevent root logger from squashing child loggers from outputting
+    logging.root.setLevel(logging.NOTSET)
+    # Create custom logger object
     logger = logtools.make_logger(
         path=artefact_path, stderr_loglevel=args.verbosity
     )
@@ -471,14 +481,7 @@ def main() -> None:
     ##### Set numexpr to use as many threads as possible #####
     ##########################################################
     # Set numexpr to have the appropriate number of threads
-    # This should have already worked at import time, but it doesn't for some reason
-    preferred_thread_count: int = int(2 * os.cpu_count())  # ty:ignore[unsupported-operator]
-    nthreads: int = int(
-        os.environ.get("NUMEXPR_MAX_THREADS", default=None)
-        or preferred_thread_count
-    )
-    logger.debug(f"Setting numexpr num_threads to {nthreads:d}")
-    ne.set_num_threads(nthreads)
+    lib.ne_tools.try_set_nethreads(args.ne_threads, logger=logger)
 
     ##########################################################
     ######## Prepare the input data for the FBP recon ########
