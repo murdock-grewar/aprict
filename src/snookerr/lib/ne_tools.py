@@ -62,7 +62,7 @@ def try_set_nethreads(
     logger and logger.info(f"Setting for --ne-threads: {nethreads.name:s}")
     match nethreads:
         case NETHREADS.NE_DEFAULT:
-            nthreads_target: int | None = env_num_threads or env_max_threads
+            nthreads_target: int | None = None  # env_num_threads or env_max_threads
         case NETHREADS.NE_DEFAULT_MAXTHREADS:
             nthreads_target: int = ne.MAX_THREADS
         case NETHREADS.ALL_LOGICAL_CORES:
