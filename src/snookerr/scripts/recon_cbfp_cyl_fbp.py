@@ -174,6 +174,14 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         required=False,
         help="Whether to apply bilinear interpolation between measurement pixels, when backprojecting.",
     )
+    group_fbp_options.add_argument(
+        "--superres",
+        metavar="1",
+        type=int,
+        default=1,
+        required=False,
+        help="Reconstruct with a voxel size this many times smaller, then downsample.",
+    )
 
     group_io_options = parser.add_argument_group(title="I/O options")
     group_io_options.add_argument(
@@ -505,8 +513,8 @@ def main() -> None:
 
     # Create the working volume
     vol = Volume.zeros(
-        args.volshape,
-        voxwid=args.voxwid,
+        tuple(n * args.superres for n in args.volshape),
+        voxwid=args.voxwid / args.superres,
         dtype=np.float32,  # ty:ignore[invalid-argument-type]
         pos_c=args.volpos,
     )
@@ -524,7 +532,9 @@ def main() -> None:
     ##########################################################
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
-    logger.info(f"voxel width: {vol.voxwid!s:s}")
+    logger.info(f"superres voxel width: {vol.voxwid!s:s}")
+    logger.info(f"superres volume shape: {vol.shape!s:s}")
+    logger.info(f"superres factor: {args.superres!s:s}")
     logger.debug(
         f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}"
     )
@@ -540,6 +550,7 @@ def main() -> None:
 
         # Get the current volume
         x = vol.as_numpy()
+        x = lib.ne_tools.downbin(x, n=args.superres, preserve_sum=False)
 
         # Get the 'root' directory of where this volume will be saved
         save_path = path_intms if is_intermediate else path_output

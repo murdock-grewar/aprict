@@ -16,12 +16,42 @@
 """Tools related to numexpr usage."""
 
 import enum
+import itertools
 import logging  # noqa: TC003
 import os
 import pathlib  # noqa: TC003
 
 import numexpr as ne
 import numpy as np
+
+
+def downbin(
+    x: np.ndarray, *, n: int, preserve_sum: bool, out: np.ndarray | None = None
+) -> np.ndarray:
+    """Downbin or downsample an array to a common integer divisor in every axis."""
+    xnew = (
+        np.empty_like(x, shape=tuple(s // n for s in x.shape))
+        if out is None
+        else out
+    )
+    first: bool = True
+    for offsets in itertools.product(range(n), repeat=len(xnew.shape)):
+        sls = [slice(off, None, n) for off in offsets]
+        xsl = x[*sls]
+        if first:
+            ne.evaluate("xsl", out=xnew, local_dict={"xsl": xsl, "xnew": xnew})
+            first = False
+        else:
+            ne.evaluate(
+                "xsl + xnew", out=xnew, local_dict={"xsl": xsl, "xnew": xnew}
+            )
+    if not preserve_sum:
+        ne.evaluate(
+            "xnew/num",
+            out=xnew,
+            local_dict={"xnew": xnew, "num": pow(n, len(xnew.shape))},
+        )
+    return xnew
 
 
 def save(path: pathlib.Path, arr: np.ndarray) -> None:
@@ -62,7 +92,9 @@ def try_set_nethreads(
     logger and logger.info(f"Setting for --ne-threads: {nethreads.name:s}")
     match nethreads:
         case NETHREADS.NE_DEFAULT:
-            nthreads_target: int | None = None  # env_num_threads or env_max_threads
+            nthreads_target: int | None = (
+                None  # env_num_threads or env_max_threads
+            )
         case NETHREADS.NE_DEFAULT_MAXTHREADS:
             nthreads_target: int = ne.MAX_THREADS
         case NETHREADS.ALL_LOGICAL_CORES:
