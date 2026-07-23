@@ -62,15 +62,16 @@ class RampFilterer:
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int = 2,  # not much benefit going above 3, I think. And it uses a lot of VRAM.
         stream: cp.cuda.Stream | None = None,
+        override_kern_func: typing.Callable | None = None,
     ) -> None:
         self.chunk_shape = (projs_per_batch, *proj_2d_shape)
         self.physpixwid = physpixwid
         self.stream = (
             cp.cuda.get_current_stream() if stream is None else stream
         )
-        self._initialise()
+        self._initialise(override_kern_func=override_kern_func)
 
-    def _initialise(self) -> None:
+    def _initialise(self, override_kern_func) -> None:  # noqa: ANN001
         with self.stream:
             chunk_shape = self.chunk_shape
             physpixwid = self.physpixwid
@@ -79,9 +80,9 @@ class RampFilterer:
             self._fft_2d_shape = (h, self.chunk_shape[2])
             # Get the horz kernel as a multiplier in Fourier space
             hk = h + (1 - (h % 2))
-            # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel(hk, physpixsize=physpixwid))[:h]
+            kern_func = override_kern_func or ramp_kernels.ramp_kernel_ramlak
             kern_horz: cp.ndarray = cp.array(
-                ramp_kernels.ramp_kernel_ramlak(hk, physpixsize=physpixwid)
+                kern_func(hk, physpixsize=physpixwid)
             )[:h]
             # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel_softened(2*chunk_shape[1] - 1, inv_soften_strength=0.9, physpixsize=physpixwid))
             kern_horz = cp.roll(kern_horz, shift=-(hk // 2), axis=0)
