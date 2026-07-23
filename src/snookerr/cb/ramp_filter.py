@@ -47,9 +47,9 @@ class RampFilterer:
 
     _cufft_plan_forward: cp.cuda.cufft.Plan1D
     _cufft_plan_bckward: cp.cuda.cufft.Plan1D
-    _fft_mult_horz: cp.ndarray
+    _fft_mults_horz: list[cp.ndarray]
     _chunk_mem_horz_filter: cp.ndarray
-    _chunk_mem_horz_filter_after_fft: cp.ndarray
+    _chunk_mems_horz_filter_after_fft: cp.ndarray
 
     # CUDA stream events
     _e_mem1_free: cp.cuda.Event | None
@@ -62,16 +62,23 @@ class RampFilterer:
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int = 2,  # not much benefit going above 3, I think. And it uses a lot of VRAM.
         stream: cp.cuda.Stream | None = None,
-        override_kern_func: typing.Callable | None = None,
+        override_kern_funcs: tuple[typing.Callable] | None,
     ) -> None:
         self.chunk_shape = (projs_per_batch, *proj_2d_shape)
         self.physpixwid = physpixwid
         self.stream = (
             cp.cuda.get_current_stream() if stream is None else stream
         )
-        self._initialise(override_kern_func=override_kern_func)
+        self._initialise(
+            kern_funcs=override_kern_funcs or (ramp_kernels.ramp_kernel_ramlak,)
+        )
 
-    def _initialise(self, override_kern_func) -> None:  # noqa: ANN001
+    @property
+    def num_kerns(self) -> int:
+        """Return the number of kernels applied by this object."""
+        return len(self._fft_mults_horz)
+
+    def _initialise(self, kern_funcs) -> None:  # noqa: ANN001
         with self.stream:
             chunk_shape = self.chunk_shape
             physpixwid = self.physpixwid
@@ -80,14 +87,15 @@ class RampFilterer:
             self._fft_2d_shape = (h, self.chunk_shape[2])
             # Get the horz kernel as a multiplier in Fourier space
             hk = h + (1 - (h % 2))
-            kern_func = override_kern_func or ramp_kernels.ramp_kernel_ramlak
-            kern_horz: cp.ndarray = cp.array(
-                kern_func(hk, physpixsize=physpixwid)
-            )[:h]
-            # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel_softened(2*chunk_shape[1] - 1, inv_soften_strength=0.9, physpixsize=physpixwid))
-            kern_horz = cp.roll(kern_horz, shift=-(hk // 2), axis=0)
-            self._fft_mult_horz = cufft.rfft(kern_horz, norm="backward")
-            fft_len = self._fft_mult_horz.shape[0]
+            self._fft_mults_horz = []
+            for kern_func in kern_funcs:
+                kern_horz: cp.ndarray = cp.array(
+                    kern_func(hk, physpixsize=physpixwid)
+                )[:h]
+                # kern_horz: cp.ndarray = cp.array(ramp_kernels.ramp_kernel_softened(2*chunk_shape[1] - 1, inv_soften_strength=0.9, physpixsize=physpixwid))
+                kern_horz = cp.roll(kern_horz, shift=-(hk // 2), axis=0)
+                self._fft_mults_horz.append(cufft.rfft(kern_horz, norm="backward"))
+            fft_len = self._fft_mults_horz[0].shape[0]
 
             # Reserve memory and plans for FFT stuff
             self._chunk_mem_horz_filter = cp.zeros(
@@ -97,16 +105,22 @@ class RampFilterer:
             self._cufft_plan_forward = cufft.get_fft_plan(
                 self._chunk_mem_horz_filter, axes=(1,), value_type="R2C"
             )
-            self._chunk_mem_horz_filter_after_fft: cp.ndarray = cp.zeros(
+
+            # Initialise the output arrays
+            chunk_mem_horz_filter_after_fft: cp.ndarray = cp.zeros(
                 (
                     self._chunk_mem_horz_filter.shape[0],
                     fft_len,
                     self._chunk_mem_horz_filter.shape[2],
                 ),
                 dtype=cp.complex64,
-            )  # Initialise the output array
+            )
+            self._chunk_mems_horz_filter_after_fft = []
+            for _ in kern_funcs:
+                self._chunk_mems_horz_filter_after_fft.append(chunk_mem_horz_filter_after_fft.copy())
+
             self._cufft_plan_bckward = cufft.get_fft_plan(
-                self._chunk_mem_horz_filter_after_fft,
+                chunk_mem_horz_filter_after_fft,
                 shape=(self._chunk_mem_horz_filter.shape[1],),
                 axes=(1,),
                 value_type="C2R",
@@ -120,7 +134,7 @@ class RampFilterer:
         cparr_view: cp.ndarray,
         input_in_mem1: bool = False,
         wait_on_events: list[cp.cuda.Event] | None = None,
-    ) -> tuple[cp.ndarray, cp.cuda.Event]:
+    ) -> tuple[list[cp.ndarray], cp.cuda.Event]:
         """Filter an input cp.ndarray (can be a view) and produce a view into a newly allocated cupy array as output."""
         with self.stream as stream:
             chunk_shape = self.chunk_shape
@@ -166,7 +180,7 @@ class RampFilterer:
                     : cparr_view.shape[0], : chunk_shape[1], :
                 ]
                 cp.multiply(cparr_view, 1, out=v)
-            out = cufft.rfft(
+            out_ = cufft.rfft(
                 self._chunk_mem_horz_filter,
                 axis=1,
                 norm="backward",
@@ -178,21 +192,24 @@ class RampFilterer:
             )
             stream.record(self._e_mem1_free)
 
+            outs = []
             if self._e_mem2_free is not None:
                 self._e_mem2_free.synchronize()
-            cp.multiply(
-                out,
-                self._fft_mult_horz[cp.newaxis, :, cp.newaxis],
-                out=self._chunk_mem_horz_filter_after_fft,
-            )
-            # NOTE: we can apply multiplicative factors here that commute with the ramp filter, e.g. a softening function
-            out = cufft.irfft(
-                self._chunk_mem_horz_filter_after_fft,
-                n=self._chunk_mem_horz_filter.shape[1],
-                axis=1,
-                norm="backward",
-                plan=self._cufft_plan_bckward,
-            )
+            for index, (fft_mult, chunk_mem_after_fft) in enumerate(zip(
+                    self._fft_mults_horz, self._chunk_mems_horz_filter_after_fft)):
+                cp.multiply(
+                    out_,
+                    fft_mult[cp.newaxis, :, cp.newaxis],
+                    out=chunk_mem_after_fft,
+                )
+                # NOTE: we can apply multiplicative factors here that commute with the ramp filter, e.g. a softening function
+                outs.append(cufft.irfft(
+                    chunk_mem_after_fft,
+                    n=self._chunk_mem_horz_filter.shape[1],
+                    axis=1,
+                    norm="backward",
+                    plan=self._cufft_plan_bckward,
+                ))
             self._e_mem2_free = cp.cuda.Event(
                 block=True, disable_timing=True, interprocess=False
             )
@@ -204,13 +221,14 @@ class RampFilterer:
             )
             stream.record(event_filter_complete)
 
-            out = out[:, : chunk_shape[1], :]
-            out = out[: cparr_view.shape[0], ...]
-            return out, event_filter_complete
+            for index in range(self.num_kerns):
+                outs[index] = outs[index][:, : chunk_shape[1], :]
+                outs[index] = outs[index][: cparr_view.shape[0], ...]
+            return outs, event_filter_complete
 
     def filter_bulk_axis1_stream(
         self, cparr_view: cp.ndarray, block: bool = True
-    ) -> typing.Generator[tuple[cp.ndarray, cp.cuda.Event]]:
+    ) -> typing.Generator[tuple[list[cp.ndarray], cp.cuda.Event]]:
         """Create a generator of ramp-filtered projection chunks, from an input array."""
         num_slices: int = (
             cparr_view.shape[0] + (self.chunk_shape[0] - 1)
@@ -229,26 +247,27 @@ class RampFilterer:
 
     def filter_bulk_axis1_concat(
         self, cparr_view: cp.ndarray, block: bool = True
-    ) -> tuple[cp.ndarray, cp.cuda.Event]:
-        """Create an output array of ramp-filtered projections, from an input array."""
+    ) -> tuple[list[cp.ndarray], cp.cuda.Event]:
+        """Create an output array of [list of filtered projections, one item for each filter], from an input array."""
         out_gen = self.filter_bulk_axis1_stream(
             cparr_view, block=_HOTFIX_DISABLE_ASYNCHRONICITY
         )
         with cp.cuda.Stream(
             non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
         ) as stream:
-            output = cp.zeros_like(cparr_view)
-            output_created_event = stream.record()
+            outputs = [cp.zeros_like(cparr_view) for _ in range(self.num_kerns)]
+            outputs_created_event = stream.record()
         sl_start: int = 0
         events = []
-        for index, (out_arr, e) in enumerate(out_gen):
-            sl = slice(sl_start, sl_start + out_arr.shape[0])
+        for index, (out_arrs, e) in enumerate(out_gen):
+            sl = slice(sl_start, sl_start + out_arrs[0].shape[0])
             with cp.cuda.Stream(
                 non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
             ) as stream:
-                stream.wait_event(output_created_event)
+                stream.wait_event(outputs_created_event)
                 stream.wait_event(e)
-                cp.multiply(out_arr, 1, out=output[sl])
+                for out_index in range(self.num_kerns):
+                    cp.multiply(out_arrs[out_index], 1, out=outputs[out_index][sl])
                 ev = cp.cuda.Event(
                     block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                     disable_timing=True,
@@ -256,7 +275,7 @@ class RampFilterer:
                 )
                 stream.record(ev)
                 events.append(ev)
-            sl_start += out_arr.shape[0]
+            sl_start += out_arrs[0].shape[0]
 
         with cp.cuda.Stream(
             non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
@@ -271,7 +290,7 @@ class RampFilterer:
         if block:
             completed_event.synchronize()
 
-        return output, completed_event
+        return outputs, completed_event
 
 
 class FBPFilterer:
@@ -295,6 +314,8 @@ class FBPFilterer:
     _fft_2d_shape: tuple[int, int]
     _multmask_2d: cp.ndarray
 
+    _include_hilbert_transform: bool
+
     class SamplingStrategy(enum.Enum):
         """Enum for strategies to sample the integral required for the full filtration."""
 
@@ -311,8 +332,10 @@ class FBPFilterer:
         sampling_strategy: SamplingStrategy = SamplingStrategy.SINGLE_ROTATION_RANDOM_UNIFORM,
         limit_zeta: float
         | None = None,  # limit the maximum rotation angle zeta
+        include_hilbert_transform_in_output: bool = False,
         _hacky_fan_beam_mode: bool = False,  # Modifies the behaviour to be compatible with a simple fan-beam
     ) -> None:
+        self._include_hilbert_transform = include_hilbert_transform_in_output
         self.hacky_fan_beam_mode = _hacky_fan_beam_mode
         self.L = L
         self.physpixwid = physpixwid
@@ -334,6 +357,9 @@ class FBPFilterer:
             *self._expanded_2d_shape,
         )
         # Construct the ramp-filtering object with memory buffers
+        kern_funcs = (ramp_kernels.ramp_kernel_ramlak,)
+        if self._include_hilbert_transform:
+            kern_funcs += (ramp_kernels.hilbert_transform_kernel_approx,)
         self.rfilt = RampFilterer(
             physpixwid=physpixwid
             * R
@@ -343,6 +369,7 @@ class FBPFilterer:
             stream=cp.cuda.Stream(
                 non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
             ),
+            override_kern_funcs=kern_funcs,  # ty:ignore[invalid-argument-type]
         )
         # self._fft_2d_shape = self.rfilt._fft_2d_shape
         self.event_completed_filter = None
@@ -468,7 +495,7 @@ class FBPFilterer:
         block: bool = True,
         clear_gpu_cache_regularly: bool = False,
         force_rotation_angle: float | None = None,
-    ) -> typing.Generator[tuple[cp.ndarray, cp.cuda.Event]]:
+    ) -> typing.Generator[tuple[list[cp.ndarray], cp.cuda.Event]]:
         """Create a generator of filtered projection chunks, from an input array."""
         # Place the rotated data directly into the memory of the rfilt object. This will result in a small optimisation by removing the need for an additional data copy.
         chunkmem = self.rfilt._chunk_mem_horz_filter[  # noqa: SLF001
@@ -627,18 +654,12 @@ class FBPFilterer:
                 for e in events:
                     stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
-                if True:
-                    out, self.event_completed_ramp = (
-                        self.rfilt._filter_chunk_axis1(  # noqa: SLF001
-                            chunkmem, input_in_mem1=True
-                        )
+                outs, self.event_completed_ramp = (
+                    self.rfilt._filter_chunk_axis1(  # noqa: SLF001
+                        chunkmem, input_in_mem1=True
                     )
-                else:
-                    out = chunkmem.copy()
-                    # Weighted projection now has an incorrect factor...
-                    self.event_completed_ramp = cp.cuda.Event()
-                    stream.record(self.event_completed_ramp)
-                out = out[: v.shape[0], ...]
+                )
+                outs = [arr[: v.shape[0], ...] for arr in outs]
             # Before overwriting the output buffer with the next result, yield the previous answer
             if not i == 0:
                 if block:
@@ -646,21 +667,21 @@ class FBPFilterer:
                     self.event_completed_filter.synchronize()
                 # yield out_buffer
                 yield (
-                    out_buffer[  # noqa: F821
+                    [arr[
                         :,
                         padx : ((-padx) or None),
                         pady : ((-pady) or None),
-                    ],
+                    ] for arr in outs_buffer],  # noqa: F821
                     self.event_completed_filter,
                 )
-                out_buffer = None
+                outs_buffer = None
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
             # Rotate back to original orientation and place into output buffer
             with cp.cuda.Stream(
                 non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
             ) as stream:
-                out_buffer = cp.zeros_like(out)
+                outs_buffer = [cp.zeros_like(arr) for arr in outs]
                 event_out_buffer_created = stream.record()
             for proj_index in range(v.shape[0]):
                 with cp.cuda.Stream(
@@ -669,20 +690,21 @@ class FBPFilterer:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
-                    if rotang_rads_list[proj_index] != 0:
-                        cupyx.scipy.ndimage.rotate(
-                            input=out[proj_index],
-                            angle=180 / np.pi * rotang_rads_list[proj_index],
-                            axes=(1, 0),
-                            reshape=False,
-                            output=out_buffer[proj_index, ...],
-                            order=1,
-                            mode="grid-constant",
-                            cval=0,
-                            prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
-                        )
-                    else:
-                        out_buffer[proj_index, ...] = out[proj_index]
+                    for out, out_buffer in zip(outs, outs_buffer):
+                        if rotang_rads_list[proj_index] != 0:
+                            cupyx.scipy.ndimage.rotate(
+                                input=out[proj_index],
+                                angle=180 / np.pi * rotang_rads_list[proj_index],
+                                axes=(1, 0),
+                                reshape=False,
+                                output=out_buffer[proj_index, ...],
+                                order=1,
+                                mode="grid-constant",
+                                cval=0,
+                                prefilter=False,  # OK if it blurs a little with prefilter=False for order > 1
+                            )
+                        else:
+                            out_buffer[proj_index, ...] = out[proj_index]
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                         disable_timing=True,
@@ -705,14 +727,14 @@ class FBPFilterer:
             self.event_completed_filter.synchronize()
         # yield out_buffer
         yield (
-            out_buffer[
+            [arr[
                 :,
                 padx : ((-padx) or None),
                 pady : ((-pady) or None),
-            ],
+            ] for arr in outs_buffer],
             self.event_completed_filter,
         )
-        out_buffer = None
+        outs_buffer = None
         if clear_gpu_cache_regularly:
             gpu_tools.clear_cache()
 
@@ -722,7 +744,7 @@ class FBPFilterer:
         clear_gpu_cache_regularly: bool = True,
         force_rotation_angle: float | None = None,
         block: bool = True,
-    ) -> cp.ndarray:
+    ) -> tuple[list[cp.ndarray], cp.cuda.Event]:
         """Create an output array of filtered projections, from an input array."""
         out_gen = self.filter_bulk_axis1_stream(
             arr,
@@ -733,18 +755,19 @@ class FBPFilterer:
         with cp.cuda.Stream(
             non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
         ) as stream:
-            output = cp.zeros_like(arr)
-            output_created_event = stream.record()
+            outputs = [cp.zeros_like(arr) for _ in range(self.rfilt.num_kerns)]
+            outputs_created_event = stream.record()
         sl_start: int = 0
         events = []
-        for index, (out_arr, e) in enumerate(out_gen):
-            sl = slice(sl_start, sl_start + out_arr.shape[0])
+        for index, (out_arrs, e) in enumerate(out_gen):
+            sl = slice(sl_start, sl_start + out_arrs[0].shape[0])
             with cp.cuda.Stream(
                 non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
             ) as stream:
                 stream.wait_event(e)
-                stream.wait_event(output_created_event)
-                cp.multiply(out_arr, 1, out=output[sl])
+                stream.wait_event(outputs_created_event)
+                for out_arr, output in zip(out_arrs, outputs):
+                    cp.multiply(out_arr, 1, out=output[sl])
                 ev = cp.cuda.Event(
                     block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                     disable_timing=True,
@@ -752,7 +775,7 @@ class FBPFilterer:
                 )
                 stream.record(ev)
                 events.append(ev)
-            sl_start += out_arr.shape[0]
+            sl_start += out_arrs[0].shape[0]
 
         with cp.cuda.Stream(
             non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
@@ -767,7 +790,7 @@ class FBPFilterer:
         if block:
             completed_event.synchronize()
 
-        return output, completed_event
+        return outputs, completed_event
 
 
 if __name__ == "__main__":
@@ -786,7 +809,7 @@ if __name__ == "__main__":
     t1 = time.time()
     completed_events = []
     for _, rotang in zip(range(ncycles), rotangs):
-        x, e = filt.filter_bulk_axis1_concat(
+        xs, e = filt.filter_bulk_axis1_concat(
             cparr,
             block=_HOTFIX_DISABLE_ASYNCHRONICITY,
             force_rotation_angle=rotang,

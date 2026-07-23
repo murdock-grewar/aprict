@@ -388,11 +388,13 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # Create ProjectionSet with filtered data in buffer
             if num_rot_angs is None:
                 with cp.cuda.Stream(non_blocking=False) as stream:
-                    filt_arr, event_completed = filt.filter_bulk_axis1_concat(
+                    filt_arrs, event_completed = filt.filter_bulk_axis1_concat(
                         cp.array(data_mm[sl]),
                         force_rotation_angle=None,
                         block=True,
                     )
+                    filt_arr = filt_arrs[0]
+                    del filt_arrs
                     stream.wait_event(event_completed)
                     assert not fan_beam_mode
                     cp.multiply(
@@ -410,13 +412,15 @@ def get_filtered_projectionset_generator(  # noqa: C901
                     assert ps.data is not None
                     ps.data.fill(0)
                     for ang in angs:
-                        filt_arr, event_completed = (
+                        filt_arrs, event_completed = (
                             filt.filter_bulk_axis1_concat(
                                 cp.array(data_mm[sl]),
                                 force_rotation_angle=ang,
                                 block=True,
                             )
                         )
+                        filt_arr = filt_arrs[0]
+                        del filt_arrs
                         stream.wait_event(event_completed)
                         cp.add(filt_arr, ps.data, out=ps.data)
                     if not fan_beam_mode:
