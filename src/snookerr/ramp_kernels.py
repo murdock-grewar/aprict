@@ -74,6 +74,7 @@ def hilbert_transform_kernel_approx(
     zmask: np.ndarray = np.mod((
         np.arange(2 * halfn - 1, dtype=np.int32) - halfn + 1
     ), 2) == 0
-    kern = np.true_divide(2, np.pi * arange * (physpixsize or 1))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        kern = np.true_divide(2, np.pi * arange * (physpixsize or 1))
     kern[zmask] = 0
     return kern
