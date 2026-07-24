@@ -464,7 +464,7 @@ __device__ Tv _backproject_CB_getval(
                             float dsigned_on_c = dsigned_on_R / c_on_R;
                             float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
                             float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
-                            float vxrel_on_R = dot_prod(source_pos, vox_pos)/R/R;
+                            float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
                             multiplier *= fcast<Tp>(
                                 -1 *
                                 2 *
