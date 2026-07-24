@@ -10,5 +10,6 @@ struct config_CB_backproject {
     float Z_on_val_factor_val;
     bool approx_mode_direct_raycast;
     bool approx_mode_linear_interpolate;
+    unsigned char backproj_weighting_preset;
 };
 

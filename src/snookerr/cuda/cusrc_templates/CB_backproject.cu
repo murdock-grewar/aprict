@@ -429,16 +429,57 @@ __device__ Tv _backproject_CB_getval(
 
             if (config.approx_mode_direct_raycast) {
                 Tp multiplier = 1;
-                if (config.Z_on_L_factor_power != 0) {
+                if (
+                    (config.Z_on_L_factor_power != 0) ||
+                    (config.Z_on_val_factor_power != 0) ||
+                    (config.backproj_weighting_preset != 0)
+                ) {
                     fvec3 Lvec = projspec.dspec.pos - source_pos;
-                    float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
-                    multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
-                }
-                if (config.Z_on_val_factor_power != 0) {
-                    float val = config.Z_on_val_factor_val;
-                    fvec3 Lvec = projspec.dspec.pos - source_pos;
-                    float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
-                    multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                    float Z = dot_prod((vox_pos - source_pos), Lvec) / norm_fvec3(Lvec);
+                    if (config.Z_on_L_factor_power != 0) {
+                        float Z_on_L = Z / norm_fvec3(Lvec);
+                        multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                    }
+                    if (config.Z_on_val_factor_power != 0) {
+                        float val = config.Z_on_val_factor_val;
+                        float Z_on_val = Z / val;
+                        multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                    }
+                    if (
+                        (config.backproj_weighting_preset == 1) ||
+                        (config.backproj_weighting_preset == 2)
+                    ) {
+                        // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
+                        float R = config.Z_on_val_factor_val;
+                        fvec3 r_minus_s = vox_pos - source_pos;
+                        float ell_on_R = norm_fvec3(fvec3(r_minus_s.x, r_minus_s.y, 0.f))/R;
+                        float Z_on_R = Z / R;
+                        float c_on_R = Z_on_R / ell_on_R;
+                        float dsigned_on_R = c_on_R - ell_on_R;  // positive if the source point is further away
+                        if (config.backproj_weighting_preset == 1) {
+                            // multiplier /= fcast<Tp>(2*powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
+                            multiplier /= fcast<Tp>(powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
+                        }
+                        if (config.backproj_weighting_preset == 2) {
+                            float dsigned_on_c = dsigned_on_R / c_on_R;
+                            float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
+                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                            float vxrel_on_R = dot_prod(source_pos, vox_pos)/R/R;
+                            multiplier *= fcast<Tp>(
+                                -1 *
+                                2 *
+                                powint(1 - powint(rho_on_R, 2), 2) /
+                                powint(powint(c_on_R, 2) + powint(dsigned_on_R, 2), 2) *
+                                (-vyrel_on_R) * (
+                                    1 + (
+                                        vxrel_on_R / Z_on_R
+                                    )
+                                ) /
+                                powint(ell_on_R, 2) /
+                                R  // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                            );
+                        }
+                    }
                 }
                 sub_accumulator = fcast<Tv>(det_value * multiplier);
             } else {

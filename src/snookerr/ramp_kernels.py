@@ -61,7 +61,7 @@ def ramp_kernel_ramlak(
 
 def hilbert_transform_kernel_approx(
     n: int,  # Size of window. Must be odd.
-    physpixsize: float | None = None,
+    physpixsize: float | None = None,  # ignored argument # noqa: ARG001
 ) -> np.ndarray:
     """Produce a 1D kernel which implements the Hilbert transform when linearly convolved."""
     if n % 2 == 0:
@@ -69,12 +69,10 @@ def hilbert_transform_kernel_approx(
         raise ValueError(msg)
     halfn = (n + 1) // 2
     arange: np.ndarray = (
-        np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1
+        np.arange(2 * halfn - 1, dtype=np.float128) - halfn + 1
     )
-    zmask: np.ndarray = np.mod((
-        np.arange(2 * halfn - 1, dtype=np.int32) - halfn + 1
-    ), 2) == 0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        kern = np.true_divide(2, np.pi * arange * (physpixsize or 1))
-    kern[zmask] = 0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        kern = np.true_divide(2, arange)
+    kern[halfn - 1] = 0
+    # NOTE: physpixsize has no effect on this filter! It's omitted from the formula deliberately, while maintaining the function signature.
     return kern

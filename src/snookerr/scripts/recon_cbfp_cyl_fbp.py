@@ -151,6 +151,14 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         help="Set to True to activate fan-beam reconstruction mode. This may avoid some other settings to make it work on 2D circular fan-beam data.",
     )
     group_fbp_options.add_argument(
+        "--two-sided",
+        metavar="True",
+        type=lib.argparse_tools.BoolArgType,
+        default=True,
+        required=False,
+        help="When True, this uses a combination of the ramp filter and Hilbert transform to correct for angular undersampling.",
+    )
+    group_fbp_options.add_argument(
         "--limit-zeta",
         metavar="1.23",
         type=lib.argparse_tools.MaybeType(float),
@@ -270,9 +278,12 @@ def get_filtered_projectionset_generator(  # noqa: C901
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
     logger: logging.Logger,
+    two_sided: bool,
 ) -> tuple[
     cbfp.ProjGeom,
-    typing.Iterable[tuple[slice[int, int, None], cbfp.ProjectionSet]],
+    typing.Iterable[
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
+    ],
     float,
     float,
     float,
@@ -346,6 +357,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
         L=L,
         physpixwid=pixwid,
         limit_zeta=limit_zeta,
+        include_hilbert_transform_in_output=two_sided,
         _hacky_fan_beam_mode=fan_beam_mode,
     )
 
@@ -367,8 +379,8 @@ def get_filtered_projectionset_generator(  # noqa: C901
         )
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
-    def _gen() -> typing.Generator[
-        tuple[slice[int, int, None], cbfp.ProjectionSet]
+    def _gen() -> typing.Generator[  # noqa: C901
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
     ]:
         if num_rot_angs is not None:  # None means a single random angle.
             if num_rot_angs == 1:
@@ -393,24 +405,31 @@ def get_filtered_projectionset_generator(  # noqa: C901
                         force_rotation_angle=None,
                         block=True,
                     )
-                    filt_arr = filt_arrs[0]
-                    del filt_arrs
                     stream.wait_event(event_completed)
                     assert not fan_beam_mode
-                    cp.multiply(
-                        filt_arr,
+                    mult = (
                         2
                         * filt.zeta
-                        / np.float_power(np.sin(filt.zeta / 2), 2),
-                        out=filt_arr,
+                        / np.float_power(np.sin(filt.zeta / 2), 2)
                     )
-                ps = cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
+                    for index in range(len(filt_arrs)):
+                        cp.multiply(
+                            filt_arrs[index], mult, out=filt_arrs[index]
+                        )
+                pss = [
+                    cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
+                    for filt_arr in filt_arrs
+                ]
             else:
                 with cp.cuda.Stream(non_blocking=False) as stream:
-                    ps = cbfp.ProjectionSet(pg.sliced(sl), data=None)
-                    ps.create_buffer(dtype=cp.float32)
-                    assert ps.data is not None
-                    ps.data.fill(0)
+                    pss = [
+                        cbfp.ProjectionSet(pg.sliced(sl), data=None)
+                        for _ in range(2 if two_sided else 1)
+                    ]
+                    for ps in pss:
+                        ps.create_buffer(dtype=cp.float32)
+                        assert ps.data is not None  # useful for type-checking
+                        ps.data.fill(0)
                     for ang in angs:
                         filt_arrs, event_completed = (
                             filt.filter_bulk_axis1_concat(
@@ -419,28 +438,33 @@ def get_filtered_projectionset_generator(  # noqa: C901
                                 block=True,
                             )
                         )
-                        filt_arr = filt_arrs[0]
-                        del filt_arrs
                         stream.wait_event(event_completed)
-                        cp.add(filt_arr, ps.data, out=ps.data)
+                        for index in range(len(filt_arrs)):
+                            cp.add(
+                                filt_arrs[index],
+                                pss[index].data,
+                                out=pss[index].data,
+                            )
                     if not fan_beam_mode:
-                        cp.multiply(
-                            ps.data,
+                        mult = (
                             2
                             * filt.zeta
                             / np.float_power(np.sin(filt.zeta / 2), 2)
-                            / len(angs),
-                            out=ps.data,
+                            / len(angs)
                         )
+                        for index in range(len(filt_arrs)):
+                            cp.multiply(
+                                pss[index].data, mult, out=pss[index].data
+                            )
             # Yield
-            yield sl, ps
+            yield sl, tuple(pss)
             # Increment the slice
             sl_start += num_projs_per_chunk
 
     return pg, _gen(), R, L, final_multiplier
 
 
-def main() -> None:
+def main() -> None:  # noqa: C901
     """Run the script."""
     # Parse the input arguments
     parser = _make_arg_parser()
@@ -512,6 +536,7 @@ def main() -> None:
             flip_y=args.flip_y,
             flip_z=args.flip_z,
             logger=logger,
+            two_sided=args.two_sided,
         )
     )
 
@@ -524,11 +549,32 @@ def main() -> None:
     )
 
     # Initialise the configuration used for backprojection
-    config_backproject = cbfp.ConfigBackproject(
+    config_backproject_ramp_onesided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
         Z_on_val_factor_power=(-2 if args.fan_beam else -3),
         Z_on_val_factor_val=R,
+        backproj_weighting_preset=0,
+        approx_mode_direct_raycast=True,
+        approx_mode_bilinear_interpolate=args.interpolate_measurements,
+    )
+    # Configurations to backproject the ramp- and Hilbert-filtered data
+    # This two-sided formula is based on Kudo et al's super short-scan formula.
+    config_backproject_ramp_twosided = cbfp.ConfigBackproject(
+        fast_approx=True,
+        cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
+        Z_on_val_factor_power=(0 if args.fan_beam else -1),
+        Z_on_val_factor_val=R,
+        backproj_weighting_preset=1,
+        approx_mode_direct_raycast=True,
+        approx_mode_bilinear_interpolate=args.interpolate_measurements,
+    )
+    config_backproject_hilb_twosided = cbfp.ConfigBackproject(
+        fast_approx=True,
+        cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
+        Z_on_val_factor_power=0,
+        Z_on_val_factor_val=R,
+        backproj_weighting_preset=2,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
@@ -586,6 +632,16 @@ def main() -> None:
                 pmin=args.plotmin,
                 pmax=args.plotmax,
             )
+            imview.save_volslice(
+                save_path_sl.joinpath(
+                    "midslice_" + axis_str + "_fullrange_" + id_str + ".png"
+                ),
+                x,
+                axis=axis,
+                index_of_slice=x.shape[axis] // 2,
+                pmin=x.min(),
+                pmax=x.max(),
+            )
 
     ##########################################################
     ################# Begin reconstruction ###################
@@ -600,11 +656,40 @@ def main() -> None:
     ) as pbar:
         if args.fan_beam:
             sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
-        for sl, ps in sl_filtps_gen:
-            cbfp.backproject(config_backproject, vol, ps, block=True)
-            assert ps.data is not None  # useful assertion for type-checking
-            if args.fan_beam:
-                sum_of_c += float(cp.sum(ps.data[:, ps.data.shape[1] // 2, :]))
+        for sl, pss in sl_filtps_gen:
+            if args.two_sided:
+                ps_ramp, ps_hilb = pss
+                cbfp.backproject(
+                    config_backproject_ramp_twosided, vol, ps_ramp, block=True
+                )
+                cbfp.backproject(
+                    config_backproject_hilb_twosided, vol, ps_hilb, block=True
+                )
+                assert (
+                    ps_ramp.data is not None
+                )  # useful assertion for type-checking
+                assert (
+                    ps_hilb.data is not None
+                )  # useful assertion for type-checking
+                if args.fan_beam:
+                    sum_of_c += float(
+                        cp.sum(ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :])
+                    )
+                    sum_of_c += float(
+                        cp.sum(ps_hilb.data[:, ps_ramp.data.shape[1] // 2, :])
+                    )
+            else:
+                (ps_ramp,) = pss
+                cbfp.backproject(
+                    config_backproject_ramp_onesided, vol, ps_ramp, block=True
+                )
+                assert (
+                    ps_ramp.data is not None
+                )  # useful assertion for type-checking
+                if args.fan_beam:
+                    sum_of_c += float(
+                        cp.sum(ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :])
+                    )
             # Perform logging updates
             pbar.update_to(sl.stop)
 

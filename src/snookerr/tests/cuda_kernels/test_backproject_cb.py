@@ -205,9 +205,9 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
         num_projs = self.input_projs.shape[0]
         input_projs_strides_bytes = self.input_projs_strides_bytes
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
-        blocklayer = 10
+        blockx = 8
+        blocky = 8
+        blocklayer = 8
         # 48 kB shared memory in a block gives a maximum vol block size of 18x18x18
         volblockx = (
             vol.shape[0] if self.blockdims[0] is None else self.blockdims[0]
@@ -278,12 +278,12 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
 @pytest.mark.parametrize(
     argnames=["volres", "numprojs", "use_voltex", "blockdims", "exact"],
     argvalues=[
-        (420, 20, False, [10, 10, 10], True),
-        (840, 20, False, [10, 10, 10], False),
-        (840, 40, False, [10, 10, 10], False),
-        (420, 20, True, [10, 10, 10], True),
-        (840, 20, True, [10, 10, 10], False),
-        (840, 40, True, [10, 10, 10], False),
+        (420, 20, False, [8, 8, 8], True),
+        (840, 20, False, [8, 8, 8], False),
+        (840, 40, False, [8, 8, 8], False),
+        (420, 20, True, [8, 8, 8], True),
+        (840, 20, True, [8, 8, 8], False),
+        (840, 40, True, [8, 8, 8], False),
     ],
     ids=[
         "BP_mem_420-20",
@@ -327,6 +327,7 @@ class TestCB_BACKPROJ_randomnoise:
                 1,
                 np.bool(False),
                 np.bool(True),
+                np.uint8(0),
             ),
             dtype=ks_config.dtype,
         )

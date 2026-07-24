@@ -664,6 +664,7 @@ class ConfigBackproject:
         Z_on_val_factor_val: float = 1,  # noqa: N803
         approx_mode_direct_raycast: bool = False,
         approx_mode_bilinear_interpolate: bool = False,
+        backproj_weighting_preset: int = 0,
     ) -> None:
         r = cyl_mask_rad or 0  # coerce 'None' to 0
         sep = soften_det_edges_proportion or 0  # coerce 'None' to 0
@@ -686,6 +687,7 @@ class ConfigBackproject:
                 np.float32(Z_on_val_factor_val),
                 np.bool(approx_mode_direct_raycast),
                 np.bool(approx_mode_bilinear_interpolate),
+                np.uint8(backproj_weighting_preset),
             ),
             dtype=structs.config_cb_backproject,
         )
@@ -836,9 +838,9 @@ def backproject(
         msg = "To prevent unintended behaviour, the config 'apply_summand_multiplier' must be true if and only if a summand_multiplier is included."
         raise ValueError(msg)
     # Prepare the kernel and the static kernel args
-    blockx = min(9, volume.shape[0])
-    blocky = min(9, volume.shape[1])
-    blockz = min(9, volume.shape[2])
+    blockx = min(8, volume.shape[0])
+    blocky = min(8, volume.shape[1])
+    blockz = min(8, volume.shape[2])
     kern = _select_backprojection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blockz)
     grid_dims = (

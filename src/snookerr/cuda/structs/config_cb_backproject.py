@@ -39,6 +39,7 @@ class config_cb_backproject(
         "Z_on_val_factor_val",
         "approx_mode_direct_raycast",
         "approx_mode_linear_interpolate",
+        "backproj_weighting_preset",
     ],
     dtypes=[
         np.bool,
@@ -52,6 +53,7 @@ class config_cb_backproject(
         np.float32,
         np.bool,
         np.bool,
+        np.uint8,
     ],
 ):
     pass  # ty:ignore[invalid-argument-type]
