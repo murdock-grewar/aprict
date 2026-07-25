@@ -572,7 +572,7 @@ def main() -> None:  # noqa: C901
     config_backproject_hilb_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
-        Z_on_val_factor_power=0,
+        Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
         backproj_weighting_preset=2,
         approx_mode_direct_raycast=True,
