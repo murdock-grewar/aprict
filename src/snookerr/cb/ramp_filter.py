@@ -105,7 +105,7 @@ class RampFilterer:
             # Reserve memory and plans for FFT stuff
             self._chunk_mem_horz_filter = cp.zeros(
                 (chunk_shape[0], h, chunk_shape[2]),
-                dtype=cp.float64,
+                dtype=cp.float32,
             )
             self._cufft_plan_forward = cufft.get_fft_plan(
                 self._chunk_mem_horz_filter, axes=(1,), value_type="R2C"
@@ -118,7 +118,7 @@ class RampFilterer:
                     fft_len,
                     self._chunk_mem_horz_filter.shape[2],
                 ),
-                dtype=cp.complex128,
+                dtype=cp.complex64,
             )
             self._chunk_mems_horz_filter_after_fft = []
             for _ in kern_funcs:
