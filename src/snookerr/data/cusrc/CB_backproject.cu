@@ -468,8 +468,10 @@ __device__ Tv _backproject_CB_getval(
                             multiplier *= fcast<Tp>(
                                 -1 *
                                 2 *
-                                powint(1 - powint(rho_on_R, 2), 2) /
-                                powint(powint(c_on_R, 2) + powint(dsigned_on_R, 2), 2) *
+                                // powint(1 - powint(rho_on_R, 2), 2) /
+                                // above is same as (c^2 - d^2)^2
+                                //powint(powint(c_on_R, 2) + powint(dsigned_on_R, 2), 2) *
+                                powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2)
                                 (-vyrel_on_R) * (
                                     1 + (
                                         vxrel_on_R / Z_on_R
