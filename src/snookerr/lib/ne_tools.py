@@ -29,6 +29,8 @@ def downbin(
     x: np.ndarray, *, n: int, preserve_sum: bool, out: np.ndarray | None = None
 ) -> np.ndarray:
     """Downbin or downsample an array to a common integer divisor in every axis."""
+    if n == 1 and (out is None or out is x):
+        return x
     xnew = (
         np.empty_like(x, shape=tuple(s // n for s in x.shape))
         if out is None
