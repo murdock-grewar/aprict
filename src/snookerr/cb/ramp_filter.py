@@ -529,9 +529,6 @@ class FBPFilterer:
         # padx_fft = (self._fft_2d_shape[0] - self._expanded_2d_shape[0])
         # pady_fft = (self._fft_2d_shape[1] - self._expanded_2d_shape[1])
 
-        # import time
-        # time.sleep(0.1)
-
         # Loop through chunks
         for i in itertools.count():
             sl = slice(
@@ -562,9 +559,14 @@ class FBPFilterer:
                 )
             events = [None for _ in range(v.shape[0])]
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(
-                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
-                ) as stream:
+                tmp_stream = (
+                    cp.cuda.get_current_stream()
+                    if _HOTFIX_DISABLE_ASYNCHRONICITY
+                    else cp.cuda.Stream(
+                        non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                    )
+                )
+                with tmp_stream as stream:
                     # The ramp filter uses the same memory we're about to write into.
                     # Wait for it to complete filtering and producing its output before
                     # we overwrite that memory.
@@ -578,11 +580,13 @@ class FBPFilterer:
                             stream.wait_event(e)
 
                     # HOTFIX: this line should not be necessary! But there are synchronicity issues without it. Bizarre. Unsure if it's a bug with my software or with cupy.
+                    # time.sleep(0.05)
                     cp.multiply(
                         chunkmem[proj_index, ...],
                         0,
                         out=chunkmem[proj_index, ...],
                     )
+                    # time.sleep(0.05)
 
                     if rotang_rads_list[proj_index] != 0:
                         cupyx.scipy.ndimage.rotate(
@@ -662,12 +666,17 @@ class FBPFilterer:
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                         disable_timing=True,
-                        interprocess=False,
+                        interprocess=True,
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
             # Wait for all rotations to complete
             # with self.rfilt.stream as stream:
-            with self.rfilt.stream as stream:
+            tmp_stream = (
+                cp.cuda.get_current_stream()
+                if _HOTFIX_DISABLE_ASYNCHRONICITY
+                else self.rfilt.stream
+            )
+            with tmp_stream as stream:
                 for e in events:
                     stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
@@ -698,15 +707,25 @@ class FBPFilterer:
                 if clear_gpu_cache_regularly:
                     gpu_tools.clear_cache()
             # Rotate back to original orientation and place into output buffer
-            with cp.cuda.Stream(
-                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
-            ) as stream:
+            tmp_stream = (
+                cp.cuda.get_current_stream()
+                if _HOTFIX_DISABLE_ASYNCHRONICITY
+                else cp.cuda.Stream(
+                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                )
+            )
+            with tmp_stream as stream:
                 outs_buffer = [cp.zeros_like(arr) for arr in outs]
                 event_out_buffer_created = stream.record()
             for proj_index in range(v.shape[0]):
-                with cp.cuda.Stream(
-                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
-                ) as stream:
+                tmp_stream = (
+                    cp.cuda.get_current_stream()
+                    if _HOTFIX_DISABLE_ASYNCHRONICITY
+                    else cp.cuda.Stream(
+                        non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                    )
+                )
+                with tmp_stream as stream:
                     stream.wait_event(self.event_completed_ramp)
                     stream.wait_event(event_out_buffer_created)
                     # event_completed_ramp.synchronize()
@@ -733,9 +752,14 @@ class FBPFilterer:
                         interprocess=False,
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU stream which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
-            with cp.cuda.Stream(
-                non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
-            ) as stream:
+            tmp_stream = (
+                cp.cuda.get_current_stream()
+                if _HOTFIX_DISABLE_ASYNCHRONICITY
+                else cp.cuda.Stream(
+                    non_blocking=not _HOTFIX_DISABLE_ASYNCHRONICITY
+                )
+            )
+            with tmp_stream as stream:
                 for e in events:
                     stream.wait_event(e)
                 self.event_completed_filter = cp.cuda.Event(
