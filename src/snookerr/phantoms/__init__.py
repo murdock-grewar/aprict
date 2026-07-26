@@ -15,10 +15,8 @@
 
 """Phantom objects useful for simulations and testing."""
 
-from .FORBILD_head import FORBILD_head_HU
 from .FORBILD_phantoms import PhantomContainer as FORBILD  # noqa: N814
 
 __all__ = [
     "FORBILD",
-    "FORBILD_head_HU",
 ]

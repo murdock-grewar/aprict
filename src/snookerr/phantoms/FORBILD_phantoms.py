@@ -187,6 +187,19 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
+    @property
+    def RockCanisterAl(cls) -> FBVolume:
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath(
+                    "custom_other/rock_canister_01.pha"
+                )
+            )
+        )
+        # Scale the attenuation coefficient so that the canister has a value of around 0.55 mm^{-1} for aluminium
+        fbv.multiply_attenuation(0.55)
+        return fbv
+
 
 class PhantomContainer(metaclass=_MetaPhantomContainer):
     """A container for the phantom objects."""

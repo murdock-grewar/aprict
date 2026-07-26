@@ -298,7 +298,7 @@ class FBVolume:
         return s
 
     def scale_len(self, factor: float) -> None:
-        """Scale up the lengths in the volume by the given factor."""
+        """Scale up the lengths in the phantom by the given factor."""
         self.shapes = np.array(
             [
                 FBVolume._scale_shape_len(shape, factor)
@@ -337,7 +337,7 @@ class FBVolume:
         return s
 
     def flip(self, axis: int | str) -> None:
-        """Flip the object along one of the three axes."""
+        """Flip the phantom along one of the three axes."""
         self.shapes = [  # ty:ignore[invalid-assignment]
             FBVolume._flip_shape(shape, axis=axis) for shape in self.shapes
         ]
@@ -363,10 +363,26 @@ class FBVolume:
         return s
 
     def translate(self, axis: int | str, amount: float) -> None:
-        """Translate the shape along the given axis, by the given amount."""
+        """Translate the phantom along the given axis, by the given amount."""
         self.shapes = np.array(
             [
                 FBVolume._translate_shape(shape, axis=axis, amount=amount)
+                for shape in self.shapes
+            ],
+            dtype=fv.Shape,
+        )
+
+    @classmethod
+    def _multiply_attenuation_shape(cls, shape, amount: float):  # noqa: ANN001, ANN206
+        s = shape.copy()
+        s["rho"] *= amount
+        return s
+
+    def multiply_attenuation(self, amount: float) -> None:
+        """Multilpy the phantom's attenuation coefficient by this amount."""
+        self.shapes = np.array(
+            [
+                FBVolume._multiply_attenuation_shape(shape, amount=amount)
                 for shape in self.shapes
             ],
             dtype=fv.Shape,
