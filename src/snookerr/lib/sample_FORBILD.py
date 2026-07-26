@@ -91,6 +91,7 @@ def sample_FORBILD(  # noqa: C901, N802
     out: cp.ndarray | None = None,
     supersamp_cubic_vox_wid: float | None = None,
     supersamp_factor: int | None = None,
+    block: bool = True,
 ) -> cp.ndarray[
     tuple[int, int, int], np.dtype[np.float16 | np.float32 | np.float64]
 ]:
@@ -164,4 +165,6 @@ def sample_FORBILD(  # noqa: C901, N802
         np.uint8(supersamp_factor),
     )
     kern(*_get_grid_block_dims(shape), args)
+    if block:
+        cp.cuda.get_current_stream().synchronize()
     return out

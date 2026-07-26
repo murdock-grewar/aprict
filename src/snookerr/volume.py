@@ -251,6 +251,7 @@ class FBVolume:
         out: cp.ndarray | None = None,
         supersamp_cubic_vox_wid: float | None = None,
         supersamp_factor: int | None = None,
+        block: bool = True,
     ) -> cp.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
         """Convert to a float32 cupy array by simple point-sampling."""
         return sample_FORBILD.sample_FORBILD(
@@ -261,6 +262,7 @@ class FBVolume:
             out=out,
             supersamp_cubic_vox_wid=supersamp_cubic_vox_wid,
             supersamp_factor=supersamp_factor,
+            block=block,
         )
 
     def superimpose_onto(self, vol: FBVolume) -> FBVolume:

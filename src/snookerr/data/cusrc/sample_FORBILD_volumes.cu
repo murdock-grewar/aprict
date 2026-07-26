@@ -34,13 +34,17 @@ __global__ void add_FORBILD_sampling(
         (vol_idx.y < vol_shape.y) &&
         (vol_idx.z < vol_shape.z)
     );
-    const unsigned long num_voxels = vol_shape.x * vol_shape.y * vol_shape.z;
+    const unsigned long num_threads = (
+        min(vol_shape.x, blockDim.x) *
+        min(vol_shape.y, blockDim.y) *
+        min(vol_shape.z, blockDim.z)
+    );
 
     // Load the first N shapes into shared memory. Process them, then load the next. Etc.
     const unsigned long tid = (
         threadIdx.x +
         threadIdx.y*blockDim.x +
-        threadIdx.z*blockDim.x*blockDim.z
+        threadIdx.z*blockDim.x*blockDim.y
     );
     // Load shapes into shared memory for the thread block
     __shared__ Ts shapes_shared[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
@@ -71,7 +75,7 @@ __global__ void add_FORBILD_sampling(
                 MAX_NUM_SHAPES_FOR_SHARED_MEMORY
             );
             unsigned int num_shapes_to_load_per_thread = (
-                (unsigned int)ceil((float)num_shapes_to_load / num_voxels)
+                (unsigned int)ceil((float)num_shapes_to_load / num_threads)
             );
             __syncthreads();  // Wait for all threads to finish dealing with the last round of data
             for (
