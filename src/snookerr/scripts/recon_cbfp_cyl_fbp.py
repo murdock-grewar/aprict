@@ -558,7 +558,10 @@ def main() -> None:  # noqa: C901
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
     # Configurations to backproject the ramp- and Hilbert-filtered data
-    # This two-sided formula is based on a formula by F. Noo.
+    # Combine one of these preset pairs:
+    #  - (1, 2) for a formula derived from Kudo's result
+    #  - (3, 4) for a formula derived by F. Noo.
+    #  - (1, 6) for a formula derived from a result by F. Noo.
     config_bp_ramp_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
@@ -573,7 +576,7 @@ def main() -> None:  # noqa: C901
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
         Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
-        backproj_weighting_preset=2,  # 2,#4,
+        backproj_weighting_preset=6,  # 2,#4,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )

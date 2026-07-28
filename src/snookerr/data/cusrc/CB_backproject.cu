@@ -493,6 +493,26 @@ __device__ Tv _backproject_CB_getval(
                             float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
                             multiplier *= fcast<Tp>((vyrel_on_R / Z_on_R) / Z_on_R);
                         }
+                        if (config.backproj_weighting_preset == 6) {
+                            float dsigned_on_c = dsigned_on_R / c_on_R;
+                            float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
+                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                            float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
+                            multiplier *= fcast<Tp>(
+                                -1 *
+                                2 *
+                                powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2) /
+                                (1 - dsigned_on_c) *
+                                (-vyrel_on_R) * (
+                                    1 + (
+                                        vxrel_on_R / Z_on_R
+                                    )
+                                ) /
+                                Z_on_R /
+                                R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                                R // I don't know why this extra factor of R is needed.
+                            );
+                        }
                     }
                 }
                 sub_accumulator = fcast<Tv>(det_value * multiplier);
