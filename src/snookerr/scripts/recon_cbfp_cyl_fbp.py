@@ -353,7 +353,6 @@ def get_filtered_projectionset_generator(  # noqa: C901
     filt = cb.FBPFilterer(
         proj_2d_shape=(nu, nv),
         projs_per_batch=filt_chunk_size,
-        R=R,
         L=L,
         physpixwid=pixwid,
         limit_zeta=limit_zeta,
@@ -368,14 +367,14 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # 1
             # / (8 * np.square(np.pi) * R)
             # * (R * 2 * np.pi / pg.num_projs)
-            1 / (4 * np.pi * pg.num_projs)
+            1 / (4 * np.pi * R * pg.num_projs)
         )
     else:
         final_multiplier = (
             # R  # cancel the factor of R in the physpixwid of the ramp kernel
             # / (32 * np.float_power(np.pi, 3) * np.float_power(R, 3))
             # * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
-            (zs_max - zs_min) / (16 * np.square(np.pi) * R * pg.num_projs)
+            (zs_max - zs_min) / (16 * np.square(np.pi) * R**2 * pg.num_projs)
         )
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
@@ -549,7 +548,7 @@ def main() -> None:  # noqa: C901
     )
 
     # Initialise the configuration used for backprojection
-    config_backproject_ramp_onesided = cbfp.ConfigBackproject(
+    config_bp_ramp_onesided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
         Z_on_val_factor_power=(-2 if args.fan_beam else -3),
@@ -559,22 +558,22 @@ def main() -> None:  # noqa: C901
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
     # Configurations to backproject the ramp- and Hilbert-filtered data
-    # This two-sided formula is based on Kudo et al's super short-scan formula.
-    config_backproject_ramp_twosided = cbfp.ConfigBackproject(
+    # This two-sided formula is based on a formula by F. Noo.
+    config_bp_ramp_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
         Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
-        backproj_weighting_preset=1,
+        backproj_weighting_preset=1,  # 1,#3,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
-    config_backproject_hilb_twosided = cbfp.ConfigBackproject(
+    config_bp_hilb_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
         cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
         Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
-        backproj_weighting_preset=2,
+        backproj_weighting_preset=2,  # 2,#4,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
     )
@@ -660,10 +659,10 @@ def main() -> None:  # noqa: C901
             if args.two_sided:
                 ps_ramp, ps_hilb = pss
                 cbfp.backproject(
-                    config_backproject_ramp_twosided, vol, ps_ramp, block=True
+                    config_bp_ramp_twosided, vol, ps_ramp, block=True
                 )
                 cbfp.backproject(
-                    config_backproject_hilb_twosided, vol, ps_hilb, block=True
+                    config_bp_hilb_twosided, vol, ps_hilb, block=True
                 )
                 assert (
                     ps_ramp.data is not None
@@ -681,7 +680,7 @@ def main() -> None:  # noqa: C901
             else:
                 (ps_ramp,) = pss
                 cbfp.backproject(
-                    config_backproject_ramp_onesided, vol, ps_ramp, block=True
+                    config_bp_ramp_onesided, vol, ps_ramp, block=True
                 )
                 assert (
                     ps_ramp.data is not None

@@ -341,7 +341,6 @@ class FBPFilterer:
     def __init__(
         self,
         *,
-        R: float,  # noqa: N803
         L: float,  # noqa: N803
         physpixwid: float,
         proj_2d_shape: tuple[int, int],
@@ -376,11 +375,10 @@ class FBPFilterer:
         # Construct the ramp-filtering object with memory buffers
         kern_funcs = (ramp_kernels.ramp_kernel_ramlak,)
         if self._include_hilbert_transform:
-            kern_funcs += (ramp_kernels.hilbert_transform_kernel_approx,)
+            kern_funcs += (ramp_kernels.hilbert_transform_kernel,)
         self.rfilt = RampFilterer(
             physpixwid=physpixwid
-            * R
-            / L,  # use the physical pixel width on the plane projected to be 1 unit in front of the source point. ALSO, add a factor of R so that the filtrations are divided by R. This is part of the definition of the filtered projections: to add a factor of 1/R. I've done that by inserting R here.
+            / L,  # use the physical pixel width on the plane projected to be 1 unit in front of the source point.
             proj_2d_shape=self.chunk_shape[1:],
             projs_per_batch=self.chunk_shape[0],
             stream=cp.cuda.Stream(
@@ -849,7 +847,7 @@ if __name__ == "__main__":
     # shape_2d = (4001, 4000)
     shape_2d = (752, 752)
     filt = FBPFilterer(
-        proj_2d_shape=shape_2d, projs_per_batch=3, R=100, L=300, physpixwid=0.1
+        proj_2d_shape=shape_2d, projs_per_batch=3, L=300, physpixwid=0.1
     )
     cparr = cp.zeros((64, *shape_2d), dtype=np.float32)
     cparr = cp.random.randn(*cparr.shape).astype(cp.float32)

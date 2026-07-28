@@ -416,6 +416,7 @@ __device__ Tv _backproject_CB_getval(
                 det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
                 det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
             });
+
             uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
             ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
             Tp det_value;
@@ -447,7 +448,11 @@ __device__ Tv _backproject_CB_getval(
                     }
                     if (
                         (config.backproj_weighting_preset == 1) ||
-                        (config.backproj_weighting_preset == 2)
+                        (config.backproj_weighting_preset == 2) ||
+                        (config.backproj_weighting_preset == 3) ||
+                        (config.backproj_weighting_preset == 4) ||
+                        (config.backproj_weighting_preset == 5) ||
+                        (config.backproj_weighting_preset == 6)
                     ) {
                         // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
                         float R = config.Z_on_val_factor_val;
@@ -475,8 +480,18 @@ __device__ Tv _backproject_CB_getval(
                                     )
                                 ) /
                                 powint(ell_on_R, 2) /
-                                R  // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                                R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                                R // I don't know why this extra factor of R is needed.
                             );
+                        }
+                        if (config.backproj_weighting_preset == 3) {
+                            // Ramp filter term from alternative formula
+                            multiplier /= fcast<Tp>(Z_on_R*powint(c_on_R, 2));
+                        }
+                        if (config.backproj_weighting_preset == 4) {
+                            // Hilbert transform term from alternative formula
+                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                            multiplier *= fcast<Tp>((vyrel_on_R / Z_on_R) / Z_on_R);
                         }
                     }
                 }
