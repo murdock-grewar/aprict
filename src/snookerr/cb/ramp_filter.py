@@ -365,7 +365,7 @@ class FBPFilterer:
             )
         self.proj_2d_shape = proj_2d_shape
         self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
-            proj_2d_shape, self._max_abs_rotation_angle
+            proj_2d_shape, self._max_abs_rotation_angle, _hacky_fan_beam_mode
         )
         # FFT is more efficient with certain sizes.
         self.chunk_shape = (
@@ -477,9 +477,15 @@ class FBPFilterer:
 
     @classmethod
     def get_expanded_proj_2d_shape(
-        cls, proj_2d_shape: tuple[int, int], max_abs_rotation_angle: float
+        cls,
+        proj_2d_shape: tuple[int, int],
+        max_abs_rotation_angle: float,
+        _hacky_fan_beam_mode: bool = False,
     ) -> tuple[int, int]:
         """Get the 2D shape of the expanded shape of the arrays. They need to be expanded in order to accommodate a rotation."""
+        if _hacky_fan_beam_mode:
+            return tuple(proj_2d_shape)
+
         # Compute the expanded projection shape. It needs to expand in the horizontal direction
         # in order to accomodate the rotation.
         sint, cost = (

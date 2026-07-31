@@ -42,7 +42,7 @@ class det_spec(
         "nv",  # number of columns/rows. i.e. length of x axis; length of y axis.
         "type",  # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
     ],
-    dtypes=[fvec3, fvec3, fvec3, np.uint16, np.uint16, np.uint8],
+    dtypes=[fvec3, fvec3, fvec3, np.uint32, np.uint32, np.uint8],
 ):
     pass  # ty:ignore[invalid-argument-type]
 

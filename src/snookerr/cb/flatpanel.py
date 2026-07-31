@@ -455,8 +455,8 @@ class ProjGeom:  # noqa: PLW1641
             det_pos=np.array(pgs.det_pos, dtype=np.float32),
             det_uvec=np.array(pgs.det_uvec, dtype=np.float32),
             det_vvec=np.array(pgs.det_vvec, dtype=np.float32),
-            nu=np.array(pgs.nu, dtype=np.int32),
-            nv=np.array(pgs.nv, dtype=np.int32),
+            nu=np.array(pgs.nu, dtype=np.uint32),
+            nv=np.array(pgs.nv, dtype=np.uint32),
             _skip_regularisation=True,
         )
 
@@ -496,8 +496,8 @@ class ProjGeom:  # noqa: PLW1641
         dps = convert_to_fvec3(pg.det_pos)
         us = convert_to_fvec3(pg.det_uvec)
         vs = convert_to_fvec3(pg.det_vvec)
-        nus = np.array(pg.nu, dtype=np.uint16)
-        nvs = np.array(pg.nv, dtype=np.uint16)
+        nus = np.array(pg.nu, dtype=np.uint32)
+        nvs = np.array(pg.nv, dtype=np.uint32)
         tps = np.array(np.uint(0), dtype=np.uint8)
 
         def func_det(*args):  # noqa: ANN002, ANN202

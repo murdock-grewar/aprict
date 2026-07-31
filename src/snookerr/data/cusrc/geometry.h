@@ -2,8 +2,8 @@ struct det_spec {
     fvec3 pos;
     fvec3 u;
     fvec3 v;
-    unsigned short nu;
-    unsigned short nv;
+    unsigned int nu;
+    unsigned int nv;
     unsigned char type;
 };
 
