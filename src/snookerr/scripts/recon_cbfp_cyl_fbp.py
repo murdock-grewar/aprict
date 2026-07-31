@@ -287,6 +287,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
     float,
     float,
     float,
+    float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if fan_beam_mode:
@@ -346,8 +347,10 @@ def get_filtered_projectionset_generator(  # noqa: C901
         msg = "Inconsistent source-to-detector length."
         raise NotImplementedError(msg)
     L = Ls[0]  # noqa: N806
+    recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
     logger.info(f"R: {R!s:s}")
     logger.info(f"L: {L!s:s}")
+    logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
 
     # Set up the filtering object
     filt = cb.FBPFilterer(
@@ -460,7 +463,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
             # Increment the slice
             sl_start += num_projs_per_chunk
 
-    return pg, _gen(), R, L, final_multiplier
+    return pg, _gen(), R, L, recon_support_radius, final_multiplier
 
 
 def main() -> None:  # noqa: C901
@@ -522,7 +525,7 @@ def main() -> None:  # noqa: C901
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     # Create the ProjectionSet objects corresponding to each ordered subset
-    pg, sl_filtps_gen, R, L, final_multiplier = (  # noqa: N806, RUF059
+    pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # noqa: N806, RUF059
         get_filtered_projectionset_generator(
             projdata_path=args.projdata,
             pg=cbfp.ProjGeom.load(args.projgeom),
@@ -547,10 +550,15 @@ def main() -> None:  # noqa: C901
         pos_c=args.volpos,
     )
 
+    # This works fine when --volpos '(0,0,0)' and the volume is square, but not very good otherwise
+    # cyl_mask_rad = vol.shape[0] / 2 * vol.voxwid
+    # Set to reconstruction support radius instead
+    cyl_mask_rad = recon_support_radius
+
     # Initialise the configuration used for backprojection
     config_bp_ramp_onesided = cbfp.ConfigBackproject(
         fast_approx=True,
-        cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
+        cyl_mask_rad=cyl_mask_rad,
         Z_on_val_factor_power=(-2 if args.fan_beam else -3),
         Z_on_val_factor_val=R,
         backproj_weighting_preset=0,
@@ -564,7 +572,7 @@ def main() -> None:  # noqa: C901
     #  - (1, 6) for a formula derived from a result by F. Noo.
     config_bp_ramp_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
-        cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
+        cyl_mask_rad=cyl_mask_rad,
         Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
         backproj_weighting_preset=1,  # 1,#3,
@@ -573,7 +581,7 @@ def main() -> None:  # noqa: C901
     )
     config_bp_hilb_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
-        cyl_mask_rad=vol.shape[0] / 2 * vol.voxwid,
+        cyl_mask_rad=cyl_mask_rad,
         Z_on_val_factor_power=(0 if args.fan_beam else -1),
         Z_on_val_factor_val=R,
         backproj_weighting_preset=6,  # 2,#4,
