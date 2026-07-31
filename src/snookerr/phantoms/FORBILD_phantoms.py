@@ -200,6 +200,14 @@ class _MetaPhantomContainer(type):
         fbv.multiply_attenuation(0.55)
         return fbv
 
+    @property
+    def UnitCyl_z(cls) -> FBVolume:
+        return FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath("custom_other/unit_Cyl_z.pha")
+            )
+        )
+
 
 class PhantomContainer(metaclass=_MetaPhantomContainer):
     """A container for the phantom objects."""
