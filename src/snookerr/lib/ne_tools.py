@@ -25,20 +25,47 @@ import numexpr as ne
 import numpy as np
 
 
-def downbin(
-    x: np.ndarray, *, n: int, preserve_sum: bool, out: np.ndarray | None = None
+def downbin(  # noqa: C901
+    x: np.ndarray,
+    *,
+    n: int,
+    preserve_sum: bool,
+    out: np.ndarray | None = None,
+    axis: tuple[int, ...] | None = None,
 ) -> np.ndarray:
     """Downbin or downsample an array to a common integer divisor in every axis."""
+    # Normalize the 'axis' input value
+    if axis is None:
+        axis = tuple(range(x.ndim))
+    elif type(axis) is int:
+        axis = (axis,)
+    # Check that a valid selection of axes was made
+    for i in axis:
+        if i >= x.ndim:
+            msg = f"axis index {i:d} too large for array with dimensions {x.ndim}"
+            raise ValueError(msg)
+    if len(axis) == 0:
+        return (
+            x.copy()
+        )  # no downsampling; just return a copy of the original array
+
     if n == 1 and (out is None or out is x):
         return x
-    xnew = (
-        np.empty_like(x, shape=tuple(s // n for s in x.shape))
-        if out is None
-        else out
-    )
+    newshape = tuple((s if s in axis else s // n) for s in x.shape)
+    xnew = np.empty_like(x, shape=newshape) if out is None else out
     first: bool = True
-    for offsets in itertools.product(range(n), repeat=len(xnew.shape)):
-        sls = [slice(off, None, n) for off in offsets]
+
+    for offsets in itertools.product(range(n), repeat=len(axis)):
+        # Create slice objects
+        sls = []
+        counter: int = 0
+        for i in range(x.ndim):
+            if i in axis:
+                sls.append(slice(offsets[counter], None, n))
+                counter += 1
+            else:
+                sls.append(slice(None, None))
+
         xsl = x[*sls]
         if first:
             ne.evaluate("xsl", out=xnew, local_dict={"xsl": xsl, "xnew": xnew})
@@ -51,7 +78,7 @@ def downbin(
         ne.evaluate(
             "xnew/num",
             out=xnew,
-            local_dict={"xnew": xnew, "num": pow(n, len(xnew.shape))},
+            local_dict={"xnew": xnew, "num": pow(n, len(axis))},
         )
     return xnew
 

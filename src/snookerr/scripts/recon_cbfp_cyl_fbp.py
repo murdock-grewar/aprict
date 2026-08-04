@@ -543,8 +543,14 @@ def main() -> None:  # noqa: C901
     )
 
     # Create the working volume
+    volshape = (
+        (*tuple(n * args.superres for n in args.volshape[0:2]), 1)
+        if args.fan_beam
+        else tuple(n * args.superres for n in args.volshape)
+    )
+    print(volshape)
     vol = Volume.zeros(
-        tuple(n * args.superres for n in args.volshape),
+        volshape,
         voxwid=args.voxwid / args.superres,
         dtype=np.float32,  # ty:ignore[invalid-argument-type]
         pos_c=args.volpos,
@@ -610,7 +616,12 @@ def main() -> None:  # noqa: C901
 
         # Get the current volume
         x = vol.as_numpy()
-        x = lib.ne_tools.downbin(x, n=args.superres, preserve_sum=False)
+        x = lib.ne_tools.downbin(
+            x,
+            n=args.superres,
+            preserve_sum=False,
+            axis=(0, 1) if args.fan_beam else (0, 1, 2),
+        )
 
         # Get the 'root' directory of where this volume will be saved
         save_path = path_intms if is_intermediate else path_output
