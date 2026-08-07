@@ -28,7 +28,14 @@ import cupyx
 import numpy as np
 
 from .cuda.structs import FORBILD_volumes as fv
-from .lib import gpu_tools, ne_tools, sample_FORBILD, texture_tools
+from .cuda.structs import bbox as ks_bbox
+from .lib import (
+    bboxes_FORBILD,
+    gpu_tools,
+    ne_tools,
+    sample_FORBILD,
+    texture_tools,
+)
 from .lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
@@ -264,6 +271,75 @@ class FBVolume:
             supersamp_factor=supersamp_factor,
             block=block,
         )
+
+    def get_bbox(
+        self,
+    ) -> tuple[
+        np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
+        np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
+    ]:
+        """Return a bounding box for this volume."""
+        b: np.dtype[ks_bbox] = bboxes_FORBILD.overall_bbox(self.shapes)  # ty:ignore[invalid-type-arguments]
+        xyz_min = np.array(
+            [
+                b["xyz_min"]["x"],
+                b["xyz_min"]["y"],
+                b["xyz_min"]["z"],
+            ],
+            dtype=np.float32,
+        )
+        xyz_max = np.array(
+            [
+                b["xyz_max"]["x"],
+                b["xyz_max"]["y"],
+                b["xyz_max"]["z"],
+            ],
+            dtype=np.float32,
+        )
+        return xyz_min, xyz_max
+
+    def prune_to_bbox(
+        self,
+        xyz_min: tuple[float, float, float]
+        | np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
+        xyz_max: tuple[float, float, float]
+        | np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
+    ) -> FBVolume:
+        """Return a new FBVolume containing only the shapes relevant to the given bounding box."""
+        # Handle float inputs
+        xyz_min = np.array(xyz_min, dtype=np.float32)
+        xyz_max = np.array(xyz_max, dtype=np.float32)
+
+        accept_mask = np.ones(len(self.shapes), dtype=np.bool)
+        bboxes: np.ndarray[tuple[int], np.dtype[ks_bbox]] = (  # ty:ignore[invalid-type-arguments]
+            bboxes_FORBILD.bboxes_FORBILD_shapes(self.shapes, block=True).get()
+        )
+        # Prune away the pieces
+        a = np.array(
+            [b["xyz_max"]["x"] >= xyz_min[0] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        a = np.array(
+            [b["xyz_max"]["y"] >= xyz_min[1] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        a = np.array(
+            [b["xyz_max"]["z"] >= xyz_min[2] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        a = np.array(
+            [b["xyz_min"]["x"] <= xyz_max[0] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        a = np.array(
+            [b["xyz_min"]["y"] <= xyz_max[1] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        a = np.array(
+            [b["xyz_min"]["z"] <= xyz_max[2] for b in bboxes], dtype=np.bool
+        )
+        accept_mask = np.logical_and(accept_mask, a)
+        return FBVolume(self.shapes[accept_mask])
 
     def superimpose_onto(self, vol: FBVolume) -> FBVolume:
         """Superimpose this volume onto another."""

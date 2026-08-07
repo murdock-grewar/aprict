@@ -1,14 +1,3 @@
-struct fvec2 {
-    float x;
-    float y;
-
-public:
-    // implicit constructor from floats
-    fvec2(float xi, float yi) : x(xi), y(yi) {}
-    // default constructor, used with i.e. 'fvec2 v;'
-    fvec2() = default;
-};
-
 struct uivec3 {
     unsigned int x;
     unsigned int y;
@@ -190,6 +179,28 @@ __device__ fvec3 operator/(
     return o;
 }
 
+
+struct bbox {
+    fvec3 xyz_min;
+    fvec3 xyz_max;
+
+public:
+    // implicit constructor from fvec3s
+    bbox(fvec3 xyz_mini, fvec3 xyz_maxi) : xyz_min(xyz_mini), xyz_max(xyz_maxi) {}
+    // default constructor, used with i.e. 'bbox b;'
+    bbox() = default;
+};
+
+struct fvec2 {
+    float x;
+    float y;
+
+public:
+    // implicit constructor from floats
+    fvec2(float xi, float yi) : x(xi), y(yi) {}
+    // default constructor, used with i.e. 'fvec2 v;'
+    fvec2() = default;
+};
 
 struct uivec2 {
     unsigned int x;

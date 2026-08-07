@@ -18,7 +18,7 @@
 import numpy as np
 
 from .. import kern_structs
-from .base import fvec2, fvec3, uivec2, uivec3  # noqa: F401
+from .base import bbox, fvec2, fvec3, uivec2, uivec3  # noqa: F401
 
 __all__ = [
     "Box",
@@ -54,7 +54,7 @@ class Sphere(
         "r",
     ],
     dtypes=[np.float32, np.float32, np.float32, np.float32, np.float32],
-    force_dependencies=[fvec2, fvec3],
+    force_dependencies=[fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -64,6 +64,21 @@ __device__ bool _in_region(
     fvec3 pos = fvec3(sphere.x, sphere.y, sphere.z);
     float d = norm_fvec3(pos - v);
     return (d < sphere.r);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Sphere sphere
+)
+{
+    fvec3 v1;
+    v1.x = sphere.x - sphere.r;
+    v1.y = sphere.y - sphere.r;
+    v1.z = sphere.z - sphere.r;
+    fvec3 v2;
+    v2.x = sphere.x + sphere.r;
+    v2.y = sphere.y + sphere.r;
+    v2.z = sphere.z + sphere.r;
+    return bbox(v1, v2);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -148,7 +163,7 @@ class Box(
         np.float32,
         np.float32,
     ],
-    force_dependencies=[fvec2, fvec3],
+    force_dependencies=[fvec2, fvec3, bbox],
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -159,6 +174,21 @@ __device__ bool _in_region(
     if (abs(v.y - box.y) > box.dy/2.f) { return false; }
     if (abs(v.z - box.z) > box.dz/2.f) { return false; }
     return true;
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Box box
+)
+{
+    fvec3 v1;
+    v1.x = box.x - box.dx/2.f;
+    v1.y = box.y - box.dy/2.f;
+    v1.z = box.z - box.dz/2.f;
+    fvec3 v2;
+    v2.x = box.x + box.dx/2.f;
+    v2.y = box.y + box.dy/2.f;
+    v2.z = box.z + box.dz/2.f;
+    return bbox(v1, v2);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -239,7 +269,7 @@ class Cylinder(
         np.float32,
         fvec3,
     ],
-    force_dependencies=[fvec2, fvec3],
+    force_dependencies=[fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -253,6 +283,42 @@ __device__ bool _in_region(
     float nv = norm_fvec3(v - pos);
     float cyl_rho_sq = max(0.f, nv*nv - cyl_z*cyl_z);
     return (cyl_rho_sq <= cylinder.r*cylinder.r);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cylinder cylinder
+)
+{
+    // We just need to construct any rectangular prism fitting the cylinder,
+    // then take the minimum/maximum x,y,z coords of all 8 points.
+    const fvec3 pos = fvec3(cylinder.x, cylinder.y, cylinder.z);
+    fvec3 axis_normed = cylinder.axis/norm_fvec3(cylinder.axis);
+    float hl = cylinder.l/2.f;
+
+    // Get the midpoints of the circular caps
+    fvec3 end1 = pos + axis_normed*hl;
+    fvec3 end2 = pos - axis_normed*hl;
+
+    // Get azimuthal angle of cylinder axis.
+    float axis_aziang = atan2f(cylinder.axis.y, cylinder.axis.x);
+    // Get polar angle
+    float cos_pol = axis_normed.z;
+    float sin_pol = sqrt(max(0.f, 1 - cos_pol*cos_pol));
+
+    // Instantiate bounding box
+    bbox b;
+
+    // Compute min/max coords
+    float dx = abs(sin(axis_aziang) * cylinder.r) + abs(cos(axis_aziang) * cylinder.r * cos_pol);
+    float dy = abs(cos(axis_aziang) * cylinder.r) + abs(sin(axis_aziang) * cylinder.r * cos_pol);
+    float dz = abs(sin_pol * cylinder.r);
+    b.xyz_min.x = min(end1.x, end2.x) - dx;
+    b.xyz_min.y = min(end1.y, end2.y) - dy;
+    b.xyz_min.z = min(end1.z, end2.z) - dz;
+    b.xyz_max.x = max(end1.x, end2.x) + dx;
+    b.xyz_max.y = max(end1.y, end2.y) + dy;
+    b.xyz_max.z = max(end1.z, end2.z) + dz;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -351,7 +417,7 @@ class Cylinder_x(
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cylinder, fvec2, fvec3],
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -363,6 +429,20 @@ __device__ bool _in_region(
     if (abs(v_rel.x) > cylinder_x.l/2.f) { return false; }
     if (v_rel.y*v_rel.y + v_rel.z*v_rel.z > cylinder_x.r*cylinder_x.r) { return false; }
     return true;
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cylinder_x c
+)
+{
+    bbox b;
+    b.xyz_min.x = c.x - c.l/2.f;
+    b.xyz_max.x = c.x + c.l/2.f;
+    b.xyz_min.y = c.y - c.r;
+    b.xyz_max.y = c.y + c.r;
+    b.xyz_min.z = c.z - c.r;
+    b.xyz_max.z = c.z + c.r;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -405,7 +485,7 @@ class Cylinder_y(
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cylinder, fvec2, fvec3],
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -417,6 +497,20 @@ __device__ bool _in_region(
     if (abs(v_rel.y) > cylinder_y.l/2.f) { return false; }
     if (v_rel.x*v_rel.x + v_rel.z*v_rel.z > cylinder_y.r*cylinder_y.r) { return false; }
     return true;
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cylinder_y c
+)
+{
+    bbox b;
+    b.xyz_min.x = c.x - c.r;
+    b.xyz_max.x = c.x + c.r;
+    b.xyz_min.y = c.y - c.l/2.f;
+    b.xyz_max.y = c.y + c.l/2.f;
+    b.xyz_min.z = c.z - c.r;
+    b.xyz_max.z = c.z + c.r;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -459,7 +553,7 @@ class Cylinder_z(
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cylinder, fvec2, fvec3],
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -471,6 +565,20 @@ __device__ bool _in_region(
     if (abs(v_rel.z) > cylinder_z.l/2.f) { return false; }
     if (v_rel.x*v_rel.x + v_rel.y*v_rel.y > cylinder_z.r*cylinder_z.r) { return false; }
     return true;
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cylinder_z c
+)
+{
+    bbox b;
+    b.xyz_min.x = c.x - c.r;
+    b.xyz_max.x = c.x + c.r;
+    b.xyz_min.y = c.y - c.r;
+    b.xyz_max.y = c.y + c.r;
+    b.xyz_min.z = c.z - c.l/2.f;
+    b.xyz_max.z = c.z + c.l/2.f;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -515,7 +623,7 @@ class Ellipsoid(
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Sphere, fvec2, fvec3],
+    force_dependencies=[Sphere, fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -528,6 +636,20 @@ __device__ bool _in_region(
     v_rel.y /= ellipsoid.dy;
     v_rel.z /= ellipsoid.dz;
     return (norm_fvec3(v_rel) <= 1);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Ellipsoid e
+)
+{
+    bbox b;
+    b.xyz_min.x = e.x - e.dx;
+    b.xyz_max.x = e.x + e.dx;
+    b.xyz_min.y = e.y - e.dy;
+    b.xyz_max.y = e.y + e.dy;
+    b.xyz_min.z = e.z - e.dz;
+    b.xyz_max.z = e.z + e.dz;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -585,7 +707,7 @@ class Ellipsoid_free(
         fvec3,
         fvec3,
     ],
-    force_dependencies=[Sphere, fvec2, fvec3],
+    force_dependencies=[Sphere, fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -604,6 +726,26 @@ __device__ bool _in_region(
     vy /= ef.dy;
     vz /= ef.dz;
     return (vx*vx + vy*vy + vz*vz <= 1);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Ellipsoid_free ef
+)
+{
+    fvec3 ax = ef.a_x / norm_fvec3(ef.a_x);
+    fvec3 ay = ef.a_y / norm_fvec3(ef.a_y);
+    fvec3 az = ef.a_z / norm_fvec3(ef.a_z);
+    bbox b;
+    float d = abs(ef.dx*ax.x) + abs(ef.dy*ay.x) + abs(ef.dz*az.x);
+    b.xyz_min.x = ef.x - d;
+    b.xyz_max.x = ef.x + d;
+    d = abs(ef.dx*ax.y) + abs(ef.dy*ay.y) + abs(ef.dz*az.y);
+    b.xyz_min.y = ef.y - d;
+    b.xyz_max.y = ef.y + d;
+    d = abs(ef.dx*ax.z) + abs(ef.dy*ay.z) + abs(ef.dz*az.z);
+    b.xyz_min.z = ef.z - d;
+    b.xyz_max.z = ef.z + d;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -695,6 +837,26 @@ __device__ bool _in_region(
     return (vx*vx + vy*vy <= 1);
 }
 
+__device__ bbox get_bbox(
+    FORBILD_Ellipt_Cyl ecyl
+)
+{
+    fvec3 ax = ecyl.a_x / norm_fvec3(ecyl.a_x);
+    fvec3 ay = ecyl.a_y / norm_fvec3(ecyl.a_y);
+    fvec3 az = ecyl.axis / norm_fvec3(ecyl.axis);
+    bbox b;
+    float d = abs(ecyl.dx*ax.x) + abs(ecyl.dy*ay.x) + abs(ecyl.l/2.f*az.x);
+    b.xyz_min.x = ecyl.x - d;
+    b.xyz_max.x = ecyl.x + d;
+    d = abs(ecyl.dx*ax.y) + abs(ecyl.dy*ay.y) + abs(ecyl.l/2.f*az.y);
+    b.xyz_min.y = ecyl.y - d;
+    b.xyz_max.y = ecyl.y + d;
+    d = abs(ecyl.dx*ax.z) + abs(ecyl.dy*ay.z) + abs(ecyl.l/2.f*az.z);
+    b.xyz_min.z = ecyl.z - d;
+    b.xyz_max.z = ecyl.z + d;
+    return b;
+}
+
 __device__ fvec2 FORBILD_clip_line_segment(
     // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
     fvec3 v1,
@@ -752,7 +914,7 @@ class Ellipt_Cyl_x(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -771,6 +933,20 @@ __device__ bool _in_region(
     ecyl.a_x = fvec3(0.f,1.f,0.f);
     ecyl.a_y = fvec3(0.f,0.f,1.f);
     return _in_region(v, ecyl);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Ellipt_Cyl_x ecx
+)
+{
+    bbox b;
+    b.xyz_min.x = ecx.x - ecx.l/2.f;
+    b.xyz_max.x = ecx.x + ecx.l/2.f;
+    b.xyz_min.y = ecx.y - ecx.dy;
+    b.xyz_max.y = ecx.y + ecx.dy;
+    b.xyz_min.z = ecx.z - ecx.dz;
+    b.xyz_max.z = ecx.z + ecx.dz;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -819,7 +995,7 @@ class Ellipt_Cyl_y(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -838,6 +1014,20 @@ __device__ bool _in_region(
     ecyl.a_x = fvec3(1.f,0.f,0.f);
     ecyl.a_y = fvec3(0.f,0.f,1.f);
     return _in_region(v, ecyl);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Ellipt_Cyl_y ecy
+)
+{
+    bbox b;
+    b.xyz_min.x = ecy.x - ecy.dx;
+    b.xyz_max.x = ecy.x + ecy.dx;
+    b.xyz_min.y = ecy.y - ecy.l/2.f;
+    b.xyz_max.y = ecy.y + ecy.l/2.f;
+    b.xyz_min.z = ecy.z - ecy.dz;
+    b.xyz_max.z = ecy.z + ecy.dz;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -886,7 +1076,7 @@ class Ellipt_Cyl_z(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3],
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -905,6 +1095,20 @@ __device__ bool _in_region(
     ecyl.a_x = fvec3(1.f,0.f,0.f);
     ecyl.a_y = fvec3(0.f,1.f,0.f);
     return _in_region(v, ecyl);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Ellipt_Cyl_z ecz
+)
+{
+    bbox b;
+    b.xyz_min.x = ecz.x - ecz.dx;
+    b.xyz_max.x = ecz.x + ecz.dx;
+    b.xyz_min.y = ecz.y - ecz.dy;
+    b.xyz_max.y = ecz.y + ecz.dy;
+    b.xyz_min.z = ecz.z - ecz.l/2.f;
+    b.xyz_max.z = ecz.z + ecz.l/2.f;
+    return b;
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -954,7 +1158,7 @@ class Cone_z(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cylinder_z, fvec2, fvec3],
+    force_dependencies=[Cylinder_z, fvec2, fvec3, bbox],
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -970,6 +1174,18 @@ __device__ bool _in_region(
     return (v_rel.x*v_rel.x + v_rel.y*v_rel.y <= rad*rad);
 }
 
+__device__ bbox get_bbox(
+    FORBILD_Cone_z cone_z
+)
+{
+    FORBILD_Cylinder_z cz;
+    cz.x = cone_z.x;
+    cz.y = cone_z.y;
+    cz.z = cone_z.z;
+    cz.r = max(cone_z.r1, cone_z.r2);
+    cz.l = cone_z.l;
+    return get_bbox(cz);
+}
 
 __device__ fvec2 FORBILD_clip_line_segment(
     // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
@@ -1169,7 +1385,7 @@ class Cone(
         np.float32,
         fvec3,
     ],
-    force_dependencies=[Cone_z, fvec2, fvec3],
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1191,6 +1407,20 @@ __device__ bool _in_region(
     cz.r1 = cone.r1;
     cz.r2 = cone.r2;
     return _in_region(fvec3(vx, vy, vz), cz);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cone cone
+)
+{
+    FORBILD_Cylinder c;
+    c.x = cone.x;
+    c.y = cone.y;
+    c.z = cone.z;
+    c.r = max(cone.r1, cone.r2);
+    c.l = cone.l;
+    c.axis = cone.axis;
+    return get_bbox(c);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -1254,7 +1484,7 @@ class Cone_x(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cone_z, fvec2, fvec3],
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_x, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1272,6 +1502,19 @@ __device__ bool _in_region(
     cz.r1 = cone_x.r1;
     cz.r2 = cone_x.r2;
     return _in_region(fvec3(v_rel.z, v_rel.y, v_rel.x), cz);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cone_x cone_x
+)
+{
+    FORBILD_Cylinder_x c;
+    c.x = cone_x.x;
+    c.y = cone_x.y;
+    c.z = cone_x.z;
+    c.r = max(cone_x.r1, cone_x.r2);
+    c.l = cone_x.l;
+    return get_bbox(c);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -1320,7 +1563,7 @@ class Cone_y(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
     ],
-    force_dependencies=[Cone_z, fvec2, fvec3],
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_y, bbox],
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1338,6 +1581,19 @@ __device__ bool _in_region(
     cz.r1 = cone_y.r1;
     cz.r2 = cone_y.r2;
     return _in_region(fvec3(v_rel.x, v_rel.z, v_rel.y), cz);
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Cone_y cone_y
+)
+{
+    FORBILD_Cylinder_y c;
+    c.x = cone_y.x;
+    c.y = cone_y.y;
+    c.z = cone_y.z;
+    c.r = max(cone_y.r1, cone_y.r2);
+    c.l = cone_y.l;
+    return get_bbox(c);
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
@@ -1511,6 +1767,7 @@ class Shape(  # A generic container for any shape
     force_dependencies=[
         fvec2,
         fvec3,
+        bbox,
         Box,
         Cone,
         Cone_x,
@@ -1786,6 +2043,54 @@ __device__ bool _in_region(
             return _in_region(v, _to_Ellipt_Cyl_z(shape));
         default:
             return false;
+    }
+}
+
+__device__ bbox get_bbox(
+    FORBILD_Shape shape
+)
+{
+
+    // To get a tighter bounding box, check the clipping planes here
+
+    switch (shape.type) {
+        case 0:
+            // Should not occur
+            assert(false);
+        case 1:
+            return get_bbox(_to_Box(shape));
+        case 2:
+            return get_bbox(_to_Cone(shape));
+        case 3:
+            return get_bbox(_to_Cone_x(shape));
+        case 4:
+            return get_bbox(_to_Cone_y(shape));
+        case 5:
+            return get_bbox(_to_Cone_z(shape));
+        case 6:
+            return get_bbox(_to_Cylinder(shape));
+        case 7:
+            return get_bbox(_to_Cylinder_x(shape));
+        case 8:
+            return get_bbox(_to_Cylinder_y(shape));
+        case 9:
+            return get_bbox(_to_Cylinder_z(shape));
+        case 10:
+            return get_bbox(_to_Ellipsoid(shape));
+        case 11:
+            return get_bbox(_to_Ellipsoid_free(shape));
+        case 12:
+            return get_bbox(_to_Ellipt_Cyl(shape));
+        case 13:
+            return get_bbox(_to_Sphere(shape));
+        case 14:
+            return get_bbox(_to_Ellipt_Cyl_x(shape));
+        case 15:
+            return get_bbox(_to_Ellipt_Cyl_y(shape));
+        case 16:
+            return get_bbox(_to_Ellipt_Cyl_z(shape));
+        default:
+            assert(false);
     }
 }
 

@@ -19,6 +19,7 @@ import numpy as np
 from .. import kern_structs
 
 __all__ = [
+    "bbox",
     "fvec2",
     "fvec3",
     "uivec2",
@@ -266,6 +267,22 @@ __device__ fvec3 operator/(
     o.z = v.z / f;
     return o;
 }
+""",
+):
+    pass  # ty:ignore[invalid-argument-type]
+
+
+class bbox(
+    kern_structs.KernelStruct,
+    struct_name="bbox",
+    names=["xyz_min", "xyz_max"],
+    dtypes=[fvec3, fvec3],
+    insert_into_struct="""
+public:
+    // implicit constructor from fvec3s
+    bbox(fvec3 xyz_mini, fvec3 xyz_maxi) : xyz_min(xyz_mini), xyz_max(xyz_maxi) {}
+    // default constructor, used with i.e. 'bbox b;'
+    bbox() = default;
 """,
 ):
     pass  # ty:ignore[invalid-argument-type]
