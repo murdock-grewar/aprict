@@ -1,3 +1,5 @@
+// CB_backproject.cu
+
 /*
  * In order to mantain O(N^3) scaling, we need a finite, closed-form solution
  * which maps a voxel to its projection onto the detector, in terms of the detector indices.
@@ -33,7 +35,8 @@ __device__ T powint(T base, short exponent) {
 }
 
 
-template <typename T> float sgn(const T val) {
+template <typename T>
+__device__ float sgn(const T val) {
     return (T(0) < val) - (val < T(0));
 }
 

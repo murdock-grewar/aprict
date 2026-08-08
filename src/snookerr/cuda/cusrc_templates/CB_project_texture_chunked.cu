@@ -1,3 +1,5 @@
+// CB_project_texture_chunked.cu
+
 #include <cuda/atomic>
 #include <cuda_fp16.h>
 //#include <assert.h>
