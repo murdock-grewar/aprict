@@ -37,7 +37,7 @@ class uivec2(
     insert_into_struct="""
 public:
     // implicit constructor from unsigned ints
-    uivec2(unsigned int xi, unsigned int yi) : x(xi), y(yi) {}
+    __device__ uivec2(unsigned int xi, unsigned int yi) : x(xi), y(yi) {}
     // default constructor, used with i.e. 'uivec2 v;'
     uivec2() = default;
 """,
@@ -53,7 +53,7 @@ class fvec2(
     insert_into_struct="""
 public:
     // implicit constructor from floats
-    fvec2(float xi, float yi) : x(xi), y(yi) {}
+    __device__ fvec2(float xi, float yi) : x(xi), y(yi) {}
     // default constructor, used with i.e. 'fvec2 v;'
     fvec2() = default;
 """,
@@ -69,7 +69,7 @@ class uivec3(
     insert_into_struct="""
 public:
     // implicit constructor from floats
-    uivec3(unsigned int xi, unsigned int yi, unsigned int zi) : x(xi), y(yi), z(zi) {}
+    __device__ uivec3(unsigned int xi, unsigned int yi, unsigned int zi) : x(xi), y(yi), z(zi) {}
     // default constructor, used with i.e. 'uivec3 v;'
     uivec3() = default;
 """,
@@ -121,7 +121,7 @@ class ulvec3(
     insert_into_struct="""
 public:
     // implicit constructor
-    ulvec3(unsigned long xi, unsigned long yi, unsigned long zi) : x(xi), y(yi), z(zi) {}
+    __device__ ulvec3(unsigned long xi, unsigned long yi, unsigned long zi) : x(xi), y(yi), z(zi) {}
     // default constructor, used with i.e. 'ulvec3 v;'
     ulvec3() = default;
 """,
@@ -140,9 +140,9 @@ class fvec3(
     insert_into_struct="""
 public:
     // implicit constructor from floats
-    fvec3(float xi, float yi, float zi) : x(xi), y(yi), z(zi) {}
+    __device__ fvec3(float xi, float yi, float zi) : x(xi), y(yi), z(zi) {}
     // implicit constructor from a uivec3
-    fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
+    __device__ fvec3(uivec3 v) : x(v.x), y(v.y), z(v.z) {}
     // default constructor, used with i.e. 'fvec3 v;'
     fvec3() = default;
 """,
@@ -280,7 +280,7 @@ class bbox(
     insert_into_struct="""
 public:
     // implicit constructor from fvec3s
-    bbox(fvec3 xyz_mini, fvec3 xyz_maxi) : xyz_min(xyz_mini), xyz_max(xyz_maxi) {}
+    __device__ bbox(fvec3 xyz_mini, fvec3 xyz_maxi) : xyz_min(xyz_mini), xyz_max(xyz_maxi) {}
     // default constructor, used with i.e. 'bbox b;'
     bbox() = default;
 """,
