@@ -230,6 +230,55 @@ class ProjGeom:  # noqa: PLW1641
             self.nu = pg.nu
             self.nv = pg.nv
 
+    def get_bbox(
+        self, *, index_tuple: tuple[int, ...] | None = None
+    ) -> tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ]:
+        """Return a bounding box."""
+        # Make a list of points such that the whole projection geometry
+        # is contained in the convex hull. Then take the min x,y,z and max x,y,z
+        it = slice(None, None) if index_tuple is None else index_tuple
+        axes = tuple(range(len(self.projs_list_shape)))
+        min_xyz, max_xyz = None, None
+        for points in (
+            self.source_pos[it],
+            (
+                self.det_pos
+                + self.det_uvec * self.nu / 2
+                + self.det_vvec * self.nv / 2
+            )[it],
+            (
+                self.det_pos
+                + self.det_uvec * self.nu / 2
+                - self.det_vvec * self.nv / 2
+            )[it],
+            (
+                self.det_pos
+                - self.det_uvec * self.nu / 2
+                + self.det_vvec * self.nv / 2
+            )[it],
+            (
+                self.det_pos
+                - self.det_uvec * self.nu / 2
+                - self.det_vvec * self.nv / 2
+            )[it],
+        ):
+            min_ = np.min(points, axis=axes)
+            max_ = np.max(points, axis=axes)
+            min_xyz = (
+                min_
+                if min_xyz is None
+                else np.min(np.stack((min_xyz, min_), axis=0), axis=0)
+            )
+            max_xyz = (
+                max_
+                if max_xyz is None
+                else np.max(np.stack((max_xyz, max_), axis=0), axis=0)
+            )
+        return tuple(min_xyz), tuple(max_xyz)  # ty:ignore[invalid-argument-type]
+
     @property
     def projs_list_shape(self) -> tuple[int, ...]:
         """Return the broadcast shape of the projection list. If a flat list was provided, then this will be a 1-tuple like (N,)."""
@@ -533,6 +582,16 @@ class ProjectionSet:
         """Return the underlying ProjGeom object."""
         return self._proj_geom
 
+    # @functools.lru_cache(maxsize=100)
+    def get_bbox(
+        self, *, index_tuple: tuple[int, ...] | None = None
+    ) -> tuple[
+        tuple[float, float, float],
+        tuple[float, float, float],
+    ]:
+        """Return a bounding box."""
+        return self._proj_geom.get_bbox(index_tuple=index_tuple)
+
     @property
     def proj_specs(
         self,
@@ -740,10 +799,8 @@ def project(
         )
     if is_fb:
         assert type(volume) is FBVolume
-        input_shapes = cp.array(
-            volume.shapes, dtype=structs.FORBILD_volumes.Shape
-        )
-        input_num_shapes = np.uint32(input_shapes.size)
+        # Prune the volume
+        volume = volume.prune_to_bbox(*projs.get_bbox())
     input_proj_array_len = np.uint32(projs.data.shape[-3])
     input_proj_array_strides = np.array(
         projs.data.strides[-3:], dtype=structs.ulvec3.dtype
@@ -780,12 +837,24 @@ def project(
             # Each block will be given only the relevant shapes to deal with
             # Never mind: launching the kernel separately for each block
             # incurs massive overhead. 307.8ms --> 22837.4ms
+
+            # Prune the volume to the bounding box containing all the source points
+            # and corners of the detectors.
+            min_xyz, max_xyz = projs.get_bbox(index_tuple=index_tuple)
+            v_pruned: FBVolume = volume.prune_to_bbox(
+                tuple(min_xyz), tuple(max_xyz)
+            )
+            input_shapes_pruned = cp.array(
+                v_pruned.shapes, dtype=structs.FORBILD_volumes.Shape
+            )
+            input_num_shapes_pruned = np.uint32(input_shapes_pruned.size)
+
             args = (  # input args
                 config.contents_fb,
                 input_proj_specs_slice,
                 input_proj_array_len,
-                input_shapes,
-                input_num_shapes,
+                input_shapes_pruned,  # input_shapes,
+                input_num_shapes_pruned,  # input_num_shapes,
                 input_proj_array_strides,  # strides in bytes
                 input_proj_array_ptr,  # pointer to the beginning of the det data
             )
