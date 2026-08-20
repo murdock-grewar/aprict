@@ -92,6 +92,13 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         required=False,
         default=(0.0, 0.0, 0.0),
     )
+    group_geometry_options.add_argument(
+        "--cyl-mask-rad",
+        metavar="None",
+        type=lib.argparse_tools.MaybeType(float),
+        required=False,
+        default=None,
+    )
 
     group_data_preprocessing = parser.add_argument_group(
         title="data preprocessing"
@@ -559,7 +566,7 @@ def main() -> None:  # noqa: C901
     # This works fine when --volpos '(0,0,0)' and the volume is square, but not very good otherwise
     # cyl_mask_rad = vol.shape[0] / 2 * vol.voxwid
     # Set to reconstruction support radius instead
-    cyl_mask_rad = recon_support_radius
+    cyl_mask_rad = args.cyl_mask_rad or recon_support_radius
 
     # Initialise the configuration used for backprojection
     config_bp_ramp_onesided = cbfp.ConfigBackproject(
@@ -598,6 +605,7 @@ def main() -> None:  # noqa: C901
     ##########################################################
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
+    logger.info(f"cyl mask radius: {cyl_mask_rad:.5g}")
     logger.info(f"superres voxel width: {vol.voxwid!s:s}")
     logger.info(f"superres volume shape: {vol.shape!s:s}")
     logger.info(f"superres factor: {args.superres!s:s}")
