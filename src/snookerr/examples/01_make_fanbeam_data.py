@@ -187,7 +187,7 @@ def make_projection_data(
         v = snookerr.phantoms.FORBILD.HeadPhantom
         # convert distances from millimeters to centimeters
         v.scale_len(1 / 10)
-        v.multiply_attenuation(10)
+        # v.multiply_attenuation(10)  # nope, already accounted for
         # convert attenuation coefficient from multiples of water to multiples of 0.184 per cm
         v.multiply_attenuation(0.184)
     else:
