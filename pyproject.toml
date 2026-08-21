@@ -17,8 +17,8 @@ classifiers = [
     'Programming Language :: Python :: 3',
 ]
 dependencies = [
-    "cuda-core[cu13]>=0.7.0",
-    "cupy-cuda13x[ctk]>=14.0.1",
+    "cuda-core[cu13]~=0.7.0",
+    "cupy-cuda13x[ctk]>=14.2.0",  # the [ctk] extra installs a compatible version of CUDA-toolkit, rather than relying on the system installation of a compatible version. The version 14.2.0 is the minimum required for a cubin caching bugfix to be merged.
     "gpustat>=1.1.1",
     "imageio>=2.37.3",
     "numexpr>=2.14.1",
