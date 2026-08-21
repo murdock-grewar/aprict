@@ -150,8 +150,8 @@ def make_proj_geom(
             L_minus_R=args.L_minus_R,
             pix_widhei_at_isocenter=(
                 pixel_wid_mm,
-                pixel_wid_mm * 1e-6,
-            ),  # the actual pixel height isn't used in generating the projections in this script, due to the implementation details. The pixel height is here set to 1e-6 to indicate to the user that it's infinitely small.
+                pixel_wid_mm,
+            ),  # the actual pixel height isn't used in generating the projections in this script, due to the implementation details. The supersampling only happens laterally, because it's meant to simulate a true fan-beam geometry.
             num_pix_widhei=(det_numpixwid, det_numpixhei),
             theta_start=theta_start,
             arc_length_rads=args.arc_length,
