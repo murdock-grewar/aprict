@@ -555,7 +555,6 @@ def main() -> None:  # ruff: ignore[complex-structure]
         if args.fan_beam
         else tuple(n * args.superres for n in args.volshape)
     )
-    print(volshape)
     vol = Volume.zeros(
         volshape,
         voxwid=args.voxwid / args.superres,
