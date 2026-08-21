@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         "--pixwid-fovc",
         type=float,
         default=0.03,
-        help="The pixel width at isocenter. The physical detector width will be this times 1 + L/R.",
+        help="The pixel width at isocenter. The physical detector width will be this times L/R.",
     )
     parser.add_argument(
         "--detwid", type=float, default=35, help="Width of the detector."
@@ -111,6 +111,12 @@ def parse_args() -> argparse.Namespace:
         type=lib.argparse_tools.BoolArgType,
         default=False,
         help="Supply 'True' to additionally print some more information on stderr.",
+    )
+    parser.add_argument(
+        "--multiply-attenuation",
+        type=float,
+        default=1,
+        help="Multiply the input phantom's attenuation by this amount. The modified phantom will be saved to the artefact directory.",
     )
 
     return parser.parse_args()
@@ -187,11 +193,11 @@ def make_projection_data(
         v = snookerr.phantoms.FORBILD.HeadPhantom
         # convert distances from millimeters to centimeters
         v.scale_len(1 / 10)
-        # v.multiply_attenuation(10)  # nope, already accounted for
         # convert attenuation coefficient from multiples of water to multiples of 0.184 per cm
         v.multiply_attenuation(0.184)
     else:
         v = snookerr.FBVolume.load(args.phantom)
+    v.multiply_attenuation(args.multiply_attenuation)
     with open(path_fbv_pha, mode="w+", encoding="utf-8") as f:
         f.write(v.FORBILD_str)
     v = v.prune_to_bbox(*pg.get_bbox())  # Prune unused shapes in phantom
