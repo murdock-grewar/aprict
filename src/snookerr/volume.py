@@ -36,6 +36,7 @@ from .lib import (
     sample_FORBILD,
     texture_tools,
 )
+from .lib import process_pha_file as ppf
 from .lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
@@ -248,6 +249,11 @@ class FBVolume:
 
     def __init__(self, shapes: np.ndarray[np.dtype[fv.Shape]]) -> None:  # ty:ignore[invalid-type-arguments]
         self.shapes = shapes
+
+    @classmethod
+    def load(cls, path_to_pha: pathlib.Path) -> FBVolume:
+        """Load a *.pha file into an FBVolume type."""
+        return cls(ppf.convert_ph_file_to_shapes(path_to_pha))
 
     def to_cupy(
         self,

@@ -24,6 +24,7 @@ import json
 import logging  # ruff: ignore[typing-only-standard-library-import]
 import math
 import pathlib
+import typing
 
 import cupy as cp
 import numpy as np
@@ -565,6 +566,93 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
                 sps, func_det_broadcastable(dps, us, vs, nus, nvs, tps)
             ),
             dtype=structs.proj_spec,
+        )
+
+    @classmethod
+    def new_circular_scan(
+        cls,
+        *,
+        num_source_points: int,
+        R: float,  # ruff: ignore[invalid-argument-name]
+        L_minus_R: float,  # ruff: ignore[invalid-argument-name]
+        pix_widhei_at_isocenter: tuple[float, float],
+        # Mutually exclusive:
+        det_widhei: tuple[float, float] | None = None,
+        num_pix_widhei: tuple[int, int] | None = None,
+        # Optionals:
+        theta_start: float = 0,
+        arc_length_rads: float = 2 * np.pi,
+        isocenter: list[float]
+        | tuple[float, float, float]
+        | np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]] = (
+            0,
+            0,
+            0,
+        ),
+    ) -> ProjGeom:
+        """Create a new circular ProjGeom object."""
+        # Check validity of mutually exclusive arguments
+        if det_widhei is None and num_pix_widhei is None:
+            msg = "Exactly one of 'det_widhei' and 'num_pix_widhei' must be specified."
+            raise ValueError(msg)
+        if det_widhei is not None and num_pix_widhei is not None:
+            msg = "Exactly one of 'det_widhei' and 'num_pix_widhei' must be specified."
+            raise ValueError(msg)
+
+        # Normalise inputs
+        L: float = R + L_minus_R  # ruff: ignore[non-lowercase-variable-in-function]
+        if det_widhei is None:
+            assert num_pix_widhei is not None
+            px, py = pix_widhei_at_isocenter
+            nx, ny = num_pix_widhei
+            det_widhei = (px * L / R * nx, py * L / R * ny)
+        else:
+            assert det_widhei is not None
+            dx, dy = det_widhei
+            px, py = pix_widhei_at_isocenter
+            px, py = px * L / R, py * L / R
+            num_pix_widhei = (math.ceil(dx / px), math.ceil(dy / py))
+
+        # Unpack tuples
+        pix_wid_at_isocenter, pix_hei_at_isocenter = pix_widhei_at_isocenter
+        det_wid, det_hei = det_widhei  # ruff: ignore[unused-unpacked-variable]
+
+        pixel_wid = (L / R) * pix_wid_at_isocenter
+        pixel_hei = (L / R) * pix_hei_at_isocenter
+        det_numpixwid, det_numpixhei = num_pix_widhei
+
+        zs = np.zeros((num_source_points,), dtype=np.float64)
+        ts = np.linspace(
+            theta_start,
+            theta_start + arc_length_rads,
+            endpoint=False,
+            num=num_source_points,
+            dtype=np.float64,
+        )
+        source_pos_arr = np.array(
+            [R * np.cos(ts), R * np.sin(ts), zs], dtype=np.float64
+        ).transpose()
+        det_pos_arr = source_pos_arr * np.array(
+            [[1 - L / R, 1 - L / R, 1]], dtype=np.float64
+        )
+        # Translate to isocenter position
+        source_pos_arr += np.array(isocenter)[np.newaxis, :]
+        det_pos_arr += np.array(isocenter)[np.newaxis, :]
+        # Define pixel coordinate vectors
+        det_uvec_arr = (
+            pixel_wid
+            * np.array(
+                [-np.sin(ts), np.cos(ts), 0 * ts], dtype=np.float64
+            ).transpose()
+        )
+        det_vvec_arr = pixel_hei * np.array([[0, 0, -1]], dtype=np.float64)
+        return cls(
+            source_pos=source_pos_arr,
+            det_pos=det_pos_arr,
+            det_uvec=det_uvec_arr,
+            det_vvec=det_vvec_arr,
+            nu=det_numpixwid,
+            nv=det_numpixhei,
         )
 
 
