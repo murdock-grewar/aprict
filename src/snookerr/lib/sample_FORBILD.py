@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -72,7 +72,7 @@ def _get_grid_block_dims(
     block_dims: tuple[int, int, int] = tuple(map(min, shape, _BLOCKDIMS))  # ty:ignore[invalid-assignment]
     grid_dims: tuple[int, int, int] = tuple(
         map(lambda s, b: math.ceil(s / b), shape, block_dims)
-    )
+    )  # ty: ignore[invalid-assignment]  # ty not smart enough to figure this out
     return grid_dims, block_dims
 
 
@@ -81,7 +81,7 @@ def _get_c_type_name(arr: np.ndarray | cp.ndarray) -> str:
     return _c_type_name_dict[arr.dtype]
 
 
-def sample_FORBILD(  # noqa: C901, N802
+def sample_FORBILD(  # ruff: ignore[complex-structure, invalid-function-name]
     shapes: list[fv.Shape] | np.ndarray[np.dtype[fv.Shape]],  # ty:ignore[invalid-type-arguments]
     xs: np.ndarray,
     ys: np.ndarray,

@@ -83,12 +83,12 @@ def compile_module(
         with open(p, "wb") as f:
             f.write(module_ptx.code)
             # print("ptx_cacher: generated new PTX at", p)
-            # TODO: add a log line here indicating that a new PTX has been generated  # noqa: FIX002
+            # TODO: add a log line here indicating that a new PTX has been generated  # ruff: ignore[line-contains-todo]
     return module_ptx
     # module_ptx.symbol_mapping  # doesn't seem to be necessary to get this mapping or do anything with it.
 
 
-def main(args: list[str]) -> None:  # noqa: D103
+def main(args: list[str]) -> None:  # ruff: ignore[undocumented-public-function]
     if "flush" in args:
         flush_cache()
 

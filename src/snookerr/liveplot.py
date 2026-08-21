@@ -1,4 +1,4 @@
-# liveplot.py  # noqa: D100
+# liveplot.py  # ruff: ignore[undocumented-public-module]
 # Copyright (C) 2024-2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -27,7 +27,7 @@ from pyqtgraph.Qt.QtCore import QThread, pyqtSignal, pyqtSlot
 from pyqtgraph.Qt.QtWidgets import QApplication, QGridLayout, QWidget
 
 
-# ruff: disable[D101,D102,D103,ANN201,ANN204]
+# ruff: disable[undocumented-public-class,undocumented-public-method,undocumented-public-function,missing-return-type-undocumented-public-function,missing-return-type-special-method]
 # fmt: off
 class QLivePlotInstruction(enum.Enum):
     UPDATE_IMAGE    = 0
@@ -75,7 +75,7 @@ class QLivePlot(QWidget):
     def do_action(
         self,
         instruction: QLivePlotInstruction,
-        data: typing.Any,  # noqa: ANN401
+        data: typing.Any,  # ruff: ignore[any-type]
     ) -> None:
         match instruction:
             case QLivePlotInstruction.UPDATE_IMAGE:
@@ -114,7 +114,7 @@ class QLivePlotWindow(QtWidgets.QMainWindow):
         show and self.show()
 
     @pyqtSlot(QLivePlotInstruction, object)
-    def do_action(self, instruction: QLivePlotInstruction, data: typing.Any):  # noqa: ANN401
+    def do_action(self, instruction: QLivePlotInstruction, data: typing.Any):  # ruff: ignore[any-type]
         match instruction:
             case QLivePlotInstruction.WIN_SET_VISIBLE:
                 self.setVisible(data)
@@ -187,7 +187,7 @@ class QLivePlotInstructionDispatcher:
     def manual_instruction(
         self,
         instruction: QLivePlotInstruction,
-        data: typing.Any,  # noqa: ANN401
+        data: typing.Any,  # ruff: ignore[any-type]
     ):
         self.pipe_out.send((instruction, data))
 
@@ -218,4 +218,4 @@ def start_live_plot_2d(
     return p, instruction_dispatcher
 
 
-# ruff: enable[D101,D102,D103,ANN201,ANN204]
+# ruff: enable[undocumented-public-class,undocumented-public-method,undocumented-public-function,missing-return-type-undocumented-public-function,missing-return-type-special-method]

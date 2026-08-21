@@ -15,16 +15,16 @@
 
 """Tests for the CB projection kernel(s)."""
 
-# ruff: disable[D101,D102,N801,ANN201]
-import itertools  # noqa: I001
-import time  # noqa: F401
+# ruff: disable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]
+import itertools  # ruff: ignore[unsorted-imports]
+import time  # ruff: ignore[unused-import]
 
 import cupy as cp
 import numexpr as ne
 import numpy as np
 import pytest
 
-from ... import imview  # noqa: F401, RUF100
+from ... import imview  # ruff: ignore[unused-import]
 from ...cuda import header_injection
 
 from ...cuda.structs import (
@@ -43,7 +43,7 @@ from ... import phantoms
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
-def create_injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
+def create_injected_module_sharedmem() -> cp.RawModule:  # ruff: ignore[undocumented-public-function]
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_sharedmem.cu",
@@ -63,11 +63,11 @@ def create_injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
 
 
 @pytest.fixture
-def injected_module_sharedmem() -> cp.RawModule:  # noqa: D103
+def injected_module_sharedmem() -> cp.RawModule:  # ruff: ignore[undocumented-public-function]
     return create_injected_module_sharedmem()
 
 
-def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
+def injected_module_texture_chunked() -> cp.RawModule:  # ruff: ignore[undocumented-public-function]
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_texture_chunked.cu",
@@ -272,7 +272,7 @@ class TestCB_sharedmem_randomnoise:
         [[18, 18, 18]],
         ids=["18x18x18"],
     )
-    def test_project(self, blockdims: list[int | None]) -> None:
+    def test_project(self, blockdims: list[int]) -> None:
         vol = self.vol
         config = self.config
         projspec_array = self.projspec_array
@@ -280,7 +280,7 @@ class TestCB_sharedmem_randomnoise:
         num_projs = self.num_projs
         output_projs_strides_bytes = self.output_projs_strides_bytes
         dethei = self.dethei
-        detwid = self.detwid  # noqa: F841
+        detwid = self.detwid  # ruff: ignore[unused-variable]
         # Prepare the kernel
         blockx = 10
         blocky = 10
@@ -398,7 +398,7 @@ class TestCB_texture_randomnoise:
             output_projs.strides, dtype=ks_ulvec3.dtype
         )
         # Very short volume.
-        vol = np.abs(np.random.randn(501, 500, 20).astype(np.float32)).copy()  # noqa: NPY002
+        vol = np.abs(np.random.randn(501, 500, 20).astype(np.float32)).copy()  # ruff: ignore[numpy-legacy-random]
         vtex = texture_tools.Texture(
             vol,
             address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
@@ -437,7 +437,7 @@ class TestCB_texture_randomnoise:
         num_projs = self.num_projs
         output_projs_strides_bytes = self.output_projs_strides_bytes
         dethei = self.dethei
-        detwid = self.detwid  # noqa: F841
+        detwid = self.detwid  # ruff: ignore[unused-variable]
         # Prepare the kernel
         blockx = 10
         blocky = 10
@@ -535,8 +535,8 @@ class TestCB_texture_randomnoise:
 )
 class TestCB_texture_FORBILD:
     @pytest.fixture(scope="function", autouse=True)
-    def setup_and_teardown(self, volres: int, dtype_vol: np.dtype, request):  # noqa: ANN001
-        test_id: str = request.node.callspec.id  # noqa: F841
+    def setup_and_teardown(self, volres: int, dtype_vol: np.dtype, request):  # ruff: ignore[missing-type-function-argument]
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD phantom.
         fbv = phantoms.FORBILD.HeadPhantom
@@ -621,7 +621,7 @@ class TestCB_texture_FORBILD:
         # imview.plot_projections(self.output_projs, title=test_id)
         self.output_projs.fill(0)
 
-    def test_project(self, volres: int) -> None:  # noqa: ARG002
+    def test_project(self, volres: int) -> None:  # ruff: ignore[unused-method-argument]
         # Prepare the kernel
         blockx = 10
         blocky = 10
@@ -659,4 +659,4 @@ class TestCB_texture_FORBILD:
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
-# ruff: enable[D101,D102,N801,ANN201]
+# ruff: enable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]

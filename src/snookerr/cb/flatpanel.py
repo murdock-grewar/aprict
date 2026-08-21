@@ -21,13 +21,13 @@ import dataclasses
 import functools
 import itertools
 import json
-import logging  # noqa: TC003
+import logging  # ruff: ignore[typing-only-standard-library-import]
 import math
 import pathlib
 
 import cupy as cp
 import numpy as np
-import numpy.typing as npt  # noqa: F401
+import numpy.typing as npt  # ruff: ignore[unused-import]
 
 from .. import logtools
 from ..cuda import header_injection, structs
@@ -106,8 +106,8 @@ _projection_module: cp.RawModule = _injected_module_project_texture_chunked()
 _backprojection_module: cp.RawModule = _injected_module_backproject()
 
 
-def _select_projection_kernel(  # noqa: ANN202
-    config: ConfigProject,  # noqa: ARG001
+def _select_projection_kernel(  # ruff: ignore[missing-return-type-private-function]
+    config: ConfigProject,  # ruff: ignore[unused-function-argument]
     volume: Volume | FBVolume,
     projs: ProjectionSet,
 ):
@@ -130,8 +130,8 @@ def _select_projection_kernel(  # noqa: ANN202
     raise RuntimeError(msg)
 
 
-def _select_backprojection_kernel(  # noqa: ANN202
-    config: ConfigBackproject,  # noqa: ARG001
+def _select_backprojection_kernel(  # ruff: ignore[missing-return-type-private-function]
+    config: ConfigBackproject,  # ruff: ignore[unused-function-argument]
     volume: Volume,
     projs: ProjectionSet,
 ):
@@ -182,7 +182,7 @@ def _assert_flatpanel_geometry_consistency(
 @dataclasses.dataclass(
     kw_only=True
 )  # making it a dataclass is somewhat useful, despite implementing the __init__ method explicitly
-class ProjGeom:  # noqa: PLW1641
+class ProjGeom:  # ruff: ignore[eq-without-hash]
     """A dataclass representing a geometry for a set of cone-beam projections."""
 
     source_pos: np.ndarray[tuple[int, ...], np.dtype[np.floating]]
@@ -277,11 +277,11 @@ class ProjGeom:  # noqa: PLW1641
                 if max_xyz is None
                 else np.max(np.stack((max_xyz, max_), axis=0), axis=0)
             )
-        return tuple(min_xyz), tuple(max_xyz)  # ty:ignore[invalid-argument-type]
+        return tuple(min_xyz), tuple(max_xyz)
 
     @property
     def projs_list_shape(self) -> tuple[int, ...]:
-        """Return the broadcast shape of the projection list. If a flat list was provided, then this will be a 1-tuple like (N,)."""
+        """The broadcast shape of the projection list. If a flat list was provided, then this will be a 1-tuple like (N,)."""
         return np.broadcast_shapes(
             self.source_pos.shape[:-1],
             self.det_pos.shape[:-1],
@@ -293,7 +293,7 @@ class ProjGeom:  # noqa: PLW1641
 
     @property
     def num_projs(self) -> int:
-        """Return the number of cone-beam projections."""
+        """The number of cone-beam projections."""
         return math.prod(self.projs_list_shape)
 
     def sliced(
@@ -386,7 +386,7 @@ class ProjGeom:  # noqa: PLW1641
             nv=self.nv,
         )
 
-    def __eq__(self, other) -> bool:  # noqa: ANN001, C901, D105
+    def __eq__(self, other) -> bool:  # ruff: ignore[missing-type-function-argument, complex-structure, undocumented-magic-method]
         if not isinstance(other, ProjGeom):
             return False
         d1 = dataclasses.asdict(self)
@@ -414,7 +414,7 @@ class ProjGeom:  # noqa: PLW1641
                 raise ValueError(msg)
         return True
 
-    def __ne__(self, other) -> bool:  # noqa: ANN001, D105
+    def __ne__(self, other) -> bool:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         if not isinstance(other, ProjGeom):
             return True
         return not self.__eq__(other)
@@ -491,7 +491,7 @@ class ProjGeom:  # noqa: PLW1641
         """Get a json dictionary representing this object."""
         # return dataclasses.asdict(self)
         pgs: ProjGeom._ProjGeomSerializable = self._pgserializable
-        return pgs._save_to_dict()  # noqa: SLF001
+        return pgs._save_to_dict()  # ruff: ignore[private-member-access]
 
     def json_str(self) -> str:
         """Get a json string representing this object."""
@@ -533,7 +533,7 @@ class ProjGeom:  # noqa: PLW1641
         self,
     ) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
         """Create a proj_spec array for use in creating a ProjectionSet object."""
-        convert_to_fvec3 = lambda a: np.apply_along_axis(  # noqa: E731
+        convert_to_fvec3 = lambda a: np.apply_along_axis(  # ruff: ignore[lambda-assignment]
             lambda arr: np.array(tuple(arr), dtype=structs.fvec3),
             axis=-1,
             arr=a,
@@ -549,13 +549,13 @@ class ProjGeom:  # noqa: PLW1641
         nvs = np.array(pg.nv, dtype=np.uint32)
         tps = np.array(np.uint(0), dtype=np.uint8)
 
-        def func_det(*args):  # noqa: ANN002, ANN202
+        def func_det(*args):  # ruff: ignore[missing-type-args, missing-return-type-private-function]
             return np.array(tuple(args), dtype=structs.det_spec)
 
         func_det_broadcastable = np.frompyfunc(func_det, nin=6, nout=1)
 
         # func_det_broadcastable = np.vectorize(func_det)
-        def func_proj(*args):  # noqa: ANN002, ANN202
+        def func_proj(*args):  # ruff: ignore[missing-type-args, missing-return-type-private-function]
             return np.array(tuple(args), dtype=structs.proj_spec)
 
         func_proj_broadcastable = np.frompyfunc(func_proj, nin=2, nout=1)
@@ -579,7 +579,7 @@ class ProjectionSet:
 
     @property
     def proj_geom(self) -> ProjGeom:
-        """Return the underlying ProjGeom object."""
+        """The underlying ProjGeom object."""
         return self._proj_geom
 
     # @functools.lru_cache(maxsize=100)
@@ -596,7 +596,7 @@ class ProjectionSet:
     def proj_specs(
         self,
     ) -> np.ndarray[tuple[int, ...], np.dtype[structs.proj_spec]]:  # ty:ignore[invalid-type-arguments]
-        """Return the underlying proj_specs object, which is derived from the underlying ProjGeom object."""
+        """The underlying proj_specs object, which is derived from the underlying ProjGeom object."""
         return self._proj_specs
 
     @property
@@ -608,7 +608,7 @@ class ProjectionSet:
         ]
         | None
     ):
-        """Return the underlying cupy array."""
+        """The underlying cupy array."""
         return self._data  # .copy() -- Too expensive to make a copy.
 
     def __init__(
@@ -674,12 +674,12 @@ class ConfigProject:
 
     @property
     def contents(self) -> np.dtype[structs.config_cb_project]:  # ty:ignore[invalid-type-arguments]
-        """Get the configuration object underlying this object."""
+        """The configuration object underlying this object."""
         return self._contents.copy()  # ty:ignore[unresolved-attribute]
 
     @property
     def contents_fb(self) -> np.dtype[structs.config_cb_project_FORBILD]:  # ty:ignore[invalid-type-arguments]
-        """Get the configuration object underlying this object."""
+        """The configuration object underlying this object."""
         return self._contents_fb.copy()  # ty:ignore[unresolved-attribute]
 
     def __init__(
@@ -707,7 +707,7 @@ class ConfigBackproject:
 
     @property
     def contents(self) -> np.dtype[structs.config_cb_backproject]:  # ty:ignore[invalid-type-arguments]
-        """Get the configuration object underlying this object."""
+        """The configuration object underlying this object."""
         return self._contents.copy()  # ty:ignore[unresolved-attribute]
 
     def __init__(
@@ -718,9 +718,9 @@ class ConfigBackproject:
         backproject_1s: bool = False,
         apply_summand_multiplier: bool = False,
         soften_det_edges_proportion: float | int | None = None,
-        Z_on_L_factor_power: int = 0,  # noqa: N803
-        Z_on_val_factor_power: int = 0,  # noqa: N803
-        Z_on_val_factor_val: float = 1,  # noqa: N803
+        Z_on_L_factor_power: int = 0,  # ruff: ignore[invalid-argument-name]
+        Z_on_val_factor_power: int = 0,  # ruff: ignore[invalid-argument-name]
+        Z_on_val_factor_val: float = 1,  # ruff: ignore[invalid-argument-name]
         approx_mode_direct_raycast: bool = False,
         approx_mode_bilinear_interpolate: bool = False,
         backproj_weighting_preset: int = 0,
@@ -866,7 +866,7 @@ def project(
                 input_proj_specs_slice,
                 input_proj_array_len,
                 texchunkspec,
-                volume._texture.surfobj,  # noqa: SLF001
+                volume._texture.surfobj,  # ruff: ignore[private-member-access]
                 input_proj_array_strides,  # strides in bytes
                 input_proj_array_ptr,  # pointer to the beginning of the det data
             )
@@ -992,10 +992,10 @@ def backproject(
                 args = (  # input args
                     config.contents,
                     texchunkspec,
-                    volume._texture.surfobj,  # noqa: SLF001
+                    volume._texture.surfobj,  # ruff: ignore[private-member-access]
                     None
                     if summand_multiplier is None
-                    else summand_multiplier._texture.surfobj,  # noqa: SLF001
+                    else summand_multiplier._texture.surfobj,  # ruff: ignore[private-member-access]
                     input_proj_chunk_spec,
                 )
                 kern(grid_dims, block_dims, args)

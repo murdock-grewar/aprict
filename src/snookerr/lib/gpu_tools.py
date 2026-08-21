@@ -64,7 +64,7 @@ class UtilisationAveragePercMon:
 
     @property
     def gpu_perc(self) -> float | None:
-        """Return average percentage utilisation of the configured GPUs."""
+        """Average percentage utilisation of the configured GPUs."""
         tim = float(time.time())
         if self.last_time is None or (
             self.last_time <= (tim - self.interval_seconds)

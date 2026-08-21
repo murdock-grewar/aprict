@@ -22,7 +22,7 @@ import itertools
 import multiprocessing
 import operator
 import os
-import pathlib  # noqa: TC003
+import pathlib  # ruff: ignore[typing-only-standard-library-import]
 import re
 import sys
 
@@ -81,13 +81,13 @@ def _preprocess_str(s: str) -> str:
     return oh.getvalue()
 
 
-def convert_ph_file_to_shapes(  # noqa: D103
+def convert_ph_file_to_shapes(  # ruff: ignore[undocumented-public-function]
     fn: str | pathlib.Path,
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
     return _convert_preprocessed_ph_str_to_shapes(_preprocess_file(fn))
 
 
-def convert_ph_str_to_shapes(  # noqa: D103
+def convert_ph_str_to_shapes(  # ruff: ignore[undocumented-public-function]
     s: str, skip_preprocessing: bool = False
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
     if skip_preprocessing:
@@ -203,10 +203,10 @@ def _remove_spaces_from_parentheticals(s: str) -> str:
 
 
 # Need this to be at the top-level so it can be used in multiprocessing.Pool.map
-def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
+def _objs_to_shape(objs):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function, complex-structure]
     shape_objs = []
     for obj in objs:
-        obj = _remove_spaces_from_parentheticals(obj)  # noqa: PLW2901
+        obj = _remove_spaces_from_parentheticals(obj)  # ruff: ignore[redefined-loop-name]
         shape = re_shape.findall(obj)[0]
         remaining = re_shape.sub("", obj)
         remaining_properties = re_key.findall(remaining)
@@ -216,7 +216,7 @@ def _objs_to_shape(objs):  # noqa: ANN001, ANN202, C901
 
         # Construct an empty object of the correct type
         shape_obj = np.array(0, dtype=fv.Shape)
-        shape_obj["type"] = fv._dict_shape_name_to_type_num[shape_name]  # noqa: SLF001
+        shape_obj["type"] = fv._dict_shape_name_to_type_num[shape_name]  # ruff: ignore[private-member-access]
         # Fill the shape with the found properties
         for k, v in [
             prop.split("=") for prop in shape_properties + remaining_properties

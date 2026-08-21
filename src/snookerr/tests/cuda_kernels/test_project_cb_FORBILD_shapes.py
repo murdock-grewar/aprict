@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,15 +16,15 @@
 
 """Tests for the CB projection kernel(s)."""
 
-# ruff: disable[D101,D102,N801,ANN201]
-import itertools  # noqa: I001
-import time  # noqa: F401
+# ruff: disable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]
+import itertools  # ruff: ignore[unsorted-imports]
+import time  # ruff: ignore[unused-import]
 
 import cupy as cp
 import numpy as np
 import pytest
 
-from ... import imview  # noqa: F401, RUF100
+from ... import imview  # ruff: ignore[unused-import]
 from ...cuda import header_injection
 from ...lib import gpu_tools
 
@@ -40,7 +40,7 @@ from ...cuda.structs import (
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
-def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
+def injected_module_texture_chunked() -> cp.RawModule:  # ruff: ignore[undocumented-public-function]
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_texture_chunked.cu",
@@ -100,17 +100,17 @@ class TestCB_FORBILD_spheres:
         numspheres: int,
         add_attenuations: bool,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD boxes
         shapes = []
         spheres = []
         for _ in range(numspheres):
-            x, y, z = 10 * np.random.randn(3)  # noqa: NPY002
-            r = np.random.uniform(10, 10)  # noqa: NPY002
-            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
+            x, y, z = 10 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            r = np.random.uniform(10, 10)  # ruff: ignore[numpy-legacy-random]
+            atten_coeff = np.random.uniform(0, 3)  # ruff: ignore[numpy-legacy-random]
             spheres.append(
                 np.array(
                     (atten_coeff, x, y, z, r),
@@ -252,19 +252,19 @@ class TestCB_FORBILD_boxes:
         numboxes: int,
         add_attenuations: bool,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD spheres
         shapes = []
         boxes = []
         for _ in range(numboxes):
-            x, y, z = 10 * np.random.randn(3)  # noqa: NPY002
-            dx = np.random.uniform(1, 10)  # noqa: NPY002
-            dy = np.random.uniform(1, 10)  # noqa: NPY002
-            dz = np.random.uniform(1, 10)  # noqa: NPY002
-            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
+            x, y, z = 10 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            dx = np.random.uniform(1, 10)  # ruff: ignore[numpy-legacy-random]
+            dy = np.random.uniform(1, 10)  # ruff: ignore[numpy-legacy-random]
+            dz = np.random.uniform(1, 10)  # ruff: ignore[numpy-legacy-random]
+            atten_coeff = np.random.uniform(0, 3)  # ruff: ignore[numpy-legacy-random]
             s = np.array(0, dtype=structs.FORBILD_volumes.Shape)
             s["type"] = 13  # sphere type is 13
             boxes.append(
@@ -407,19 +407,19 @@ class TestCB_FORBILD_cyls:
         numcyls: int,
         add_attenuations: bool,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD cylinders
         shapes = []
         cyls = []
         for _ in range(numcyls):
-            x, y, z = 6 * np.random.randn(3)  # noqa: NPY002
-            r = np.random.uniform(1, 5)  # noqa: NPY002
-            l = np.random.uniform(1, 10)  # noqa: NPY002
-            ax, ay, az = np.random.randn(3)  # noqa: NPY002
-            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
+            x, y, z = 6 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            r = np.random.uniform(1, 5)  # ruff: ignore[numpy-legacy-random]
+            l = np.random.uniform(1, 10)  # ruff: ignore[numpy-legacy-random]
+            ax, ay, az = np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            atten_coeff = np.random.uniform(0, 3)  # ruff: ignore[numpy-legacy-random]
             s = np.array(0, dtype=structs.FORBILD_volumes.Shape)
             s["type"] = 13  # sphere type is 13
             axis = np.array((ax, ay, az), dtype=structs.fvec3)
@@ -564,18 +564,18 @@ class TestCB_FORBILD_ellipsoids:
         numellipsoids: int,
         add_attenuations: bool,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841, RUF100
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD cylinders
         ellipsoids = []
         for _ in range(numellipsoids):
-            x, y, z = 6 * np.random.randn(3)  # noqa: NPY002
-            dx, dy, dz = 3 * np.random.randn(3)  # noqa: NPY002
-            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
-            a_x = np.random.randn(3)  # noqa: NPY002
-            a_y = np.random.randn(3)  # noqa: NPY002
+            x, y, z = 6 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            dx, dy, dz = 3 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            atten_coeff = np.random.uniform(0, 3)  # ruff: ignore[numpy-legacy-random]
+            a_x = np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            a_y = np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
             a_y -= (a_x / np.linalg.norm(a_x)) * np.dot(
                 a_x / np.linalg.norm(a_x), a_y
             )
@@ -720,19 +720,19 @@ class TestCB_FORBILD_cones:
         numcones: int,
         add_attenuations: bool,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841, RUF100
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD cylinders
         cones = []
         for _ in range(numcones):
-            x, y, z = 6 * np.random.randn(3)  # noqa: NPY002
-            l = np.random.uniform(1, 4)  # noqa: NPY002
-            r1 = np.random.uniform(0, 4)  # noqa: NPY002
-            r2 = np.random.uniform(0, 4)  # noqa: NPY002
-            atten_coeff = np.random.uniform(0, 3)  # noqa: NPY002
-            axis = np.array(tuple(np.random.randn(3)), dtype=structs.fvec3)  # noqa: NPY002
+            x, y, z = 6 * np.random.randn(3)  # ruff: ignore[numpy-legacy-random]
+            l = np.random.uniform(1, 4)  # ruff: ignore[numpy-legacy-random]
+            r1 = np.random.uniform(0, 4)  # ruff: ignore[numpy-legacy-random]
+            r2 = np.random.uniform(0, 4)  # ruff: ignore[numpy-legacy-random]
+            atten_coeff = np.random.uniform(0, 3)  # ruff: ignore[numpy-legacy-random]
+            axis = np.array(tuple(np.random.randn(3)), dtype=structs.fvec3)  # ruff: ignore[numpy-legacy-random]
             cone = np.array(
                 (atten_coeff, x, y, z, l, r1, r2, axis),
                 dtype=structs.FORBILD_volumes.Cone,
@@ -839,4 +839,4 @@ class TestCB_FORBILD_cones:
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
-# ruff: enable[D101,D102,N801,ANN201]
+# ruff: enable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]

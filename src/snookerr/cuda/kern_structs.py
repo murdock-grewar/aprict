@@ -26,7 +26,7 @@ import typing
 import cupy as cp
 import numpy as np
 import numpy.typing as npt
-from cuda.core import (  # noqa: F401
+from cuda.core import (  # ruff: ignore[unused-import]
     Device,
     LaunchConfig,
     ObjectCode,
@@ -37,10 +37,10 @@ from cuda.core import (  # noqa: F401
 
 from . import dtype_cacher, ptx_cacher
 
-_valid_C_identifier_regex = re.compile(r"[_a-zA-Z]+\w*")  # noqa: N816
+_valid_C_identifier_regex = re.compile(r"[_a-zA-Z]+\w*")  # ruff: ignore[mixed-case-variable-in-global-scope]
 
 # fmt: off
-_np_dtype_to_c_type = {
+_np_dtype_to_c_type: dict[np.dtype, str] = {
     np.dtype(np.bool):          "bool",
     np.dtype(np.int8):          "char",
     np.dtype(np.uint8):         "unsigned char",
@@ -118,7 +118,7 @@ class KernelStruct[T: np.dtype[typing.Any]](
             else:
                 actual_dtype = dtype
             if issubclass(actual_dtype, KernelStruct):  # ty:ignore[invalid-argument-type]
-                return dtype_to_cname_dict[actual_dtype]  # ty:ignore[invalid-argument-type]
+                return dtype_to_cname_dict[actual_dtype]  # ty: ignore[invalid-argument-type]
             return dtype_to_cname_dict[np.dtype(actual_dtype)]
 
         def get_fieldname(
@@ -273,7 +273,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             f.write(cls.struct_definition_c)
             f.write(end)
 
-    def __init_subclass__(  # noqa: D105
+    def __init_subclass__(  # ruff: ignore[undocumented-magic-method]
         cls,
         struct_name: str,
         *,
@@ -342,7 +342,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             dtype_to_cname_dict,
             struct_name,
             insert_into_struct,
-            *tuples_type_name,
+            *tuples_type_name,  # ty: ignore[invalid-argument-type]
         ) + ("" if extra_code is None else extra_code)
 
         # If the dtype isn't in the cache, then generate it now.
@@ -368,7 +368,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
                 struct_name,
                 force_dependencies,
                 insert_into_struct,
-                *tuples_type_name,
+                *tuples_type_name,  # ty: ignore[invalid-argument-type]
             )
             # kernel((1,), (1,), (itemsize, sizes, offsets))
 

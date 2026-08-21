@@ -30,13 +30,13 @@ from . import test_cusrc
 def ks() -> type[kern_structs.KernelStruct]:
     """Create a custom numpy dtype."""
 
-    class Config_Sum(  # noqa: N801
+    class Config_Sum(  # ruff: ignore[invalid-class-name]
         kern_structs.KernelStruct,
         struct_name="Config_Sum",
         names=["alternate_sign", "multiply_first_term"],
-        dtypes=[np.bool, np.int8],
+        dtypes=[np.bool, np.int8],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     ):
-        pass  # ty:ignore[invalid-argument-type]
+        pass
 
     return Config_Sum
 
@@ -91,13 +91,13 @@ __global__ void sumsqs(Config_Sum config, T* vec, int len, T* output_num) {
 
 
 @pytest.mark.dependency(name="ks_01")
-def test_compile_module(module) -> None:  # noqa: ANN001
+def test_compile_module(module) -> None:  # ruff: ignore[missing-type-function-argument]
     """Test if the given module can be compiled."""
     module.compile()
 
 
 @pytest.mark.dependency(name="ks_02", depends=["ks_01"])
-def test_run_kernel_float_with_kernelstruct(ks, module) -> None:  # noqa: ANN001
+def test_run_kernel_float_with_kernelstruct(ks, module) -> None:  # ruff: ignore[missing-type-function-argument]
     """Test a basic kernel using a custom structure."""
     kern_float = module.get_function("sumsqs<float>")
     # Create an 'array' which is just a bare value; not really an array

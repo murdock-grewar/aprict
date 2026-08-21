@@ -33,7 +33,7 @@ path_to_generated_cusrc = pathlib.Path(str(data.__path__[0])).joinpath("cusrc")
 path_to_template_cusrc = pathlib.Path(str(cusrc_templates.__path__[0]))
 
 
-def import_module_rel_name(module_rel_name: str, anchor, is_pkg: bool = True):  # noqa: ANN001, ANN202
+def import_module_rel_name(module_rel_name: str, anchor, is_pkg: bool = True):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
     module_name = anchor.__name__ + module_rel_name
     anchor_path = pathlib.Path(anchor.__path__[0])
     if is_pkg:
@@ -55,7 +55,7 @@ def import_module_rel_name(module_rel_name: str, anchor, is_pkg: bool = True):  
     return module
 
 
-def import_submodules(package, anchor, recursive=True):  # noqa: ANN001, ANN202
+def import_submodules(package, anchor, recursive=True):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
     results = {}
     for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
         full_name = package.__name__ + "." + name
@@ -81,7 +81,7 @@ def generate_headers(
             continue
         # Get the KernelStruct objects from the file
         kernstructs: list[tuple[str, KernelStruct]] = list(
-            inspect.getmembers(submod, KernelStruct._issubclass)  # noqa: SLF001
+            inspect.getmembers(submod, KernelStruct._issubclass)  # ruff: ignore[private-member-access]
         )
         if not include_dependencies:
             # Filter out the structs imported into the file.

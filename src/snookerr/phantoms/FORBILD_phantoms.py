@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -29,10 +29,10 @@ from ..cuda.structs import FORBILD_volumes as fv
 from ..lib import process_pha_file as ppf
 from ..volume import FBVolume
 
-path_to_FORBILD_src = pathlib.Path(str(data.__path__[0])).joinpath("FORBILD")  # noqa: N816
+path_to_FORBILD_src = pathlib.Path(str(data.__path__[0])).joinpath("FORBILD")  # ruff: ignore[mixed-case-variable-in-global-scope]
 
 
-# ruff: disable[N802,D400]
+# ruff: disable[invalid-function-name,missing-trailing-period]
 
 
 class _MetaPhantomContainer(type):
@@ -102,7 +102,7 @@ class _MetaPhantomContainer(type):
         v = v.superimpose_onto(ab)
         v = v.superimpose_onto(hi)
         v = v.superimpose_onto(cavity)
-        return v  # noqa: RET504
+        return v  # ruff: ignore[unnecessary-assign]
 
     @property
     def JawPhantom(cls) -> FBVolume:
@@ -213,7 +213,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
     """A container for the phantom objects."""
 
     @classmethod
-    def _LungPhantom_phastring(  # noqa: C901
+    def _LungPhantom_phastring(  # ruff: ignore[complex-structure]
         cls,
         generation: int,
         scale_factor: float
@@ -518,7 +518,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         return fbv
 
     @classmethod
-    def TallRockPhantom(  # noqa: C901
+    def TallRockPhantom(  # ruff: ignore[complex-structure]
         cls,
         num_interior_objects: int = 10000,
         *,
@@ -553,7 +553,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         # Make rock container -- it will be contained within the radius r,
         # but will be a little smaller and have randomised position
         cyl_outer = np.array(0, dtype=fv.Shape)
-        cyl_outer["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+        cyl_outer["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
         cyl_outer["r"] = outer_radius
         cyl_outer["x"] = offset_x
         cyl_outer["y"] = offset_y
@@ -564,7 +564,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             cyl_outer["r"] = (outer_radius + inner_radius) / 2
         shapes.append(cyl_outer)
         cyl_inner = np.array(0, dtype=fv.Shape)
-        cyl_inner["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+        cyl_inner["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
         cyl_inner["r"] = inner_radius
         cyl_inner["x"] = offset_x
         cyl_inner["y"] = offset_y
@@ -573,7 +573,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         shapes.append(cyl_inner)
 
         # Generate random shapes
-        def random_sphere():  # noqa: ANN202
+        def random_sphere():  # ruff: ignore[missing-return-type-private-function]
             posrad = np.sqrt(rng.random() * inner_radius**2)
             r = min(
                 0.002 * inner_radius * np.exp(6 * rng.random() - 3),
@@ -596,10 +596,10 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s["z"] = z
             s["r"] = r
             s["rho"] = rho
-            s["type"] = fv._dict_shape_name_to_type_num[t]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num[t]  # ruff: ignore[private-member-access]
             return s
 
-        def random_cone():  # noqa: ANN202
+        def random_cone():  # ruff: ignore[missing-return-type-private-function]
             axis_z = 1 - 2 * rng.random()
             axis_longitude = 2 * np.pi * rng.random()
             costheta = axis_z
@@ -677,7 +677,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             s["r2"] = r2
             s["l"] = l
             s["rho"] = rho
-            s["type"] = fv._dict_shape_name_to_type_num[t]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num[t]  # ruff: ignore[private-member-access]
             # Apply clipping axes if necessary, to keep the cone within bounds
             if s["z"] + max(s["r1"], s["r2"]) + s["l"] / 2 > h / 2:
                 # Add top clipping axis
@@ -695,14 +695,14 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 s["cas2"] = cas2
             return s
 
-        def random_shape():  # noqa: ANN202
+        def random_shape():  # ruff: ignore[missing-return-type-private-function]
             f = rng.choice(
                 [
                     random_cone,
                     random_sphere,
                 ],
                 p=[0.3, 0.7],
-            )  # ty:ignore[no-matching-overload]  # ty is bugged
+            )  # ty is bugged
             return f()
 
         while len(shapes) < num_interior_objects + 2:
@@ -719,7 +719,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         # Add the caps, if applicable
         if caps_height is not None:
             captop = np.array(0, dtype=fv.Shape)
-            captop["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            captop["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
             captop["rho"] = 1.1 * outer_container_rho
             captop["l"] = caps_height
             captop["r"] = outer_radius
@@ -736,7 +736,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
 
             mb_rho = 1.1 * outer_container_rho
             s = np.array(0, dtype=fv.Shape)
-            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
             s["rho"] = mb_rho
             s["r"] = (inner_radius + outer_radius) / 2
             s["x"] = offset_x
@@ -751,7 +751,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             dz = zs[1] - zs[0]
             zs = zs[2:-2]
             s = np.array(0, dtype=fv.Shape)
-            s["type"] = fv._dict_shape_name_to_type_num["Ellipsoid"]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num["Ellipsoid"]  # ruff: ignore[private-member-access]
             s["x"] = offset_x + inner_radius / 2
             s["y"] = offset_y + inner_radius / 4
             s["rho"] = 1.05 * mb_rho
@@ -764,7 +764,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 mbs.append(s_)
             # Make some large, high-frequency 'bubbles' in the band
             s = np.array(0, dtype=fv.Shape)
-            s["type"] = fv._dict_shape_name_to_type_num["Sphere"]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num["Sphere"]  # ruff: ignore[private-member-access]
             s["rho"] = 0
             r = min(0.0075 * inner_radius, mbh / 4)
             s["r"] = r
@@ -794,7 +794,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             # knurl_wid = dz
             zs = zs[1:-1]
             s = np.array(0, dtype=fv.Shape)
-            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+            s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
             s["rho"] = 0
             s["x"] = offset_x
             s["y"] = offset_y
@@ -816,7 +816,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 0, 2 * np.pi, num=num_cutouts, endpoint=False
             ):
                 s = np.array(0, dtype=fv.Shape)
-                s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # noqa: SLF001
+                s["type"] = fv._dict_shape_name_to_type_num["Cylinder_z"]  # ruff: ignore[private-member-access]
                 s["rho"] = 0
                 s["x"] = offset_x + outer_radius * np.cos(theta)
                 s["y"] = offset_y + outer_radius * np.sin(theta)
@@ -830,4 +830,4 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         return FBVolume(np.array(shapes, dtype=fv.Shape))
 
 
-# ruff: enable[N802,D400]
+# ruff: enable[invalid-function-name,missing-trailing-period]

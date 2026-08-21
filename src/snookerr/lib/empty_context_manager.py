@@ -19,8 +19,8 @@
 class EmptyContextManager:
     """A context manager that does nothing."""
 
-    def __enter__(self) -> None:  # noqa: D105
+    def __enter__(self) -> None:  # ruff: ignore[undocumented-magic-method]
         pass
 
-    def __exit__(self, exc_type, exc_value, exc_tb) -> None:  # noqa: ANN001, D105
+    def __exit__(self, exc_type, exc_value, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         pass

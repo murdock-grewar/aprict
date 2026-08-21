@@ -36,7 +36,7 @@ class LogLevel(enum.Enum):
     DEBUG = 40
 
 
-def make_logger(  # noqa: C901
+def make_logger(  # ruff: ignore[complex-structure]
     path: pathlib.Path | None,
     *,
     name: str = _module_name,

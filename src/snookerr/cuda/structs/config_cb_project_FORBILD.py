@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class config_cb_project_FORBILD(
     kern_structs.KernelStruct,
     struct_name="config_CB_project_FORBILD",
@@ -32,9 +32,9 @@ class config_cb_project_FORBILD(
         "multiply_before_adding",  # multiply the projection by this constant before adding it to the data array
         "overlap_addition",  # if True, then add the values of overlapping shapes. If False, then prioritise the last shape's value
     ],
-    dtypes=[np.float32, np.bool],
+    dtypes=[np.float32, np.bool],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

@@ -30,7 +30,7 @@ __all__ = [
 
 # CUDA doesn't seem to support 64-bit floats in channel descriptors. See https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__HIGHLEVEL.html#group__CUDART__HIGHLEVEL_1g655725c27d8ffe75accb9b531ecf2d15 where it says "The template function specializes for the following scalar types: char, signed char, unsigned char, short, unsigned short, int, unsigned int, long, unsigned long, and float." Note that double isn't listed. When I try a double, I get 'cudaErrorInvalidChannelDescriptor'.
 # Despite the documentation saying that long and unsigned long should be supported, that doesn't seem to be the case, as I get the same error. I'm not sure why that is.
-# TODO: find out why 64-bit values do not work.  # noqa: FIX002
+# TODO: find out why 64-bit values do not work.  # ruff: ignore[line-contains-todo]
 
 _supported_arr_dtypes: set[cp.dtype] = {
     cp.dtype(cp.int8),
@@ -64,7 +64,7 @@ _dtype_to_cfk: dict[cp.dtype, int] = {
 }
 
 
-# ruff: disable[N815]
+# ruff: disable[mixed-case-variable-in-class-scope]
 class FilterMode(enum.Enum):
     """CUDA filter modes for textures."""
 
@@ -81,7 +81,7 @@ class AddressMode(enum.Enum):
     cudaAddressModeBorder = cp.cuda.runtime.cudaAddressModeBorder  # = 3
 
 
-# ruff: enable[N815]
+# ruff: enable[mixed-case-variable-in-class-scope]
 
 
 class Texture:
@@ -98,40 +98,40 @@ class Texture:
 
     @property
     def is_flagset_layered(self) -> bool:
-        """Returns the state of the 'cudaArrayLayered' flag."""
+        """The state of the 'cudaArrayLayered' flag."""
         # For some reason, the definition "cudaArrayLayered = 1" has been commented out in the CuPy source code.
         return self.cuda_array.flags & 1
 
     @property
-    def is_flagset_surfaceLoadStore(self) -> bool:  # noqa: N802
-        """Returns the state of the 'cudaArraySurfaceLoadStore' flag."""
+    def is_flagset_surfaceLoadStore(self) -> bool:  # ruff: ignore[invalid-function-name]
+        """The state of the 'cudaArraySurfaceLoadStore' flag."""
         return (
             self.cuda_array.flags & cp.cuda.runtime.cudaArraySurfaceLoadStore
         )
 
     @property
     def is_texture_included(self) -> bool:
-        """Returns whether this object has a corresponding cudaTexture."""
+        """Whether this object has a corresponding cudaTexture."""
         return self.texobj is not None
 
     @property
     def is_surface_included(self) -> bool:
-        """Returns whether this object has a corresponding cudaSurface."""
+        """Whether this object has a corresponding cudaSurface."""
         return self.surfobj is not None
 
     @property
     def filter_mode(self) -> int:
-        """Returns the filterMode of the texture descriptor."""
+        """The filterMode of the texture descriptor."""
         return self.texobj.TexDesc.get_texture_desc()["filterMode"]
 
     @property
     def address_modes(self) -> int:
-        """Returns the addressModes of the texture descriptors."""
+        """The addressModes of the texture descriptors."""
         return self.texobj.TexDesc.get_texture_desc()["addressModes"]
 
     # For simplicity, I am currently making this always generate both a texture and a surface
     # I'm going to strip away features/options I don't use, for the time being, like normalised coordinates.
-    def __init__(  # noqa: C901
+    def __init__(  # ruff: ignore[complex-structure]
         self,
         arraylike_or_dtypeshapetuple: np.ndarray
         | np.memmap

@@ -15,15 +15,15 @@
 
 """Tests for the CB backprojection kernel(s)."""
 
-# ruff: disable[D101,D102,D103,N801,ANN201]
-import itertools  # noqa: I001
-import time  # noqa: F401
+# ruff: disable[undocumented-public-class,undocumented-public-method,undocumented-public-function,invalid-class-name,missing-return-type-undocumented-public-function]
+import itertools  # ruff: ignore[unsorted-imports]
+import time  # ruff: ignore[unused-import]
 
 import cupy as cp
 import numpy as np
 import pytest
 
-from ... import imview  # noqa: F401, RUF100
+from ... import imview  # ruff: ignore[unused-import]
 from ...cuda import header_injection
 from ...cuda.structs import (
     config_cb_backproject as ks_config,
@@ -88,7 +88,7 @@ def create_injected_module_backproject() -> cp.RawModule:
 
 
 @pytest.fixture()
-def kern_BP_sharedmem():  # noqa: N802
+def kern_BP_sharedmem():  # ruff: ignore[invalid-function-name]
     module = create_injected_module_sharedmem_backproject()
     return module.get_function(
         "backproject_CB_sharedmem<float,float,18,18,18>"
@@ -96,13 +96,13 @@ def kern_BP_sharedmem():  # noqa: N802
 
 
 @pytest.fixture()
-def kern_BP_volmem():  # noqa: N802
+def kern_BP_volmem():  # ruff: ignore[invalid-function-name]
     module = create_injected_module_backproject()
     return module.get_function("backproject_CB_volmem<float,float>")
 
 
 @pytest.fixture()
-def kern_BP_voltex():  # noqa: N802
+def kern_BP_voltex():  # ruff: ignore[invalid-function-name]
     module = create_injected_module_backproject()
     return module.get_function("backproject_CB_voltex<float,float>")
 
@@ -123,12 +123,12 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
     def setup_and_teardown(
         self,
         volres: int,
-        kernel,  # noqa: ANN001
+        kernel,  # ruff: ignore[missing-type-function-argument]
         blockdims: list[int | None],
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
         kernel = request.getfixturevalue(kernel)
-        test_id: str = request.node.callspec.id  # noqa: F841
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Set up configuration objects etc
         num_projs = np.uint32(10)
         detwid: int = int(4 / 5 * volres * 3)
@@ -304,9 +304,9 @@ class TestCB_BACKPROJ_randomnoise:
         use_voltex: bool,
         blockdims: list[int | None],
         exact: bool,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         if use_voltex:
             self.usevoltex: bool = True
             kernel = request.getfixturevalue("kern_BP_voltex")
@@ -541,4 +541,4 @@ class TestCB_BACKPROJ_randomnoise:
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
-# ruff: enable[D101,D102,D103,N801,ANN201]
+# ruff: enable[undocumented-public-class,undocumented-public-method,undocumented-public-function,invalid-class-name,missing-return-type-undocumented-public-function]

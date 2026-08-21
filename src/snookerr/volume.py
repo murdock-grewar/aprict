@@ -19,7 +19,7 @@
 # to the volume data. The user should not have to interact with internal
 # classes like texture_tools.Texture, and the like.
 
-import pathlib  # noqa: TC003
+import pathlib  # ruff: ignore[typing-only-standard-library-import]
 import types
 import typing
 
@@ -39,11 +39,11 @@ from .lib import (
 from .lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
-_DType_base = np.float16 | np.float32
-_DType = np.dtype[np.float16] | np.dtype[np.float32]
+_DType_base = np.float16 | np.float32 | np.float64
+_DType = np.dtype[np.float16] | np.dtype[np.float32] | np.dtype[np.float64]
 
 
-# TODO fix up the typing of the shape and dtype once astral-sh implements the relevant features into ty  # noqa: FIX002
+# TODO fix up the typing of the shape and dtype once astral-sh implements the relevant features into ty  # ruff: ignore[line-contains-todo]
 
 
 class Volume[
@@ -65,34 +65,34 @@ class Volume[
 
     @property
     def voxwid(self) -> float:
-        """Return the width of each voxel, in arbitrary units of distance."""
+        """The width of each voxel, in arbitrary units of distance."""
         return self._voxwid
 
     @property
     def shape(self) -> _ShapeType:
-        """Return the shape of the volume array."""
+        """The shape of the volume array."""
         return self._shape
 
     @property
     def norm(self) -> float:
-        """Return the l2 norm of the volume."""
+        """The l2 norm of the volume."""
         return tops.norm(self._texture)
 
     @property
     def dtype(self) -> _DType:
-        """Return the dtype of the volume array."""
+        """The dtype of the volume array."""
         return self._dtype
 
     @property
     def texture(self) -> texture_tools.Texture:
-        """Return the underlying Texture object."""
+        """The underlying Texture object."""
         return self._texture
 
     @property
     def pos_c(
         self,
     ) -> np.ndarray[tuple[typing.Literal[3],], np.dtype[np.float32]]:
-        """Return the position of the centre of the volume."""
+        """The position of the centre of the volume."""
         return self._pos_c.copy()
 
     def __init__(
@@ -354,7 +354,7 @@ class FBVolume:
         return self.to_cupy(xs, ys, zs).get()
 
     @classmethod
-    def _scale_shape_len(cls, shape, scale: float):  # noqa: ANN001, ANN206
+    def _scale_shape_len(cls, shape, scale: float):  # ruff: ignore[missing-type-function-argument, missing-return-type-class-method]
         s = shape.copy()
         for key in ("cas1", "cas2", "cas3"):
             s[key]["dotprod"] *= scale
@@ -384,7 +384,7 @@ class FBVolume:
         )
 
     @classmethod
-    def _flip_shape(cls, shape, axis: int | str):  # noqa: ANN001, ANN206
+    def _flip_shape(cls, shape, axis: int | str):  # ruff: ignore[missing-type-function-argument, missing-return-type-class-method]
         match axis:
             case 0 | "x":
                 axis = "x"
@@ -419,7 +419,7 @@ class FBVolume:
         ]
 
     @classmethod
-    def _translate_shape(cls, shape, axis: int | str, amount: float):  # noqa: ANN001, ANN206
+    def _translate_shape(cls, shape, axis: int | str, amount: float):  # ruff: ignore[missing-type-function-argument, missing-return-type-class-method]
         match axis:
             case 0 | "x":
                 axis = "x"
@@ -449,7 +449,7 @@ class FBVolume:
         )
 
     @classmethod
-    def _multiply_attenuation_shape(cls, shape, amount: float):  # noqa: ANN001, ANN206
+    def _multiply_attenuation_shape(cls, shape, amount: float):  # ruff: ignore[missing-type-function-argument, missing-return-type-class-method]
         s = shape.copy()
         s["rho"] *= amount
         return s
@@ -465,9 +465,9 @@ class FBVolume:
         )
 
     @classmethod
-    def _shape_FORBIRD_str(cls, shape) -> str:  # noqa: ANN001, C901, N802
+    def _shape_FORBIRD_str(cls, shape) -> str:  # ruff: ignore[missing-type-function-argument, complex-structure, invalid-function-name]
         type_int = shape["type"]
-        id_to_str = {v: k for k, v in fv._dict_shape_name_to_type_num.items()}  # noqa: SLF001
+        id_to_str = {v: k for k, v in fv._dict_shape_name_to_type_num.items()}  # ruff: ignore[private-member-access]
         type_str = id_to_str[int(type_int)]
         ns = types.SimpleNamespace(
             {k: v for k, v in zip(shape.dtype.names, shape)}
@@ -719,6 +719,6 @@ class FBVolume:
         return out
 
     @property
-    def FORBILD_str(self) -> str:  # noqa: N802
-        """Return a string representing this volume in FORBILD format."""
+    def FORBILD_str(self) -> str:  # ruff: ignore[invalid-function-name]
+        """A string representing this volume in FORBILD format."""
         return "\n".join([self._shape_FORBIRD_str(s) for s in self.shapes])

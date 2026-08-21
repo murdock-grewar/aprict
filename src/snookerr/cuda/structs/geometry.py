@@ -17,7 +17,13 @@
 import numpy as np
 
 from .. import kern_structs
-from .base import fvec2, fvec3, uivec2, uivec3, ulvec3  # noqa: F401
+from .base import (  # ruff: ignore[unused-import]
+    fvec2,
+    fvec3,
+    uivec2,
+    uivec3,
+    ulvec3,
+)
 
 __all__ = [
     "det_spec",
@@ -30,7 +36,7 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class det_spec(
     kern_structs.KernelStruct,
     struct_name="det_spec",
@@ -42,19 +48,19 @@ class det_spec(
         "nv",  # number of columns/rows. i.e. length of x axis; length of y axis.
         "type",  # numeric integer describing the type of detector. Currently, leave it at 0 for a flat panel.
     ],
-    dtypes=[fvec3, fvec3, fvec3, np.uint32, np.uint32, np.uint8],
+    dtypes=[fvec3, fvec3, fvec3, np.uint32, np.uint32, np.uint8],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class proj_spec(
     kern_structs.KernelStruct,
     struct_name="proj_spec",
     names=["sourcepos", "dspec"],
-    dtypes=[fvec3, det_spec],
+    dtypes=[fvec3, det_spec],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     force_dependencies=[
         fvec2,
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 /*
  * In order to mantain O(N^3) scaling in the backprojection, we need a finite, closed-form equation
@@ -100,7 +106,7 @@ __device__ fvec2 get_projected_detector_coords(
     }
 }""",
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class proj_chunk_spec_maxlen10(
@@ -112,9 +118,9 @@ class proj_chunk_spec_maxlen10(
         np.uint8,
         np.uint64,
         ulvec3,
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class proj_tex_chunk_spec_maxlen10(
@@ -125,9 +131,9 @@ class proj_tex_chunk_spec_maxlen10(
         kern_structs.KernelArray(dtype=proj_spec, shape=(10,)),
         np.uint8,
         np.uint32,
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 # Note: this now used by the projection only.
@@ -143,9 +149,9 @@ class volume_chunk_spec(
         "idx_zstart",
         "idx_zstop",
     ],
-    dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],
+    dtypes=[np.uint16, np.uint16, np.uint16, np.uint16, np.uint16, np.uint16],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class vol_spec(
@@ -161,9 +167,9 @@ class vol_spec(
         # will determine how much is considered within range and should be accessed.
         "pos_000",  # x,y,z position of the center of the 0,0,0 voxel.
     ],
-    dtypes=[np.uint64, ulvec3, uivec3, fvec3],
+    dtypes=[np.uint64, ulvec3, uivec3, fvec3],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class vol_tex_chunk_spec(
@@ -175,9 +181,9 @@ class vol_tex_chunk_spec(
         "shape",  # unsigned shape of the chunk
         "texpos",  # The 0,0,0 corner of the texture of which chunk is a part. The position is measured in the same units of distance as the voxwid. E.g. mm or cm. NOT in voxel-widths. NOTE: this is NOT the position of the center of the 0,0,0 voxel! It is the position of the corner of that voxel.
     ],
-    dtypes=[np.float32, uivec3, uivec3, fvec3],
+    dtypes=[np.float32, uivec3, uivec3, fvec3],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

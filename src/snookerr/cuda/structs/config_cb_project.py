@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class config_cb_project(
     kern_structs.KernelStruct,
     struct_name="config_CB_project",
@@ -31,9 +31,9 @@ class config_cb_project(
         "shrink_volume_factor",  # causes the whole volume to be shrunk by this factor, *with respect to the coordinate origin*, after being specified by whatever volume chunk spec object is relevant.
         "multiply_before_adding",  # multiply the projection by this constant before adding it to the data array
     ],
-    dtypes=[np.float32, np.float32],
+    dtypes=[np.float32, np.float32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

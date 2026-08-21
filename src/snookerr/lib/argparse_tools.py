@@ -25,7 +25,7 @@ import typing
 class EnumAction(argparse.Action):
     """Argparse action for handling Enums."""
 
-    def __init__(self, **kwargs) -> None:  # noqa: ANN003
+    def __init__(self, **kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
         # Pop off the type value
         enum_type = kwargs.pop("type", None)
 
@@ -48,12 +48,12 @@ class EnumAction(argparse.Action):
 
         self._enum = enum_type
 
-    def __call__(  # noqa: D102
+    def __call__(  # ruff: ignore[undocumented-public-method]
         self,
-        parser: argparse.ArgumentParser,  # noqa: ARG002
+        parser: argparse.ArgumentParser,  # ruff: ignore[unused-method-argument]
         namespace: argparse.Namespace,
-        values,  # noqa: ANN001
-        option_string=None,  # noqa: ANN001, ARG002
+        values,  # ruff: ignore[missing-type-function-argument]
+        option_string=None,  # ruff: ignore[missing-type-function-argument, unused-method-argument]
     ) -> None:
         # Convert value back into an Enum
         # value = self._enum(values)
@@ -64,7 +64,7 @@ class EnumAction(argparse.Action):
 class MaybeEnumAction(argparse.Action):
     """Argparse action for handling Enums. Allows for the additional option 'None', useful for allowing nonspecified/automatic behaviour."""
 
-    def __init__(self, **kwargs) -> None:  # noqa: ANN003
+    def __init__(self, **kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
         # Pop off the type value
         enum_type = kwargs.pop("type", None)
 
@@ -86,12 +86,12 @@ class MaybeEnumAction(argparse.Action):
 
         self._enum = enum_type
 
-    def __call__(  # noqa: D102
+    def __call__(  # ruff: ignore[undocumented-public-method]
         self,
-        parser: argparse.ArgumentParser,  # noqa: ARG002
+        parser: argparse.ArgumentParser,  # ruff: ignore[unused-method-argument]
         namespace: argparse.Namespace,
-        values,  # noqa: ANN001
-        option_string=None,  # noqa: ANN001, ARG002
+        values,  # ruff: ignore[missing-type-function-argument]
+        option_string=None,  # ruff: ignore[missing-type-function-argument, unused-method-argument]
     ) -> None:
         # Convert value back into an Enum
         # value = self._enum(values)
@@ -102,8 +102,8 @@ class MaybeEnumAction(argparse.Action):
             setattr(namespace, self.dest, value)
 
 
-def ContiguousSliceArgType(string: str) -> slice[int | None, int | None, None]:  # noqa: N802
-    """A function that decodes an integer slice like slice(1,3) or slice(None, 4) from a string."""  # noqa: D401
+def ContiguousSliceArgType(string: str) -> slice[int | None, int | None, None]:  # ruff: ignore[invalid-function-name]
+    """A function that decodes an integer slice like slice(1,3) or slice(None, 4) from a string."""  # ruff: ignore[non-imperative-mood]
     string = string.replace("(", "").replace(")", "")
     if len(string) == 0:
         raise ValueError()
@@ -113,7 +113,7 @@ def ContiguousSliceArgType(string: str) -> slice[int | None, int | None, None]: 
     if len(strings) != 2:
         raise ValueError()
 
-    def _str_to_int_or_None(s: str) -> int | None:  # noqa: N802
+    def _str_to_int_or_None(s: str) -> int | None:  # ruff: ignore[invalid-function-name]
         if s.strip().lower() == "none":
             return None
         return int(s)
@@ -121,10 +121,10 @@ def ContiguousSliceArgType(string: str) -> slice[int | None, int | None, None]: 
     return slice(*map(_str_to_int_or_None, strings))
 
 
-def FloatTupleArgTypeFactory(  # noqa: N802
+def FloatTupleArgTypeFactory(  # ruff: ignore[invalid-function-name]
     *, numfloats: int
 ) -> typing.Callable[[str], tuple[float, ...]]:
-    """A factory for functions that take in a string representing a float tuple, such as (1.0, 1.4)."""  # noqa: D401
+    """A factory for functions that take in a string representing a float tuple, such as (1.0, 1.4)."""  # ruff: ignore[non-imperative-mood]
     if type(numfloats) is not int or numfloats < 0:
         msg = "'numfloats' should be a nonnegative integer"
         raise ValueError(msg)
@@ -149,10 +149,10 @@ def FloatTupleArgTypeFactory(  # noqa: N802
     return _func
 
 
-def IntTupleArgTypeFactory(  # noqa: N802
+def IntTupleArgTypeFactory(  # ruff: ignore[invalid-function-name]
     *, numints: int
 ) -> typing.Callable[[str], tuple[int, ...]]:
-    """A factory for functions that take in a string representing an int tuple, such as (1,2,3)."""  # noqa: D401
+    """A factory for functions that take in a string representing an int tuple, such as (1,2,3)."""  # ruff: ignore[non-imperative-mood]
     if type(numints) is not int or numints < 0:
         msg = "'numints' should be a nonnegative integer"
         raise ValueError(msg)
@@ -177,8 +177,8 @@ def IntTupleArgTypeFactory(  # noqa: N802
     return _func
 
 
-def BoolArgType(string: str) -> bool:  # noqa: N802
-    """A basic bool type. Fixes errors used when trying to use bool directly as an arg type. Can be combined with MaybeType."""  # noqa: D401
+def BoolArgType(string: str) -> bool:  # ruff: ignore[invalid-function-name]
+    """A basic bool type. Fixes errors used when trying to use bool directly as an arg type. Can be combined with MaybeType."""  # ruff: ignore[non-imperative-mood]
     match string.lower().strip():
         case "false" | "0":
             return False
@@ -189,7 +189,7 @@ def BoolArgType(string: str) -> bool:  # noqa: N802
             raise ValueError(msg)
 
 
-def MaybeType[T](  # noqa: N802
+def MaybeType[T](  # ruff: ignore[invalid-function-name]
     func: typing.Callable[[str], T],
 ) -> typing.Callable[[str], T | None]:
     """Extend a type like 'str' or 'float' to also accept the 'none' keyword."""
@@ -210,7 +210,7 @@ class ArgumentDictParserWithHiddenFixedConstants(argparse.ArgumentParser):
     def __init__(self) -> None:
         self.const_dict = {}
 
-    def add_hidden_const(self, key: str, val: typing.Any) -> None:  # noqa: ANN401, D102
+    def add_hidden_const(self, key: str, val: typing.Any) -> None:  # ruff: ignore[any-type, undocumented-public-method]
         self.const_dict[key] = val
 
     def parse_args_and_consts(self) -> argparse.Namespace:

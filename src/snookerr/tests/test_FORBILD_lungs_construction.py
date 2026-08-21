@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,7 @@ from .. import (  # import directly from root snookerr namespace
 )
 
 
-def test_correctness_of_Lungs_3Generations() -> None:  # noqa: N802
+def test_correctness_of_Lungs_3Generations() -> None:  # ruff: ignore[invalid-function-name]
     """Test that the 3rd generation lung phantom matches the definition published by the Arbeitsgruppe Phantome."""
     lungs3: FBVolume = phantoms.FORBILD.LungPhantom(generation=3)
     lungs3_ref: FBVolume = phantoms.FORBILD.LungPhantom3Generations
@@ -33,7 +33,7 @@ def test_correctness_of_Lungs_3Generations() -> None:  # noqa: N802
         "The generated and reference lungs phantoms do not have the same number of primitive shapes."
     )
 
-    def round_shape(s_in, digits: int = 2):  # noqa: ANN001, ANN202
+    def round_shape(s_in, digits: int = 2):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function]
         s = s_in.copy()
         scalar_keys = {
             "rho",

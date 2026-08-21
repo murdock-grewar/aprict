@@ -17,15 +17,15 @@
 
 import enum
 import itertools
-import logging  # noqa: TC003
+import logging  # ruff: ignore[typing-only-standard-library-import]
 import os
-import pathlib  # noqa: TC003
+import pathlib  # ruff: ignore[typing-only-standard-library-import]
 
 import numexpr as ne
 import numpy as np
 
 
-def downbin(  # noqa: C901
+def downbin(  # ruff: ignore[complex-structure]
     x: np.ndarray,
     *,
     n: int,

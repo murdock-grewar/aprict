@@ -31,7 +31,7 @@ try:
 except ModuleNotFoundError:
     _mod_avail_imview = False
 try:
-    from .. import liveplot  # noqa: F401
+    from .. import liveplot  # ruff: ignore[unused-import]
 
     _mod_avail_liveplot = True
 except ModuleNotFoundError:
@@ -269,7 +269,7 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError(msg)
 
 
-def get_filtered_projectionset_generator(  # noqa: C901
+def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     projdata_path: pathlib.Path,
     pg: cbfp.ProjGeom,
     num_rot_angs: int
@@ -340,20 +340,20 @@ def get_filtered_projectionset_generator(  # noqa: C901
     if not np.isclose(pixwid, pixhei):
         msg = "Non-square pixels of detector."
         raise NotImplementedError(msg)
-    Rs = np.sqrt(  # noqa: N806
+    Rs = np.sqrt(  # ruff: ignore[non-lowercase-variable-in-function]
         np.square(pg.source_pos[:, 0]) + np.square(pg.source_pos[:, 1])
     )
     if not np.all(np.isclose(Rs, Rs[0])):
         msg = "Inconsistent source radius."
         raise NotImplementedError(msg)
-    R = Rs[0]  # noqa: N806
-    Ls = Rs + np.sqrt(  # noqa: N806
+    R = Rs[0]  # ruff: ignore[non-lowercase-variable-in-function]
+    Ls = Rs + np.sqrt(  # ruff: ignore[non-lowercase-variable-in-function]
         np.square(pg.det_pos[:, 0]) + np.square(pg.det_pos[:, 1])
     )
     if not np.all(np.isclose(Ls, Ls[0])):
         msg = "Inconsistent source-to-detector length."
         raise NotImplementedError(msg)
-    L = Ls[0]  # noqa: N806
+    L = Ls[0]  # ruff: ignore[non-lowercase-variable-in-function]
     recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
     logger.info(f"R: {R!s:s}")
     logger.info(f"L: {L!s:s}")
@@ -388,7 +388,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
         )
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
-    def _gen() -> typing.Generator[  # noqa: C901
+    def _gen() -> typing.Generator[  # ruff: ignore[complex-structure]
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
     ]:
         if num_rot_angs is not None:  # None means a single random angle.
@@ -473,7 +473,7 @@ def get_filtered_projectionset_generator(  # noqa: C901
     return pg, _gen(), R, L, recon_support_radius, final_multiplier
 
 
-def main() -> None:  # noqa: C901
+def main() -> None:  # ruff: ignore[complex-structure]
     """Run the script."""
     # Parse the input arguments
     parser = _make_arg_parser()
@@ -532,7 +532,7 @@ def main() -> None:  # noqa: C901
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     # Create the ProjectionSet objects corresponding to each ordered subset
-    pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # noqa: N806, RUF059
+    pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # ruff: ignore[non-lowercase-variable-in-function, unused-unpacked-variable]
         get_filtered_projectionset_generator(
             projdata_path=args.projdata,
             pg=cbfp.ProjGeom.load(args.projgeom),
@@ -630,6 +630,9 @@ def main() -> None:  # noqa: C901
             preserve_sum=False,
             axis=(0, 1) if args.fan_beam else (0, 1, 2),
         )
+
+        # ty is not smart enough to understand that path_intms can be None only when path_output is None
+        assert path_intms is not None
 
         # Get the 'root' directory of where this volume will be saved
         save_path = path_intms if is_intermediate else path_output

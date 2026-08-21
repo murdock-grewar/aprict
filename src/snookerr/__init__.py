@@ -20,7 +20,7 @@
 
 import os as _os
 
-if _os.environ.get("SNOOKERR_BUILDMODE", ""):  # noqa: RUF067
+if _os.environ.get("SNOOKERR_BUILDMODE", ""):  # ruff: ignore[non-empty-init-module]
     pass
 else:
     # Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.

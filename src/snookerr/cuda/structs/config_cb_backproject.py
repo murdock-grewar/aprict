@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class config_cb_backproject(
     kern_structs.KernelStruct,
     struct_name="config_CB_backproject",
@@ -54,9 +54,9 @@ class config_cb_backproject(
         np.bool,
         np.bool,
         np.uint8,
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

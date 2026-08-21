@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from ..volume import Volume
 
 
-class SIRT_flatpanel:  # noqa: N801
+class SIRT_flatpanel:  # ruff: ignore[invalid-class-name]
     """An iterable SIRT reconstructor."""
 
     # _current_iteration_number: int
@@ -82,7 +82,7 @@ class SIRT_flatpanel:  # noqa: N801
             raise ValueError(msg)
         # The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1
         # We will calculate M now.
-        M: Volume = volume.zeroed_copy()  # noqa: N806
+        M: Volume = volume.zeroed_copy()  # ruff: ignore[non-lowercase-variable-in-function]
         p: cbfp.ProjectionSet = projs.zeroed_copy()
         assert p.data is not None
         scale_factor: float = 1 / float(
@@ -153,5 +153,5 @@ class SIRT_flatpanel:  # noqa: N801
 
     @property
     def volume(self) -> Volume:
-        """Return the volume/tomogram."""
+        """The volume/tomogram."""
         return self._vol

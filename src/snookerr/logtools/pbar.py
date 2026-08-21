@@ -35,7 +35,7 @@ class ProgressBar:
     _desc: str
     _valunit: str
     _persist: bool
-    _unit_SI_scale: bool  # noqa: N815
+    _unit_SI_scale: bool  # ruff: ignore[mixed-case-variable-in-class-scope]
     _smoothing: float
 
     _enable: bool
@@ -49,7 +49,7 @@ class ProgressBar:
         maxval: float | int,
         valunit: str,
         persist: bool = False,
-        unit_SI_scale: bool = False,  # noqa: N803
+        unit_SI_scale: bool = False,  # ruff: ignore[invalid-argument-name]
         smoothing: float = 0.01,
         enable: bool = True,
     ) -> None:
@@ -76,7 +76,7 @@ class ProgressBar:
                 postfix="",
             )
 
-    def __enter__(self) -> ProgressBar:  # noqa: D105
+    def __enter__(self) -> ProgressBar:  # ruff: ignore[undocumented-magic-method]
         if self._enable:
             self._cm.__enter__()  # ty:ignore[unresolved-attribute]
             self.update_to(0)
@@ -94,7 +94,7 @@ class ProgressBar:
             pbar.n = val
             pbar.update(0)
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # noqa: ANN001, D105
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         if self._enable:
             self._pbar.close()
             self._cm.__exit__(exc_type, exc_val, exc_tb)  # ty:ignore[unresolved-attribute]

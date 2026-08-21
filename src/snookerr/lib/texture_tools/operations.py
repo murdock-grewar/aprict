@@ -103,11 +103,11 @@ def _get_grid_block_dims(
     if len(t.shape) != 3:
         msg = "Input texture was expected to be a volume, but it has an incorrect number of dimensions."
         raise ValueError(msg)
-    shape: tuple[int, int, int] = t.shape  # ty:ignore[invalid-assignment]
+    shape: tuple[int, int, int] = t.shape
     block_dims: tuple[int, int, int] = tuple(map(min, shape, _BLOCKDIMS))  # ty:ignore[invalid-assignment]
     grid_dims: tuple[int, int, int] = tuple(
         map(lambda s, b: math.ceil(s / b), shape, block_dims)
-    )
+    )  # ty: ignore[invalid-assignment]  # ty not smart enough to figure this out
     return grid_dims, block_dims
 
 
@@ -131,7 +131,7 @@ def fill(t: Texture, value: float) -> None:
         raise ValueError(msg)
 
     val = np.array(value).astype(t.dtype)  # convert to the correct datatype
-    args = (val, t.surfobj, _shape_to_uint3(t.shape))  # ty:ignore[invalid-argument-type]
+    args = (val, t.surfobj, _shape_to_uint3(t.shape))
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -150,7 +150,7 @@ def multiply(t: Texture, value: float) -> None:
         raise ValueError(msg)
 
     val = np.array(value).astype(t.dtype)  # convert to the correct datatype
-    args = (val, t.surfobj, _shape_to_uint3(t.shape))  # ty:ignore[invalid-argument-type]
+    args = (val, t.surfobj, _shape_to_uint3(t.shape))
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -169,7 +169,7 @@ def inner_prod(t1: Texture, t2: Texture) -> float:
         raise ValueError(msg)
 
     output = cp.array([0], dtype=cp.float64)
-    args = (output, t1.surfobj, t2.surfobj, _shape_to_uint3(t1.shape))  # ty:ignore[invalid-argument-type]
+    args = (output, t1.surfobj, t2.surfobj, _shape_to_uint3(t1.shape))
     ctype1 = _get_c_type_name(t1)
     ctype2 = _get_c_type_name(t2)
     kern = _module.get_function(
@@ -207,7 +207,7 @@ def multiply_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
         f"multiply_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
-    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))  # ty:ignore[invalid-argument-type]
+    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))
     kern(*_get_grid_block_dims(t1), args)
 
 
@@ -234,7 +234,7 @@ def add_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
         f"add_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
-    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))  # ty:ignore[invalid-argument-type]
+    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))
     kern(*_get_grid_block_dims(t1), args)
 
 
@@ -257,7 +257,7 @@ def invert(
         raise ValueError(msg)
 
     eps = np.float32(softmax_epsilon or 0)
-    args = (t.surfobj, _shape_to_uint3(t.shape), np.bool(ignore_zeros), eps)  # ty:ignore[invalid-argument-type]
+    args = (t.surfobj, _shape_to_uint3(t.shape), np.bool(ignore_zeros), eps)
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -278,11 +278,11 @@ def softmask_to_cylinder_xy(t: Texture, relrad_start: float) -> None:
         raise ValueError(msg)
 
     rr_start = np.float32(relrad_start)  # convert to the correct datatype
-    args = (rr_start, t.surfobj, _shape_to_uint3(t.shape))  # ty:ignore[invalid-argument-type]
+    args = (rr_start, t.surfobj, _shape_to_uint3(t.shape))
     kern(*_get_grid_block_dims(t), args)
 
 
-def slice_nth_axis_to_3d_cupy_array(  # noqa: C901
+def slice_nth_axis_to_3d_cupy_array(  # ruff: ignore[complex-structure]
     t: Texture, out: cp.ndarray | None, axis: int, sl: slice
 ) -> cp.ndarray:
     """Copy a slice of the data from 2D-Layered or 3D texture into a 3D cupy array."""
@@ -317,7 +317,7 @@ def slice_nth_axis_to_3d_cupy_array(  # noqa: C901
         case 0:
             out_shape = (sl_len, *t.shape[1:])
         case 1:
-            out_shape = (t.shape[0], sl_len, t.shape[2])  # ty:ignore[index-out-of-bounds]
+            out_shape = (t.shape[0], sl_len, t.shape[2])
         case 2:
             out_shape = (*t.shape[:2], sl_len)
         case _:
@@ -344,7 +344,7 @@ def slice_nth_axis_to_3d_cupy_array(  # noqa: C901
         msg = f"Wrong dtype for output array. Provided dtype: {out.dtype}. dtype corresponding to texture object: {dtype}."
         raise ValueError(msg)
 
-    BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z = 10, 10, 10  # noqa: N806
+    BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z = 10, 10, 10  # ruff: ignore[non-lowercase-variable-in-function]
     grid_dims = (
         math.ceil(out_shape[0] / BLOCKDIM_X),
         math.ceil(out_shape[1] / BLOCKDIM_Y),
@@ -367,7 +367,7 @@ def slice_nth_axis_to_3d_cupy_array(  # noqa: C901
     return out
 
 
-def sum_along_nth_axis_to_2d_cupy_array(  # noqa: C901
+def sum_along_nth_axis_to_2d_cupy_array(  # ruff: ignore[complex-structure]
     t: Texture, out: cp.ndarray | None, axis: int
 ) -> cp.ndarray:
     """Sum the data from a 2D-Layered or 3D texture along an axis, into a 2D cupy array."""
@@ -388,9 +388,9 @@ def sum_along_nth_axis_to_2d_cupy_array(  # noqa: C901
     # Determine output shape
     match axis:
         case 0:
-            out_shape = (t.shape[1], t.shape[2])  # ty:ignore[index-out-of-bounds]
+            out_shape = (t.shape[1], t.shape[2])
         case 1:
-            out_shape = (t.shape[0], t.shape[2])  # ty:ignore[index-out-of-bounds]
+            out_shape = (t.shape[0], t.shape[2])
         case 2:
             out_shape = (t.shape[0], t.shape[1])
         case _:
@@ -421,11 +421,11 @@ def sum_along_nth_axis_to_2d_cupy_array(  # noqa: C901
         msg = f"Wrong dtype for output array. Provided dtype: {out.dtype}. dtype corresponding to texture object: {dtype}."
         raise ValueError(msg)
 
-    BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z = 10, 10, 10  # noqa: N806
+    BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z = 10, 10, 10  # ruff: ignore[non-lowercase-variable-in-function]
     grid_dims = (
         math.ceil(t.shape[0] / BLOCKDIM_X),
         math.ceil(t.shape[1] / BLOCKDIM_Y),
-        math.ceil(t.shape[2] / BLOCKDIM_Z),  # ty:ignore[index-out-of-bounds]
+        math.ceil(t.shape[2] / BLOCKDIM_Z),
     )
     block_dims = (BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z)
 

@@ -70,7 +70,7 @@ def flush() -> None:
         shutil.rmtree(path_to_dtype_cache)
 
 
-def main(args: list[str]) -> None:  # noqa: D103
+def main(args: list[str]) -> None:  # ruff: ignore[undocumented-public-function]
     if "flush" in args:
         flush()
 

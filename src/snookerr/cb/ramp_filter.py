@@ -77,10 +77,10 @@ class RampFilterer:
 
     @property
     def num_kerns(self) -> int:
-        """Return the number of kernels applied by this object."""
+        """The number of kernels applied by this object."""
         return len(self._fft_mults_horz)
 
-    def _initialise(self, kern_funcs) -> None:  # noqa: ANN001
+    def _initialise(self, kern_funcs) -> None:  # ruff: ignore[missing-type-function-argument]
         with self.stream:
             chunk_shape = self.chunk_shape
             physpixwid = self.physpixwid
@@ -155,7 +155,7 @@ class RampFilterer:
             if not cparr_view.shape[0] <= self.chunk_shape[0]:
                 msg = "Tried to input too many projections at once (zeroth axis of input has a length longer than the chunk size of this filtering object)."
                 raise ValueError(msg)
-            # TODO check if this can be made more efficient by not filtering the unused projections at hte end of a chunk.  # noqa: FIX002
+            # TODO check if this can be made more efficient by not filtering the unused projections at hte end of a chunk.  # ruff: ignore[line-contains-todo]
 
             if wait_on_events is not None:
                 for e in wait_on_events:
@@ -341,7 +341,7 @@ class FBPFilterer:
     def __init__(
         self,
         *,
-        L: float,  # noqa: N803
+        L: float,  # ruff: ignore[invalid-argument-name]
         physpixwid: float,
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int = 3,
@@ -454,7 +454,7 @@ class FBPFilterer:
 
     @property
     def zeta(self) -> float:
-        """Get the maximum rotation angle which can be accomodated by this object."""
+        """The maximum rotation angle which can be accomodated by this object."""
         return self._max_abs_rotation_angle
 
     @classmethod
@@ -462,7 +462,7 @@ class FBPFilterer:
         cls,
         proj_2d_shape: tuple[int, int],
         physpixwid: float,
-        L: float,  # noqa: N803
+        L: float,  # ruff: ignore[invalid-argument-name]
     ) -> float:
         """Get the maximum rotation angle which can be accomodated by an instance of this object."""
         # Compute the maximum rotation angle.
@@ -510,7 +510,7 @@ class FBPFilterer:
 
         return tuple(expanded_proj_2d_shape)  # ty:ignore[invalid-return-type]
 
-    def filter_bulk_axis1_stream(  # noqa: C901
+    def filter_bulk_axis1_stream(  # ruff: ignore[complex-structure]
         self,
         arr: cp.ndarray | np.ndarray | np.memmap,
         block: bool = True,
@@ -519,7 +519,7 @@ class FBPFilterer:
     ) -> typing.Generator[tuple[list[cp.ndarray], cp.cuda.Event]]:
         """Create a generator of filtered projection chunks, from an input array."""
         # Place the rotated data directly into the memory of the rfilt object. This will result in a small optimisation by removing the need for an additional data copy.
-        chunkmem = self.rfilt._chunk_mem_horz_filter[  # noqa: SLF001
+        chunkmem = self.rfilt._chunk_mem_horz_filter[  # ruff: ignore[private-member-access]
             :, : self.chunk_shape[1], :
         ]
         # out_buffer = cp.zeros_like(chunkmem)
@@ -552,7 +552,7 @@ class FBPFilterer:
 
             # Rotate and copy into the memory buffer
             if force_rotation_angle is None:
-                rotang_rads_list = np.random.uniform(  # noqa: NPY002
+                rotang_rads_list = np.random.uniform(  # ruff: ignore[numpy-legacy-random]
                     low=-self._max_abs_rotation_angle,
                     high=self._max_abs_rotation_angle,
                     size=(v.shape[0],),
@@ -574,8 +574,8 @@ class FBPFilterer:
                     # The ramp filter uses the same memory we're about to write into.
                     # Wait for it to complete filtering and producing its output before
                     # we overwrite that memory.
-                    if self.rfilt._e_mem1_free is not None:  # noqa: SLF001
-                        stream.wait_event(self.rfilt._e_mem1_free)  # noqa: SLF001
+                    if self.rfilt._e_mem1_free is not None:  # ruff: ignore[private-member-access]
+                        stream.wait_event(self.rfilt._e_mem1_free)  # ruff: ignore[private-member-access]
                     if self.event_completed_ramp is not None:
                         stream.wait_event(self.event_completed_ramp)
                     if i == 0:
@@ -649,7 +649,7 @@ class FBPFilterer:
                             )
                             # mult_2 = 1 - (
                             #     idx_2 - (sl.stop - 1 / 2)
-                            # )  # TODO: check this  # noqa: FIX002
+                            # )  # TODO: check this  # ruff: ignore[line-contains-todo]
                             mult_2 = sl.stop - (idx_2 - 1 / 2)
                             cp.multiply(
                                 chunkmem[proj_index, :, idx_2],
@@ -685,7 +685,7 @@ class FBPFilterer:
                     stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
                 outs, self.event_completed_ramp = (
-                    self.rfilt._filter_chunk_axis1(  # noqa: SLF001
+                    self.rfilt._filter_chunk_axis1(  # ruff: ignore[private-member-access]
                         chunkmem, input_in_mem1=True
                     )
                 )
@@ -703,7 +703,7 @@ class FBPFilterer:
                             padx : ((-padx) or None),
                             pady : ((-pady) or None),
                         ]
-                        for arr in outs_buffer  # noqa: F821
+                        for arr in outs_buffer  # ruff: ignore[undefined-name]
                     ],
                     self.event_completed_filter,
                 )

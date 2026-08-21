@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from ..volume import Volume
 
 
-class Landweber_flatpanel:  # noqa: N801
+class Landweber_flatpanel:  # ruff: ignore[invalid-class-name]
     """An iterable Landweber reconstructor."""
 
     # _current_iteration_number: int
@@ -162,7 +162,7 @@ class Landweber_flatpanel:  # noqa: N801
                 )  # useful assertion for type-checking
                 # Generate a random positive volume
                 v = np.abs(
-                    np.random.randn(*scratch_volume.shape) * scale_factor  # noqa: NPY002
+                    np.random.randn(*scratch_volume.shape) * scale_factor  # ruff: ignore[numpy-legacy-random]
                 ).astype(np.float32)
                 scratch_volume.copy_from(v)
                 # self._hardmask_vol(
@@ -220,7 +220,7 @@ class Landweber_flatpanel:  # noqa: N801
 
     def iterate(self) -> None:
         """Perform an iteration of the algorithm."""
-        # TODO: reduce memory usage by reusing the same projection data buffer as scratch space.  # noqa: FIX002
+        # TODO: reduce memory usage by reusing the same projection data buffer as scratch space.  # ruff: ignore[line-contains-todo]
 
         # Loop over the ordered subsets
         for meas, proj_scratch_space, rq, zm in zip(
@@ -261,5 +261,5 @@ class Landweber_flatpanel:  # noqa: N801
 
     @property
     def volume(self) -> Volume:
-        """Return the volume/tomogram."""
+        """The volume/tomogram."""
         return self._vol

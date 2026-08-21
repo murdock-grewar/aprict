@@ -23,14 +23,14 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class Test_Config_Sum(
     kern_structs.KernelStruct,
     struct_name="Test_Config_Sum",
     names=["alternate_sign", "multiply_first_term"],
-    dtypes=[np.bool, np.int8],
+    dtypes=[np.bool, np.int8],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

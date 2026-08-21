@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,13 @@
 import numpy as np
 
 from .. import kern_structs
-from .base import bbox, fvec2, fvec3, uivec2, uivec3  # noqa: F401
+from .base import (  # ruff: ignore[unused-import]
+    bbox,
+    fvec2,
+    fvec3,
+    uivec2,
+    uivec3,
+)
 
 __all__ = [
     "Box",
@@ -42,7 +48,7 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class Sphere(
     kern_structs.KernelStruct,
     struct_name="FORBILD_Sphere",
@@ -53,8 +59,8 @@ class Sphere(
         "z",
         "r",
     ],
-    dtypes=[np.float32, np.float32, np.float32, np.float32, np.float32],
-    force_dependencies=[fvec2, fvec3, bbox],
+    dtypes=[np.float32, np.float32, np.float32, np.float32, np.float32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -139,7 +145,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Box(
@@ -162,8 +168,8 @@ class Box(
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -245,7 +251,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cylinder(
@@ -268,8 +274,8 @@ class Cylinder(
         np.float32,
         np.float32,
         fvec3,
-    ],
-    force_dependencies=[fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -395,7 +401,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cylinder_x(
@@ -416,8 +422,8 @@ class Cylinder_x(
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -463,7 +469,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cylinder_y(
@@ -484,8 +490,8 @@ class Cylinder_y(
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -531,7 +537,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cylinder_z(
@@ -552,8 +558,8 @@ class Cylinder_z(
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cylinder, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cylinder, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -599,7 +605,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipsoid(
@@ -622,8 +628,8 @@ class Ellipsoid(
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Sphere, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Sphere, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -677,7 +683,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipsoid_free(
@@ -706,8 +712,8 @@ class Ellipsoid_free(
         fvec3,
         fvec3,
         fvec3,
-    ],
-    force_dependencies=[Sphere, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Sphere, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -782,7 +788,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipt_Cyl(  # Cylinder with an elliptical cross-section
@@ -812,8 +818,8 @@ class Ellipt_Cyl(  # Cylinder with an elliptical cross-section
         fvec3,
         fvec3,
         fvec3,
-    ],
-    force_dependencies=[Cylinder_z, fvec2, fvec3],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cylinder_z, fvec2, fvec3],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -890,7 +896,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipt_Cyl_x(  # Cylinder with an elliptical cross-section
@@ -913,8 +919,8 @@ class Ellipt_Cyl_x(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -971,7 +977,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipt_Cyl_y(  # Cylinder with an elliptical cross-section
@@ -994,8 +1000,8 @@ class Ellipt_Cyl_y(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1052,7 +1058,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Ellipt_Cyl_z(  # Cylinder with an elliptical cross-section
@@ -1075,8 +1081,8 @@ class Ellipt_Cyl_z(  # Cylinder with an elliptical cross-section
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Ellipt_Cyl, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1133,7 +1139,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 # Other cone cases may be reduced to this case
@@ -1157,8 +1163,8 @@ class Cone_z(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cylinder_z, fvec2, fvec3, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cylinder_z, fvec2, fvec3, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ bool _in_region(
     fvec3 v,
@@ -1354,7 +1360,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 """Cone
@@ -1384,8 +1390,8 @@ class Cone(
         np.float32,
         np.float32,
         fvec3,
-    ],
-    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1460,7 +1466,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cone_x(  # Cone with axis parallel to x axis
@@ -1483,8 +1489,8 @@ class Cone_x(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_x, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_x, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1539,7 +1545,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class Cone_y(  # Cone with axis parallel to x axis
@@ -1562,8 +1568,8 @@ class Cone_y(  # Cone with axis parallel to x axis
         np.float32,
         np.float32,
         np.float32,
-    ],
-    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_y, bbox],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[Cone_z, fvec2, fvec3, Cylinder_y, bbox],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1618,7 +1624,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class ClipAxisSpec(  # Cone with axis parallel to x axis
@@ -1629,8 +1635,8 @@ class ClipAxisSpec(  # Cone with axis parallel to x axis
         "dotprod",
         "mode",  # 0 = don't apply this plane. 1 --> enforce axis.r <= dotprod. 2 --> enforce axis.r > dotprod
     ],
-    dtypes=[fvec3, np.float32, np.uint8],
-    force_dependencies=[fvec2, fvec3],
+    dtypes=[fvec3, np.float32, np.uint8],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    force_dependencies=[fvec2, fvec3],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code="""
 __device__ bool _in_region(
     fvec3 v,
@@ -1694,7 +1700,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 _dict_shape_name_to_type_num: dict[str, int] = {
@@ -1763,7 +1769,7 @@ class Shape(  # A generic container for any shape
         fvec3,  # a_y
         fvec3,  # a_z
         fvec3,  # axis
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     force_dependencies=[
         fvec2,
         fvec3,
@@ -1784,7 +1790,7 @@ class Shape(  # A generic container for any shape
         Ellipt_Cyl_y,
         Ellipt_Cyl_z,
         Sphere,
-    ],
+    ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     extra_code=r"""
 __device__ FORBILD_Box _to_Box(const FORBILD_Shape s)
 {
@@ -2443,7 +2449,7 @@ __device__ float exact_line_integral_prioritise_last_approx(
 */
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

@@ -15,5 +15,5 @@
 
 """Tools to interact with CUDA textures/surfaces."""
 
-from . import operations as ops  # noqa: F401
+from . import operations as ops  # ruff: ignore[unused-import]
 from .texture import *

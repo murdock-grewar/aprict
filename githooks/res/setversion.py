@@ -20,7 +20,7 @@ with open(filepath) as f:
 numlines = list(map(list, enumerate(lines)))
 
 # Find candidate lines which might declare the version number.
-candidate_lines = [numline for numline in numlines if numline[1].startswith('version')]
+candidate_lines = [numline for numline in numlines if numline[1].startswith('version')]  # ty: ignore[unresolved-attribute]
 
 # If there isn't exactly one (1) candidate found, then abort.
 num_cands = len(candidate_lines)
@@ -33,9 +33,9 @@ elif num_cands > 1:
 idx_version_line = candidate_lines[0][0]
 
 # Set the new version line
-numlines[idx_version_line][1] = f'version = "{new_version:s}"'
+numlines[idx_version_line][1] = f'version = "{new_version:s}"'  # ty: ignore[invalid-argument-type]
 
 # Write out the new file
 with open(filepath, 'w') as f:
-    f.writelines([numline[1] for numline in numlines])
+    f.writelines([numline[1] for numline in numlines])  # ty: ignore[invalid-argument-type]
     f.write('\n')

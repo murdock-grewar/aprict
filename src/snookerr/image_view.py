@@ -39,7 +39,7 @@ except ImportError:
 
 def plot_projections(
     arr: np.ndarray,  # shape: (num_radiographs, rad_width, rad_height)
-    **kwargs,  # noqa: ANN003
+    **kwargs,  # ruff: ignore[missing-type-kwargs]
 ) -> None:
     """Plot a projection array shaped like (numprojs, det_xwid, det_ywid)."""
     _plot_attenuation(arr.transpose((1, 2, 0)), **kwargs)
@@ -47,7 +47,7 @@ def plot_projections(
 
 def plot_volume(
     arr: np.ndarray,
-    **kwargs,  # noqa: ANN003
+    **kwargs,  # ruff: ignore[missing-type-kwargs]
 ) -> None:
     """Plot a volume array shaped like (X,Y,Z)."""
     _plot_attenuation(arr, **kwargs)

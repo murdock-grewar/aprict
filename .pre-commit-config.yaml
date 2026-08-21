@@ -49,7 +49,7 @@ repos:
       verbose: false # true: always show output, even when test passes
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.6
+  rev: v0.16.4
   hooks:
     - id: ruff-check
       name: (Linting) ruff check

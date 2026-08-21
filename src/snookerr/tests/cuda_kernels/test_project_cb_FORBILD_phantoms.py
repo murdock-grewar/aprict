@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,20 +16,20 @@
 
 """Tests for the CB projection kernel(s)."""
 
-# ruff: disable[D101,D102,N801,ANN201]
-import itertools  # noqa: I001
-import time  # noqa: F401
+# ruff: disable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]
+import itertools  # ruff: ignore[unsorted-imports]
+import time  # ruff: ignore[unused-import]
 
 import cupy as cp
 import numpy as np
 import pytest
 
-from ... import imview  # noqa: F401, RUF100
+from ... import imview  # ruff: ignore[unused-import]
 from ...cuda import header_injection
 from ...lib import gpu_tools
 from ... import phantoms
 
-from ...cuda import structs  # noqa: F401
+from ...cuda import structs  # ruff: ignore[unused-import]
 from ...cuda.structs import (
     config_cb_project_FORBILD as ks_config,
     det_spec as ks_det_spec,
@@ -41,7 +41,7 @@ from ...cuda.structs import (
 str_pytest_gen_sources: str = "ks_gen_sources"
 
 
-def injected_module_texture_chunked() -> cp.RawModule:  # noqa: D103
+def injected_module_texture_chunked() -> cp.RawModule:  # ruff: ignore[undocumented-public-function]
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_project_texture_chunked.cu",
@@ -90,9 +90,9 @@ class TestCB_phantom_FORBILD_head:
         self,
         numprojs: int,
         dtype_proj: np.dtype,
-        request,  # noqa: ANN001
+        request,  # ruff: ignore[missing-type-function-argument]
     ):
-        test_id: str = request.node.callspec.id  # noqa: F841, RUF100
+        test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         self.shapes_cp_arr = cp.array(phantoms.FORBILD.HeadPhantom.shapes)
 
@@ -195,4 +195,4 @@ class TestCB_phantom_FORBILD_head:
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
 
 
-# ruff: enable[D101,D102,N801,ANN201]
+# ruff: enable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]

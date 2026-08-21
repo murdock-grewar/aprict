@@ -27,20 +27,20 @@ from snookerr import liveplot
 from snookerr.cb import flatpanel as cbfp
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:  # ruff: ignore[undocumented-public-function]
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
     live_plot: bool = True
-    default_plot_range_HU: list[int | float] = [0, 100]  # noqa: N806
+    default_plot_range_HU: list[int | float] = [0, 100]  # ruff: ignore[non-lowercase-variable-in-function]
     voxwid_mm: float = 0.5  # the voxel width of the head phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
     )
     apply_noise: bool = False
-    R_mm: float = 1000  # noqa: N806
-    L_mm: float = R_mm + 200  # noqa: N806
+    R_mm: float = 1000  # ruff: ignore[non-lowercase-variable-in-function]
+    L_mm: float = R_mm + 200  # ruff: ignore[non-lowercase-variable-in-function]
     num_sources: int = 1000
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 350  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
@@ -151,7 +151,7 @@ def main() -> None:  # noqa: D103
     projs.create_buffer(dtype=proj_dtype)
     print("Generating the linearised projection data... ", end="", flush=True)
     t1 = time.time()
-    out = cbfp.project(  # noqa: F841
+    out = cbfp.project(  # ruff: ignore[unused-variable]
         config_project,
         vol,
         projs,

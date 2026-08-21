@@ -38,7 +38,9 @@ def inject_headers(path_to_c_file: pathlib.Path | str) -> str:
                 pdep = p.parent.joinpath(fn)
                 s += eol + "\n"
                 with open(pdep, "r", encoding="utf-8") as fdep:
-                    [(s := s + li) for li in fdep]  # ty: ignore[unresolved-reference] # ty is bugged. See issues #3077 and #162 on the ty GitHub page.
+                    [
+                        (s := s + li) for li in fdep
+                    ]  # ty is bugged. See issues #3077 and #162 on the ty GitHub page.
                 s += "\n"
             else:
                 s += line
@@ -59,7 +61,7 @@ def load_injected_module(
     """Create a cupy.RawModule object from a .cu source file.
 
     Local header files will be injected into the file before compilation.
-    """  # noqa: DOC201
+    """  # ruff: ignore[docstring-missing-returns]
     if extraoptions is not None:
         options: tuple[str, ...] = options + extraoptions
     return cp.RawModule(

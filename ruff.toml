@@ -43,11 +43,11 @@ target-version = "py314"
 preview = true
 
 select = ["E4", "E7", "E9", "F", "D"]
-extend-select = ["ANN", "W", "COM", "C4", "EM", "EXE", "FIX", "ICN001", "PIE",
-"RET", "SLF", "TC001", "TC002", "TC003", "TC004", "TC005", "TC010", "ARG", "I",
+extend-select = ["ANN", "W", "COM", "C4", "EM", "EXE", "FIX", "unconventional-import-alias", "PIE",
+"RET", "SLF", "typing-only-first-party-import", "typing-only-third-party-import", "typing-only-standard-library-import", "runtime-import-in-type-checking-block", "empty-type-checking-block", "runtime-string-union", "ARG", "I",
 "C90", "NPY", "N", "PERF", "DOC", "PLC", "PLE", "PLW", "UP", "RUF", "TRY",
 "E"]
-ignore = ["C416", "E22", "E266", "E501", "E741", "UP015", "UP032", "E241", "F403", "COM812"] # ruff complains if COM812 is included,
+ignore = ["unnecessary-comprehension", "E22", "multiple-leading-hashes-for-block-comment", "line-too-long", "ambiguous-variable-name", "redundant-open-modes", "f-string", "multiple-spaces-after-comma", "undefined-local-with-import-star", "missing-trailing-comma"] # ruff complains if COM812 is included,
 # because it's redundant with ruff-format. Adding to ignore list to suppress
 # the warning. ruff-format should add in any missing trailing commas.
 
@@ -67,7 +67,7 @@ ignore-one-line-docstrings = true
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in selected subdirectories.
 [lint.per-file-ignores]
-"__init__.py" = ["E402"]
+"__init__.py" = ["module-import-not-at-top-of-file"]
 
 [lint.flake8-type-checking]
 # Enforce quotes around type annotations, in the event that doing so would allow us to avoid importing at runtime, by using an if TYPE_CHECKING block. Has no effect on Python 3.14+ because the type annotations are equivalent to quoted types from that version of Python and onwards. See https://docs.astral.sh/ruff/rules/typing-only-first-party-import/

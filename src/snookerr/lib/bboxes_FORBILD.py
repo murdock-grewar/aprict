@@ -1,4 +1,4 @@
-# noqa: N999
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -55,7 +55,7 @@ def _get_c_type_name(arr: np.ndarray | cp.ndarray) -> str:
     return _c_type_name_dict[arr.dtype]
 
 
-def bboxes_FORBILD_shapes(  # noqa: N802
+def bboxes_FORBILD_shapes(  # ruff: ignore[invalid-function-name]
     shapes: list[fv.Shape] | np.ndarray[np.dtype[fv.Shape]],  # ty:ignore[invalid-type-arguments]
     *,
     block: bool = True,

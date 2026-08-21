@@ -27,7 +27,7 @@ import numpy as np
 # I have not checked for an article citation at this stage.
 
 
-def _phi(d: int, iterations: int = 100):  # noqa: ANN202
+def _phi(d: int, iterations: int = 100):  # ruff: ignore[missing-return-type-private-function]
     x = np.array(2, dtype=np.float64)
     for _ in range(iterations):
         x = np.float_power(1 + x, 1 / (d + 1))
@@ -36,7 +36,7 @@ def _phi(d: int, iterations: int = 100):  # noqa: ANN202
 
 def lds_nd(
     n: int,
-    range_tuples: tuple[typing.Sequence[tuple[float, float]]] | None = None,
+    range_tuples: tuple[tuple[float, float], ...] | None = None,
 ) -> map[tuple[float, ...]]:
     """Generate a low-discrepancy sequence on an N-dimensional rectangular prism. Only really works for cubes."""
     if range_tuples is None:
@@ -51,24 +51,23 @@ def lds_nd(
     ratios_wrt_biggest = tuple(range_ / biggest_range for range_ in ranges)
 
     phi_n: np.float64 = _phi(n, 1000)
-    # ty incorrectly says that 'as_' isn't used.
-    as_: tuple[typing.Sequence[np.float64]] = tuple(
+    as_: tuple[np.float64, ...] = tuple(
         np.float_power(phi_n, -i) for i in range(1, n + 1)
     )
 
-    filter_predicate = lambda zero_based_tuple: all(  # noqa: E731
+    filter_predicate = lambda zero_based_tuple: all(  # ruff: ignore[lambda-assignment]
         val < ratio_wrt_biggest
         for val, ratio_wrt_biggest in zip(zero_based_tuple, ratios_wrt_biggest)
     )
 
-    return map(  # noqa: C417
+    return map(  # ruff: ignore[unnecessary-map]
         lambda val_tuple: tuple(
             biggest_range * val + range_min
             for range_min, val in zip(mins, val_tuple)
         ),
         filter(
             filter_predicate,
-            map(  # noqa: C417
+            map(  # ruff: ignore[unnecessary-map]
                 lambda m: tuple(((m * as_[i]) % 1) for i in range(n)),
                 itertools.count(),  # generates 0,1,2,3,4,...
             ),
@@ -80,23 +79,23 @@ def lds_cyl(
     zmin: float, zmax: float, rad: float, eccentricity: float = 1
 ) -> map[tuple[float, float]]:
     """Generate a low-discrepancy sequence on an unrolled cylinder."""
-    return map(  # noqa: C417
+    return map(  # ruff: ignore[unnecessary-map]
         lambda zt: (zmin + zt[0] * eccentricity * rad, zt[1]),
         lds_nd(
             2,
             range_tuples=(
                 (0, (zmax - zmin) / eccentricity / rad),
                 (0, 2 * np.pi),
-            ),  # ty:ignore[invalid-argument-type]  # ty is wrong here
+            ),
         ),
     )
 
 
 def lds_cyl_tiled_batched_gen(
-    R: float,  # cylinder radius  # noqa: N803
+    R: float,  # cylinder radius  # ruff: ignore[invalid-argument-name]
     h: float,  # cylinder height
     zmin: float,  # cylinder min z
-    N: int,  # points per batch  # noqa: N803
+    N: int,  # points per batch  # ruff: ignore[invalid-argument-name]
     s: int = 1,  # parity of helix, -1 or 1
 ) -> typing.Generator[list[tuple[float, float]]]:
     """Create a generator of points.
@@ -107,7 +106,7 @@ def lds_cyl_tiled_batched_gen(
     p1 = next(g) # p1 = (z1, phi1)
     p2 = next(g) # p2 = (z2, phi2)
     # ...
-    """  # noqa: DOC402, DOC501
+    """  # ruff: ignore[docstring-missing-yields, docstring-missing-exception]
     if s not in (-1, 1):
         msg = f"s should be -1 or 1, but it is {s}"
         raise ValueError(msg)
@@ -119,7 +118,7 @@ def lds_cyl_tiled_batched_gen(
     # m is the number of tiles around one sheared band
     m = math.ceil(math.sqrt(N * 2 * math.pi * R / h))
     # W is the physical sidelength of a square tile, before it is sheared
-    W = 2 * math.pi * R / m  # noqa: N806
+    W = 2 * math.pi * R / m  # ruff: ignore[non-lowercase-variable-in-function]
     # Stepsize
     dz = s * W / m
     dt = 2 * math.pi / m
@@ -166,9 +165,9 @@ def lds_cyl_tiled_batched_gen(
 
 def peel_cyl_points_arr(
     zt_arr: np.ndarray | list[tuple[float, float]],
-    R: float,  # noqa: N803
-    vZ: float,  # noqa: N803
-    vA: float,  # noqa: N803
+    R: float,  # ruff: ignore[invalid-argument-name]
+    vZ: float,  # ruff: ignore[invalid-argument-name]
+    vA: float,  # ruff: ignore[invalid-argument-name]
     phi_offset: float = 0,
     reverse: bool = False,
     reverse_parity: bool = False,
@@ -227,19 +226,19 @@ def peel_cyl_points_arr(
     dtimes = stop_time + np.amax(
         dzdt / np.array([[vZ, vA]], dtype=np.float32), axis=1
     )
-    times = np.array([0] + np.cumsum(dtimes).tolist())  # noqa: RUF005
+    times = np.array([0] + np.cumsum(dtimes).tolist())  # ruff: ignore[collection-literal-concatenation]
 
     # Construct the full array
     tzp = np.concatenate((times[:, np.newaxis], zt_new), axis=1)
-    return tzp  # noqa: RET504
+    return tzp  # ruff: ignore[unnecessary-assign]
 
 
-def peel_cyl_zts_gen(  # noqa: D103
+def peel_cyl_zts_gen(  # ruff: ignore[undocumented-public-function]
     zt_gen: typing.Iterable[tuple[float, float]],
     num_per_batch: int,
-    R: float,  # noqa: N803
-    vZ: float,  # noqa: N803
-    vA: float,  # noqa: N803
+    R: float,  # ruff: ignore[invalid-argument-name]
+    vZ: float,  # ruff: ignore[invalid-argument-name]
+    vA: float,  # ruff: ignore[invalid-argument-name]
     phi_offset: float = 0,
     reverse: bool = False,
     reverse_parity: bool = False,
@@ -274,7 +273,7 @@ def peel_cyl_zts_gen(  # noqa: D103
                     t_offset += stop_time + max(
                         abs(zfirst - zlast) / vZ, abs(phifirst - philast) / vA
                     )
-            time += t_offset  # noqa: PLW2901
+            time += t_offset  # ruff: ignore[redefined-loop-name]
             yield (time, z, phi)
             # phi_last = t  # Commented out because I'm not sure how best to start the next cycle when the previous one ends. Not too important, anyway.
         zlast, philast = z, phi
@@ -288,9 +287,9 @@ def peel_cyl_zts_gen(  # noqa: D103
 def lds_cyl_dynamic_batched_gen(
     zmin: float,
     zmax: float,
-    R: float,  # The source-to-axis distance.  # noqa: N803
-    vZ: float,  # Speed of translation of stage (units of distance per unit of time)  # noqa: N803
-    vA: float,  # Speed of rotation of stage (radians per unit of time)  # noqa: N803
+    R: float,  # The source-to-axis distance.  # ruff: ignore[invalid-argument-name]
+    vZ: float,  # Speed of translation of stage (units of distance per unit of time)  # ruff: ignore[invalid-argument-name]
+    vA: float,  # Speed of rotation of stage (radians per unit of time)  # ruff: ignore[invalid-argument-name]
     num_per_batch: int,  # Number of points per complete sampling of the cylinder.
     yield_whole_batches: bool = False,
     theta_start: float = 0,
@@ -306,7 +305,7 @@ def lds_cyl_dynamic_batched_gen(
     # Define the point iterator
     generator = lds_cyl(zmin=zmin, zmax=zmax, rad=R)
     # Add the theta_start
-    generator = map(  # noqa: C417
+    generator = map(  # ruff: ignore[unnecessary-map]
         lambda zt_tup: (zt_tup[0], zt_tup[1] + theta_start), generator
     )
     # Reorder the points within each batch according to the 'peel' method.
@@ -336,8 +335,8 @@ def lds_cyl_dynamic_batched_gen(
 #   pages={309--327},
 #   year={2006}
 # }
-def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
-    N: int,  # noqa: N803
+def points_by_equal_area_partitioning_on_sphere(  # ruff: ignore[complex-structure, undocumented-public-function]
+    N: int,  # ruff: ignore[invalid-argument-name]
     _take_half: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:  # Theta, Phi
     if type(N) is not int:
@@ -347,28 +346,28 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
     # d = 2, because we work with the 2-dimensional sphere.
 
     # eq. (2.9)
-    def Nu(theta: float) -> float:  # noqa: N802
+    def Nu(theta: float) -> float:  # ruff: ignore[invalid-function-name]
         return 4 * np.pi * np.square(np.sin(theta / 2))
 
     # eq. (2.10) -- Theta is the inverse of Nu.
-    def Theta(x: float) -> float:  # noqa: N802
+    def Theta(x: float) -> float:  # ruff: ignore[invalid-function-name]
         return 2 * np.arcsin(np.sqrt(x / (4 * np.pi)))
 
     # -- Formula in Section 3 --
 
     # 1. Determining the colatitudes of polar caps.
     # Unnumbered equation before (3.1)
-    Nu_R: float = 4 * np.pi / N  # noqa: N806
+    Nu_R: float = 4 * np.pi / N  # ruff: ignore[non-lowercase-variable-in-function]
     # eq. (3.1)
     theta_c: float = Theta(Nu_R)
 
     # 2. Determining an ideal collar angle.
     # Unnumbered equation
-    delta_I: float = np.sqrt(Nu_R)  # noqa: N806
+    delta_I: float = np.sqrt(Nu_R)  # ruff: ignore[non-lowercase-variable-in-function]
 
     # 3. Determining an ideal number of collars.
     # Unnumbered equation
-    n_I: float = (  # noqa: N806
+    n_I: float = (  # ruff: ignore[non-lowercase-variable-in-function]
         np.pi - 2 * theta_c
     ) / delta_I  # ideal number of collars
 
@@ -383,15 +382,15 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
         n = n + (n % 2)
 
     # 5. Creating a list of the ideal number of regions in each collar.
-    delta_F: float = n_I / n * delta_I  # noqa: N806
-    theta_F: list[float] = list(theta_c + np.arange(n + 1) * delta_F)  # noqa: N806
+    delta_F: float = n_I / n * delta_I  # ruff: ignore[non-lowercase-variable-in-function]
+    theta_F: list[float] = list(theta_c + np.arange(n + 1) * delta_F)  # ruff: ignore[non-lowercase-variable-in-function]
     y: list[float] = [
         (Nu(theta_F[i + 1]) - Nu(theta_F[i])) / Nu_R for i in range(n)
     ]
 
     # 6. Creating a list of the actual number of regions in each collar.
     a: list[float] = [0]
-    m: list[float] = []
+    m: list[int] = []
     for i in range(len(y)):
         m.append(round(y[i] + a[i]))
         a.append(a[-1] + y[i] - m[i])
@@ -399,10 +398,10 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
     if _take_half:
         # Round up the m to make sure they're even
         m = [mel + (mel % 2) for mel in m]
-        Nu_R = 4 * np.pi / (2 + sum(m))  # noqa: N806
+        Nu_R = 4 * np.pi / (2 + sum(m))  # ruff: ignore[non-lowercase-variable-in-function]
 
     # 7. Creating a list of colatitudes of each zone.
-    m_cumsum: list[float] = [0] + list(np.cumsum(m))  # noqa: RUF005
+    m_cumsum: list[float] = [0] + list(np.cumsum(m))  # ruff: ignore[collection-literal-concatenation]
     theta: list[float] = [0]
     theta.extend([Theta((1 + m_cumsum[i]) * Nu_R) for i in range(n + 1)])
     if not _take_half:
@@ -423,7 +422,7 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
         theta.append(np.pi)
 
     # Create a top and bottom "collar" corresponding to the polar caps.
-    m = [1] + m  # noqa: RUF005
+    m = [1] + m  # ruff: ignore[collection-literal-concatenation]
     if not _take_half:
         m.append(1)
 
@@ -442,7 +441,7 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
     # Theta_out: np.ndarray = np.empty((num_points,), dtype=np.float32)
     # Phi_out: np.ndarray = np.empty((num_points,), dtype=np.float32)
 
-    Theta_Phi: list[list[float]] = []  # noqa: N806
+    Theta_Phi: list[list[float]] = []  # ruff: ignore[non-lowercase-variable-in-function]
     for theta_, phi_offset_, m_ in zip(theta, phi_offset, m):
         phi_lst: np.ndarray = phi_offset_ + np.linspace(
             0, 2 * np.pi, endpoint=False, num=m_
@@ -451,13 +450,13 @@ def points_by_equal_area_partitioning_on_sphere(  # noqa: C901, D103
             phi_lst = phi_lst[: (1 if m_ == 1 else m_ // 2)]
         Theta_Phi.extend([[theta_, phi_] for phi_ in phi_lst])
 
-    Theta_Phi_out = np.array(Theta_Phi)  # noqa: N806
+    Theta_Phi_out = np.array(Theta_Phi)  # ruff: ignore[non-lowercase-variable-in-function]
 
     return Theta_Phi_out[:, 0], Theta_Phi_out[:, 1]
 
 
-def lines_by_equal_area_partitioning_on_sphere(  # noqa: D103
-    N_approx: int,  # noqa: N803
+def lines_by_equal_area_partitioning_on_sphere(  # ruff: ignore[undocumented-public-function]
+    N_approx: int,  # ruff: ignore[invalid-argument-name]
 ) -> tuple[np.ndarray, np.ndarray]:  # Theta, Phi
     if type(N_approx) is not int:
         msg = "'N_approx' should be of type 'int'."
@@ -474,7 +473,7 @@ def lines_by_equal_area_partitioning_on_sphere(  # noqa: D103
 
 # From https://arxiv.org/pdf/0912.4540.pdf
 # The Roberts term is from https://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/#more-3069
-def uniformly_distributed_points_on_sphere_fibonacci_lattice(  # noqa: D103
+def uniformly_distributed_points_on_sphere_fibonacci_lattice(  # ruff: ignore[undocumented-public-function]
     n_odd: int, roberts_term: bool = False
 ) -> tuple[np.ndarray, np.ndarray]:  # Theta, Phi
     if type(n_odd) is not int:
@@ -485,12 +484,12 @@ def uniformly_distributed_points_on_sphere_fibonacci_lattice(  # noqa: D103
         msg = "'n_odd' must be odd."
         raise ValueError(msg)
     # The Roberts term is appropriate for minimising the distance between points, whereas I think without the Roberts term it's better for having about the same area 'occupied' by each point. It's better without the Roberts term when we're trying to get the number of points to be roughly the same per unit solid angle (steradian), anywhere on the sphere.
-    P = n_odd  # noqa: N806
-    N = P // 2  # noqa: N806
+    P = n_odd  # ruff: ignore[non-lowercase-variable-in-function]
+    N = P // 2  # ruff: ignore[non-lowercase-variable-in-function]
     golden_ratio = (1 + np.sqrt(5)) / 2
     arange = np.arange(-N, N + 1)
-    Theta = np.arccos(2 * (arange + (0.36 if roberts_term else 0)) / P)  # noqa: N806
-    Phi = 2 * np.pi * arange / golden_ratio  # noqa: N806
+    Theta = np.arccos(2 * (arange + (0.36 if roberts_term else 0)) / P)  # ruff: ignore[non-lowercase-variable-in-function]
+    Phi = 2 * np.pi * arange / golden_ratio  # ruff: ignore[non-lowercase-variable-in-function]
     # Normalise to the conventional coordinate ranges
-    Phi = np.mod(Phi, 2 * np.pi)  # noqa: N806
+    Phi = np.mod(Phi, 2 * np.pi)  # ruff: ignore[non-lowercase-variable-in-function]
     return Theta, Phi

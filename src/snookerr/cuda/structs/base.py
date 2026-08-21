@@ -28,12 +28,12 @@ __all__ = [
 ]
 
 
-# ruff: disable[D101,N801]
+# ruff: disable[undocumented-public-class,invalid-class-name]
 class uivec2(
     kern_structs.KernelStruct,
     struct_name="uivec2",
     names=["x", "y"],
-    dtypes=[np.uint32, np.uint32],
+    dtypes=[np.uint32, np.uint32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor from unsigned ints
@@ -42,14 +42,14 @@ public:
     uivec2() = default;
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class fvec2(
     kern_structs.KernelStruct,
     struct_name="fvec2",
     names=["x", "y"],
-    dtypes=[np.float32, np.float32],
+    dtypes=[np.float32, np.float32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor from floats
@@ -58,14 +58,14 @@ public:
     fvec2() = default;
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class uivec3(
     kern_structs.KernelStruct,
     struct_name="uivec3",
     names=["x", "y", "z"],
-    dtypes=[np.uint32, np.uint32, np.uint32],
+    dtypes=[np.uint32, np.uint32, np.uint32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor from floats
@@ -110,14 +110,14 @@ __device__ float dot_prod(
 
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class ulvec3(
     kern_structs.KernelStruct,
     struct_name="ulvec3",
     names=["x", "y", "z"],
-    dtypes=[np.uint64, np.uint64, np.uint64],
+    dtypes=[np.uint64, np.uint64, np.uint64],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor
@@ -126,17 +126,17 @@ public:
     ulvec3() = default;
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class fvec3(
     kern_structs.KernelStruct,
     struct_name="fvec3",
     names=["x", "y", "z"],
-    dtypes=[np.float32, np.float32, np.float32],
+    dtypes=[np.float32, np.float32, np.float32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     force_dependencies=[
         uivec3
-    ],  # used to define a constructor in terms of uivec3
+    ],  # used to define a constructor in terms of uivec3  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor from floats
@@ -269,14 +269,14 @@ __device__ fvec3 operator/(
 }
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
 class bbox(
     kern_structs.KernelStruct,
     struct_name="bbox",
     names=["xyz_min", "xyz_max"],
-    dtypes=[fvec3, fvec3],
+    dtypes=[fvec3, fvec3],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
     insert_into_struct="""
 public:
     // implicit constructor from fvec3s
@@ -285,7 +285,7 @@ public:
     bbox() = default;
 """,
 ):
-    pass  # ty:ignore[invalid-argument-type]
+    pass
 
 
-# ruff: enable[D101,N801]
+# ruff: enable[undocumented-public-class,invalid-class-name]

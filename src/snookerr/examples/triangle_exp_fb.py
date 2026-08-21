@@ -27,7 +27,7 @@ from snookerr import liveplot
 from snookerr.cb import flatpanel as cbfp
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:  # ruff: ignore[undocumented-public-function]
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
@@ -41,7 +41,7 @@ def main() -> None:  # noqa: D103
     )
     numits: int = 100  # Number of SIRT iterations to apply
     apply_noise: bool = True
-    D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle  # noqa: N806
+    D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle  # ruff: ignore[non-lowercase-variable-in-function]
     flattened_corner_width_mm: float = 440  # also the detector width
     det_aspect_ratio: float = 1  # how many times taller than wide
     num_sources_per_side: int = 17 * 1
@@ -56,7 +56,7 @@ def main() -> None:  # noqa: D103
     # - D = Distance from center to closest point on edge is r / sqrt(2)
 
     # Derived quantities
-    D = D_mm / voxwid_mm  # noqa: N806
+    D = D_mm / voxwid_mm  # ruff: ignore[non-lowercase-variable-in-function]
     flattened_corner_width = flattened_corner_width_mm / voxwid_mm
     pixwid = pixwid_mm / voxwid_mm
     fcw: float = flattened_corner_width

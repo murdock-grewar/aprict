@@ -27,7 +27,7 @@ from snookerr import liveplot
 from snookerr.cb import flatpanel as cbfp
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:  # ruff: ignore[undocumented-public-function]
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
@@ -38,8 +38,8 @@ def main() -> None:  # noqa: D103
         1
     )
     apply_noise: bool = False
-    R_mm: float = 175  # noqa: N806
-    L_mm: float = 425  # noqa: N806
+    R_mm: float = 175  # ruff: ignore[non-lowercase-variable-in-function]
+    L_mm: float = 425  # ruff: ignore[non-lowercase-variable-in-function]
     num_sources: int = 500
     num_turns: float = 0.618 * num_sources
     total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
@@ -151,7 +151,7 @@ def main() -> None:  # noqa: D103
     projs.create_buffer(dtype=proj_dtype)
     print("Generating the linearised projection data... ", end="", flush=True)
     t1 = time.time()
-    out = cbfp.project(  # noqa: F841
+    out = cbfp.project(  # ruff: ignore[unused-variable]
         config_project,
         vol,
         projs,

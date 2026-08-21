@@ -63,8 +63,8 @@ class FBPFiltererCPU:
     def __init__(
         self,
         *,
-        R: float,  # noqa: N803
-        L: float,  # noqa: N803
+        R: float,  # ruff: ignore[invalid-argument-name]
+        L: float,  # ruff: ignore[invalid-argument-name]
         physpixwid: float,
         proj_2d_shape: tuple[int, int],
         projs_per_batch: int | None = None,
@@ -90,7 +90,7 @@ class FBPFiltererCPU:
 
         # Construct the multiplicative mask
         # NOTE: Y is the horizontal coordinate on the detector midplane. X is the vertical.
-        Yarr = (  # noqa: N806
+        Yarr = (  # ruff: ignore[non-lowercase-variable-in-function]
             physpixwid
             * (R / L)
             * (
@@ -98,7 +98,7 @@ class FBPFiltererCPU:
                 - (self._expanded_2d_shape[0] - 1) / 2
             )
         )
-        Xarr = (  # noqa: N806
+        Xarr = (  # ruff: ignore[non-lowercase-variable-in-function]
             physpixwid
             * (R / L)
             * (
@@ -226,7 +226,7 @@ class FBPFiltererCPU:
             # Multiply the last nonzero row by a number between 0 and 1
             mult_2 = 1 - (
                 idx_2 - (sl.stop - 1 / 2)
-            )  # TODO: check this  # noqa: FIX002
+            )  # TODO: check this  # ruff: ignore[line-contains-todo]
             v = np_padded_arr_3d[:, :, idx_2]
             ne.evaluate(
                 "v * mult_2", out=v, local_dict={"v": v, "mult_2": mult_2}
@@ -239,7 +239,7 @@ class FBPFiltererCPU:
 
     @property
     def zeta(self) -> float:
-        """Get the maximum rotation angle which can be accomodated by this object."""
+        """The maximum rotation angle which can be accomodated by this object."""
         return self._max_abs_rotation_angle
 
     @classmethod
@@ -247,7 +247,7 @@ class FBPFiltererCPU:
         cls,
         proj_2d_shape: tuple[int, int],
         physpixwid: float,
-        L: float,  # noqa: N803
+        L: float,  # ruff: ignore[invalid-argument-name]
     ) -> float:
         """Get the maximum rotation angle which can be accomodated by an instance of this object."""
         # Compute the maximum rotation angle.
@@ -289,7 +289,7 @@ class FBPFiltererCPU:
 
         return tuple(expanded_proj_2d_shape)  # ty:ignore[invalid-return-type]
 
-    def filter_bulk_axis1_stream(  # noqa: C901
+    def filter_bulk_axis1_stream(  # ruff: ignore[complex-structure]
         self,
         nparr_view: np.ndarray | np.memmap,
         force_rotation_angle: float | None = None,
@@ -422,7 +422,7 @@ class FBPFiltererCPU:
             # Determine the rotatian angles. It could be different angles for each layer, or a uniform rotation.
             # Rotate and copy into the memory buffer
             if force_rotation_angle is None:
-                rotang_rads_list = np.random.uniform(  # noqa: NPY002
+                rotang_rads_list = np.random.uniform(  # ruff: ignore[numpy-legacy-random]
                     low=-self._max_abs_rotation_angle,
                     high=self._max_abs_rotation_angle,
                     size=(sl_len,),
@@ -468,7 +468,7 @@ class FBPFiltererCPU:
                 workers=sl_len,  # match number of workers to CPU count
                 # plan=self._fft_plan_forward,
             )
-            fft_mult = self._fft_mult_horz_broadcastable  # noqa: F841
+            fft_mult = self._fft_mult_horz_broadcastable  # ruff: ignore[unused-variable]
             ne.evaluate("fft_out * fft_mult", out=fft_out)
             ramp_filtered_data = fft.irfft(
                 fft_out,
@@ -501,7 +501,7 @@ class FBPFiltererCPU:
                 ),
                 dtype=self._output_buffer_postrotation.dtype,
             )
-            out_view = self._output_buffer_postrotation[  # noqa: F841
+            out_view = self._output_buffer_postrotation[  # ruff: ignore[unused-variable]
                 :sl_len,
                 padx : ((-padx) or None),
                 pady : ((-pady) or None),
@@ -538,7 +538,7 @@ if __name__ == "__main__":
         physpixwid=0.1,
     )
     nparr = np.zeros((64, *shape_2d), dtype=np.float32)
-    nparr = np.random.randn(*nparr.shape).astype(np.float32)  # noqa: NPY002
+    nparr = np.random.randn(*nparr.shape).astype(np.float32)  # ruff: ignore[numpy-legacy-random]
     rotangs = np.linspace(-0.1, 0.1, endpoint=True, num=ncycles)
     # nparr[:, nparr.shape[1] // 2, :] = 1
     t1 = time.time()

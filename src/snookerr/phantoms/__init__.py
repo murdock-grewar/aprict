@@ -15,7 +15,9 @@
 
 """Phantom objects useful for simulations and testing."""
 
-from .FORBILD_phantoms import PhantomContainer as FORBILD  # noqa: N814
+from .FORBILD_phantoms import (
+    PhantomContainer as FORBILD,  # ruff: ignore[camelcase-imported-as-constant]
+)
 
 __all__ = [
     "FORBILD",

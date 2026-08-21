@@ -33,7 +33,7 @@ try:
 except ModuleNotFoundError:
     mod_avail_imview: bool = False
 try:
-    from .. import liveplot  # noqa: F401
+    from .. import liveplot  # ruff: ignore[unused-import]
 
     mod_avail_liveplot: bool = True
 except ModuleNotFoundError:
@@ -319,7 +319,7 @@ def get_ordered_subsets_and_masks(
         )
         det_numpixwid = pg.nu[0]
         det_numpixhei = pg.nv[0]
-        R = np.mean(  # noqa: N806
+        R = np.mean(  # ruff: ignore[non-lowercase-variable-in-function]
             np.sqrt(
                 ne.evaluate(
                     "sum(unit*vec*vec, 1)",
@@ -327,7 +327,7 @@ def get_ordered_subsets_and_masks(
                 )
             )
         )
-        L = np.mean(  # noqa: N806
+        L = np.mean(  # ruff: ignore[non-lowercase-variable-in-function]
             np.sqrt(
                 ne.evaluate(
                     "sum(unit*vec*vec, 1)",
@@ -506,6 +506,9 @@ def main() -> None:
         # Do nothing if the output path is None.
         if path_output is None:
             return
+
+        # ty is not smart enough to understand that path_intms can be None only when path_output is None
+        assert path_intms is not None
 
         # Get the current volume
         x = recon.volume.as_numpy()
