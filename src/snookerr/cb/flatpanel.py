@@ -240,8 +240,9 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
         """Return a bounding box."""
         # Make a list of points such that the whole projection geometry
         # is contained in the convex hull. Then take the min x,y,z and max x,y,z
-        it = slice(None, None) if index_tuple is None else index_tuple
-        axes = tuple(range(len(self.projs_list_shape)))
+        # it = slice(None, None) if index_tuple is None else index_tuple
+        it = () if index_tuple is None else index_tuple
+        axes = tuple(range(len(self.projs_list_shape) - len(it)))
         min_xyz, max_xyz = None, None
         for points in (
             self.source_pos[it],
@@ -896,6 +897,8 @@ def project(
     # Compute the projection. Loop through higher dimensions of the passed array, if applicable.
     for index_tuple in itertools.product(
         *map(range, projs.proj_specs.shape[:-1])
+        # The below line should be equivalent and more idiomatic, but may be slightly more flaky
+        # *map(range, projs.proj_geom.projs_list_shape[:-1])
     ):
         # If a flat proj_specs was passed, then 'index_tuple' will only take on the value of an  empty tuple.
         input_proj_specs_slice = cp.array(projs.proj_specs[index_tuple])
