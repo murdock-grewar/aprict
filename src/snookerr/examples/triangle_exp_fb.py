@@ -40,12 +40,15 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     fast_backproj: bool = (
         True  # whether to use the fast approximate backrpojection
     )
-    numits: int = 100  # Number of SIRT iterations to apply
+    numits: int = 100  # Number of Landweber iterations to apply
     apply_noise: bool = True
     D_mm: float = 658.353  # shortest distance from center to the edge of the equilateral triangle  # ruff: ignore[non-lowercase-variable-in-function]
     flattened_corner_width_mm: float = 440  # also the detector width
     det_aspect_ratio: float = 1  # how many times taller than wide
-    num_sources_per_side: int = 17 * 1
+    num_sources_per_side: int = 9 * 1
+    source_z_spread_ratio: float = (
+        0.0  # how much to stagger the z position of adjacent sources
+    )
     pixwid_mm: float = 0.3
     curved_source_edges: bool = True
     total_clearfield_photons: float = 5e12  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
@@ -94,7 +97,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     rdet: float = float(np.linalg.norm((e12 + e21) / 2))
     detwid: float = flattened_corner_width
     dethei: float = detwid * det_aspect_ratio
-    source_z_spread: float = dethei * 0.7
+    source_z_spread: float = dethei * source_z_spread_ratio
 
     # Print some information about the geometry
     print("Distance from center to detector (mm): ", rdet * voxwid_mm)
@@ -426,16 +429,17 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
         show=True,
     )
 
-    # Make a SIRT object
+    # Make a Landweber object
     working_vol.fill(0)
-    recon = snookerr.iterators.SIRT_flatpanel(
-        config=snookerr.iterators.SIRT_flatpanel.Config(
+    recon = snookerr.iterators.Landweber_flatpanel(
+        config=snookerr.iterators.Landweber_flatpanel.Config(
             fast_backproject=fast_backproj,
             soft_from_cylinder_relrad=0.95,
             bp_soft_from_detedge_relrad=0.95,
         ),
         volume=working_vol,
         projs=projs,
+        logger=None,
     )
     for i in range(numits + 1):
         s = f"Iteration {i:04d}/{numits:04d}"
