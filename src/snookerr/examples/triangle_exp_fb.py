@@ -15,6 +15,7 @@
 
 """Simulate an example experiment with a triangular scanning apparatus."""
 
+import itertools
 import time
 
 import cupy as cp
@@ -299,13 +300,39 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ax.add_collection(
         Poly3DCollection([verts1_mm, verts2_mm, verts3_mm], alpha=0.7)
     )
-    # Plot the sphere representing the object
-    u = np.linspace(0, 2 * np.pi, 100)
-    v = np.linspace(0, np.pi, 100)
-    x = volwid_mm / 2 * np.outer(np.cos(u), np.sin(v))
-    y = volwid_mm / 2 * np.outer(np.sin(u), np.sin(v))
-    z = volwid_mm / 2 * np.outer(np.ones(np.size(u)), np.cos(v))
-    ax.plot_surface(x, y, z, color="black", alpha=0.3, label="object")
+    ## Plot the sphere representing the object
+    # u = np.linspace(0, 2 * np.pi, 100)
+    # v = np.linspace(0, np.pi, 100)
+    # x = volwid_mm / 2 * np.outer(np.cos(u), np.sin(v))
+    # y = volwid_mm / 2 * np.outer(np.sin(u), np.sin(v))
+    # z = volwid_mm / 2 * np.outer(np.ones(np.size(u)), np.cos(v))
+    # ax.plot_surface(x, y, z, color="black", alpha=0.3, label="object")
+    # Plot a bounding box of the object
+    bounds = np.array(
+        vol.get_bbox(), dtype=np.float32
+    ).transpose()  # shape (3, 2)
+    firstface = True
+    for faceaxis in (0, 1, 2):
+        for facesign in (0, 1):
+            val = bounds[faceaxis][facesign]
+            fbounds = [bounds[i] for i in (0, 1, 2) if i != faceaxis]
+            face_points_xyz = np.array(
+                list(itertools.product(*fbounds))
+            ).transpose()
+            face_points_xyz = np.insert(
+                face_points_xyz,
+                faceaxis,
+                np.array([val, val, val, val], dtype=np.float32),
+                axis=0,
+            )
+            face_points_xyz = np.reshape(face_points_xyz, shape=(3, 2, 2))
+            ax.plot_surface(
+                *face_points_xyz,
+                color="black",
+                alpha=1 - np.sqrt(1 - 0.3),
+                label="object" if firstface else None,
+            )
+            firstface = False
     ax.legend()
     plt.show()
 
