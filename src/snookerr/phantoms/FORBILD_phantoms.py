@@ -201,6 +201,16 @@ class _MetaPhantomContainer(type):
         return fbv
 
     @property
+    def RockCanisterCavities1e5(cls) -> FBVolume:
+        return FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath(
+                    "custom_other/rock_canister_01_cavities_1e5.pha"
+                )
+            )
+        )
+
+    @property
     def UnitCyl_z(cls) -> FBVolume:
         return FBVolume(
             ppf.convert_ph_file_to_shapes(
