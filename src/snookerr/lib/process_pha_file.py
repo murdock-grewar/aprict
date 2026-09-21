@@ -155,6 +155,11 @@ def _convert_preprocessed_ph_str_to_shapes(
         lambda m: "-" + m.groups()[0],
         s,
     )
+    # For correct processing with my regex patterns, we need spaces before/after opening/closing brackets/braces.
+    s = re.sub(r"\{", lambda _: " { ", s)
+    s = re.sub(r"\}", lambda _: " } ", s)
+    s = re.sub(r"\[", lambda _: " [ ", s)
+    s = re.sub(r"\]", lambda _: " ] ", s)
 
     objs = re_obj.findall(s)
     nprocs = max(1, 2 * int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
