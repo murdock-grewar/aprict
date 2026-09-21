@@ -539,8 +539,10 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         circularise: bool,
         alternate_with_g2: bool,
         randomise_parity: bool,  # effectively supersedes 'alternate_with_g2'
-    ) -> str:
-        ans: str = ""
+    ) -> np.ndarray[tuple[int, ...], np.dtype[fv.Shape]]:  # ty: ignore[invalid-type-arguments]
+        shapes: list[np.ndarray[tuple[int, ...], np.dtype[fv.Shape]]] = []  # ty: ignore[invalid-type-arguments]
+        s = np.array(0, dtype=fv.Shape)
+        # ans: str = ""
         # Hardcoded parameters
         crf: float = np.sqrt(
             2 * (1 - np.cos(2 * np.pi / 6))
@@ -598,12 +600,26 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                     if randomise_parity:
                         theta += 0 if np.random.random() < 0.5 else np.pi  # ruff: ignore[numpy-legacy-random, redefined-loop-name]
                     ax, ay, az = np.cos(theta), np.sin(theta), 0
-                    ans += (
-                        "{"
-                        + f"[Cone: x={-ax * r + tx_} y={-ay * r + ty_} z={-az * r} r1={r1} r2={r2} l={l} axis({ax},{ay},{az})] rho={rho}"
-                        + "}\n"
-                    )
-        return ans
+                    # ans += (
+                    #    "{"
+                    #    + f"[Cone: x={-ax * r + tx_} y={-ay * r + ty_} z={-az * r} r1={r1} r2={r2} l={l} axis({ax},{ay},{az})] rho={rho}"
+                    #    + "}\n"
+                    # )
+                    s_ = s.copy()
+                    s_["rho"] = rho
+                    s_["x"] = -ax * r + tx_
+                    s_["y"] = -ay * r + ty_
+                    s_["z"] = -az * r
+                    s_["type"] = 2
+                    s_["r1"] = r1
+                    s_["r2"] = r2
+                    s_["l"] = l
+                    s_["axis"]["x"] = ax
+                    s_["axis"]["y"] = ay
+                    s_["axis"]["z"] = az
+                    shapes.append(s_)
+
+        return np.array(shapes, dtype=fv.Shape)
 
     @classmethod
     def DiscResolutionPhantom(
@@ -626,7 +642,8 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         if g2 < 1:
             msg = "g2 should be a positive integer."
             raise ValueError(msg)
-        phastr: str = cls._DiscResolutionPhantom_phastring(
+        # phastr: str = cls._DiscResolutionPhantom_phastring(
+        shapes = cls._DiscResolutionPhantom_phastring(
             g1=generation,
             g2=g2,
             radius=radius,
@@ -636,9 +653,10 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             randomise_parity=randomise_parity,
         )
         # Create the shapes and return the constucted volume
-        return FBVolume(
-            ppf.convert_ph_str_to_shapes(phastr, skip_preprocessing=True)
-        )
+        # return FBVolume(
+        #    ppf.convert_ph_str_to_shapes(phastr, skip_preprocessing=True)
+        # )
+        return FBVolume(shapes)
 
     @classmethod
     def TallRockPhantom(  # ruff: ignore[complex-structure]
