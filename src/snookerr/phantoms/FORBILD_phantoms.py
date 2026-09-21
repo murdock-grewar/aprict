@@ -18,6 +18,7 @@
 
 import dataclasses
 import itertools
+import math
 import pathlib
 
 import numpy as np
@@ -526,6 +527,118 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         # Phantom is defined upside down. Fix it here.
         fbv.flip(axis="z")
         return fbv
+
+    @classmethod
+    def _DiscResolutionPhantom_phastring(  # ruff: ignore[complex-structure]
+        cls,
+        g1: int,  # positive integer
+        g2: int,  # positive integer
+        *,
+        radius: float,
+        rho: float,
+        circularise: bool,
+        alternate_with_g2: bool,
+        randomise_parity: bool,  # effectively supersedes 'alternate_with_g2'
+    ) -> str:
+        ans: str = ""
+        # Hardcoded parameters
+        crf: float = np.sqrt(
+            2 * (1 - np.cos(2 * np.pi / 6))
+        )  # crf = cone radius factor
+        sl: float = (
+            radius * 1 / ((2 + 2 * (g1 - 1)) / 2) / (2 * g2 + 1)
+        )  # sl = scale_lens
+        if circularise:
+            g2_genmax = 1 + math.ceil(2 * g2)
+        else:
+            g2_genmax = g2
+        for g1_, g2_ in itertools.product(range(g1), range(g2_genmax)):
+            r = sl * (1 + 2 * g1_) / 2 * np.cos(2 * np.pi / 6 / 2)
+            l = sl * 2 / 2 * np.cos(2 * np.pi / 6 / 2)
+            r1 = sl * (2 + 2 * g1_) / 2 * crf / 2
+            r2 = sl * 2 * g1_ / 2 * crf / 2
+            # Make corner translations
+            tmag = radius * g2_ / (2 * g2 + 1) * np.cos(2 * np.pi / 6 / 2) * 2
+            if g2_ == 0:
+                tx = [0]
+                ty = [0]
+            else:
+                tx = []
+                ty = []
+                angs = np.linspace(
+                    0, 2 * np.pi, num=6, endpoint=False
+                ).tolist()
+                # Make the translations between corners
+                for ang1, ang2 in itertools.pairwise([*angs, angs[0]]):
+                    tx1 = np.cos(ang1)
+                    ty1 = np.sin(ang1)
+                    tx2 = np.cos(ang2)
+                    ty2 = np.sin(ang2)
+                    tx += (
+                        tmag * np.linspace(tx1, tx2, endpoint=False, num=g2_)
+                    ).tolist()
+                    ty += (
+                        tmag * np.linspace(ty1, ty2, endpoint=False, num=g2_)
+                    ).tolist()
+                if circularise:
+                    for idx in reversed(range(len(tx))):
+                        if (
+                            np.sqrt(tx[idx] ** 2 + ty[idx] ** 2)
+                            + radius / (2 * g2 + 1) * np.cos(2 * np.pi / 6 / 2)
+                        ) > radius:
+                            del tx[idx]
+                            del ty[idx]
+            for theta in (2 * np.pi / 6 * g1_) + np.linspace(
+                0, 2 * np.pi, num=3, endpoint=False
+            ):
+                if alternate_with_g2:
+                    theta += 0 if g2_ % 2 == 0 else np.pi  # ruff: ignore[redefined-loop-name]
+                ax, ay, az = np.cos(theta), np.sin(theta), 0
+                for tx_, ty_ in zip(tx, ty):
+                    if randomise_parity:
+                        theta += 0 if np.random.random() < 0.5 else np.pi  # ruff: ignore[numpy-legacy-random, redefined-loop-name]
+                    ax, ay, az = np.cos(theta), np.sin(theta), 0
+                    ans += (
+                        "{"
+                        + f"[Cone: x={-ax * r + tx_} y={-ay * r + ty_} z={-az * r} r1={r1} r2={r2} l={l} axis({ax},{ay},{az})] rho={rho}"
+                        + "}\n"
+                    )
+        return ans
+
+    @classmethod
+    def DiscResolutionPhantom(
+        cls,
+        generation: int,
+        *,
+        radius: float = 1,
+        rho: float = 1,
+        g2: int | None = None,
+        circularise: bool = True,
+        alternate_with_g2: bool = False,
+        randomise_parity: bool = False,
+    ) -> FBVolume:
+        """Generate a disc-shaped resolution phantom."""
+        if generation < 1:
+            msg = "Generation should be a positive integer."
+            raise ValueError(msg)
+        if g2 is None:
+            g2 = generation
+        if g2 < 1:
+            msg = "g2 should be a positive integer."
+            raise ValueError(msg)
+        phastr: str = cls._DiscResolutionPhantom_phastring(
+            g1=generation,
+            g2=g2,
+            radius=radius,
+            rho=rho,
+            circularise=circularise,
+            alternate_with_g2=alternate_with_g2,
+            randomise_parity=randomise_parity,
+        )
+        # Create the shapes and return the constucted volume
+        return FBVolume(
+            ppf.convert_ph_str_to_shapes(phastr, skip_preprocessing=True)
+        )
 
     @classmethod
     def TallRockPhantom(  # ruff: ignore[complex-structure]
