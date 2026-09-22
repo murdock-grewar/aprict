@@ -139,6 +139,13 @@ def _make_arg_parser() -> argparse.ArgumentParser:
         default=False,
         help="Flip the projection geometry about the xy plane.",
     )
+    group_data_preprocessing.add_argument(
+        "--rotate-xy",
+        metavar="0.0",
+        type=float,
+        default=0,
+        help="Rotate the projection geometry by this many radians, around the z axis.",
+    )
 
     group_fbp_options = parser.add_argument_group(title="FBP options")
     # group_fbp_options.add_argument(
@@ -282,6 +289,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     flip_x: bool,
     flip_y: bool,
     flip_z: bool,
+    rotate_xy: float,
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
     logger: logging.Logger,
@@ -309,6 +317,8 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         pg = pg.sliced(slice_projs)
     if flip_x or flip_y or flip_z:
         pg = pg.flipped(flip_x=flip_x, flip_y=flip_y, flip_z=flip_z)
+    if rotate_xy != 0:
+        pg = pg.rotated(xy_rads=rotate_xy)
     data_mm: np.memmap = np.lib.format.open_memmap(
         projdata_path, mode="r"
     )[
@@ -544,6 +554,7 @@ def main() -> None:  # ruff: ignore[complex-structure]
             flip_x=args.flip_x,
             flip_y=args.flip_y,
             flip_z=args.flip_z,
+            rotate_xy=args.rotate_xy,
             logger=logger,
             two_sided=args.two_sided,
         )
