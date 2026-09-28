@@ -582,6 +582,7 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
         num_pix_widhei: tuple[int, int] | None = None,
         # Optionals:
         theta_start: float = 0,
+        theta_clockwise: bool = False,
         arc_length_rads: float = 2 * np.pi,
         isocenter: list[float]
         | tuple[float, float, float]
@@ -625,7 +626,7 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
         zs = np.zeros((num_source_points,), dtype=np.float64)
         ts = np.linspace(
             theta_start,
-            theta_start + arc_length_rads,
+            theta_start + arc_length_rads * (-1 if theta_clockwise else 1),
             endpoint=False,
             num=num_source_points,
             dtype=np.float64,
