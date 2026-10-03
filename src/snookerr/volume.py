@@ -250,10 +250,20 @@ class FBVolume:
     def __init__(self, shapes: np.ndarray[np.dtype[fv.Shape]]) -> None:  # ty:ignore[invalid-type-arguments]
         self.shapes = shapes
 
+    @property
+    def FORBILD_str(self) -> str:  # ruff: ignore[invalid-function-name]
+        """A string representing this volume in FORBILD format."""
+        return "\n".join([self._shape_FORBIRD_str(s) for s in self.shapes])
+
     @classmethod
     def load(cls, path_to_pha: pathlib.Path) -> FBVolume:
         """Load a *.pha file into an FBVolume type."""
         return cls(ppf.convert_ph_file_to_shapes(path_to_pha))
+
+    def save(self, path_to_pha: pathlib.Path) -> None:
+        """Save this phantom to a *.pha file."""
+        with open(path_to_pha, mode="w+", encoding="utf-8") as f:
+            f.write(self.FORBILD_str)
 
     def to_cupy(
         self,
@@ -723,8 +733,3 @@ class FBVolume:
             case _:
                 raise NotImplementedError()
         return out
-
-    @property
-    def FORBILD_str(self) -> str:  # ruff: ignore[invalid-function-name]
-        """A string representing this volume in FORBILD format."""
-        return "\n".join([self._shape_FORBIRD_str(s) for s in self.shapes])
