@@ -16,6 +16,7 @@
 """Miscellaneous helper tools."""
 
 from . import argparse_tools as argparse_tools
+from . import click_tools as click_tools
 from . import gpu_tools as gpu_tools
 from . import lds as lds
 from . import ne_tools as ne_tools

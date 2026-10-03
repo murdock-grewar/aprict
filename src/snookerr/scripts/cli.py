@@ -1,0 +1,79 @@
+# Copyright (C) 2026  Murdock Grewar
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""snookerr-cli: the main command-line interface to snookerr."""
+
+import click_extra as ce
+
+from ..lib import click_tools
+from ..version import version
+from .recon_cbfp_cyl_fbp import main as main_fbp
+
+_progdesc: str = "Entry point for snookerr CLI."
+
+
+_cs = {
+    "show_default": True,
+    "show_choices": True,
+    "terminal_width": None,
+    "max_content_width": 300,
+}
+
+
+@ce.group(
+    name="snookerr-cli", params=None, help=_progdesc, context_settings=_cs
+)
+@ce.version_option(version=version)  # add --version from click_extra
+@ce.tree_option()  # add --tree option from click_extra
+# not including the man_option because it includes incorrect information, like possible exit codes etc.
+# I could refine the subcommands etc in the future and re-enable this.
+# @ce.man_option()  # add --man option from click_extra
+def main() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+@ce.group(
+    name="recon",
+    params=None,
+    help="Tomographic reconstruction routines.",
+    context_settings=_cs,
+)
+def recon() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+main.add_command(recon)
+
+main_fbp_fan = click_tools.command_with_option_substitutions(
+    main_fbp,
+    name="fbp-fan-circ",
+    help="Filtered backprojection for a fan-beam geometry with a circular source locus.",
+    fixed_option_values={
+        "fan_beam": True,
+        "limit_zeta": None,
+        "num_rot_angs": None,
+    },
+)
+recon.add_command(cmd=main_fbp_fan)
+
+main_fbp_cone = click_tools.command_with_option_substitutions(
+    main_fbp,
+    name="fbp-cone-cyl",
+    help="Filtered backprojection for a cone-beam geometry with a cylindrical source locus.",
+    fixed_option_values={
+        "fan_beam": False,
+    },
+)
+recon.add_command(cmd=main_fbp_cone)

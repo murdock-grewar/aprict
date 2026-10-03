@@ -15,11 +15,13 @@
 
 """Script to perform FBP reconstruction from cylindrical flat-panel cone-beam transmission data."""
 
-import argparse
 import logging
 import pathlib
+import types
 import typing
 
+import click
+import click_extra as ce
 import cupy as cp
 import numpy as np
 
@@ -43,227 +45,198 @@ from ..cb import flatpanel as cbfp
 _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam transmission data."
 
 
-def _make_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog=_progdesc,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "projgeom",
-        metavar="proj_geom.json",
-        type=pathlib.Path,
-        help="Path to saved ProjGeom object.",
-    )
-    parser.add_argument(
-        "projdata",
-        metavar="proj_data.npy",
-        type=pathlib.Path,
-        help="Path to the numpy array containing the transmission data corresponding to the ProjGeom object.",
-    )
-
-    group_mandatory_options = parser.add_argument_group(
-        title="required options"
-    )
-    group_mandatory_options.add_argument(
+@ce.command(
+    params=None,
+    help=_progdesc,
+    context_settings={
+        "show_default": True,
+        "show_choices": True,
+        "terminal_width": None,
+        "max_content_width": 300,
+    },
+)
+@ce.argument(
+    "projgeom",
+    metavar="projgeom.json",
+    type=click.Path(path_type=pathlib.Path),
+    help="Path to saved ProjGeom object.",
+)
+@ce.argument(
+    "projdata",
+    metavar="projdata.npy",
+    type=click.Path(path_type=pathlib.Path),
+    help="Path to the numpy array containing the transmission data.",
+)
+@ce.option_group(
+    "required options",
+    ce.option(
         "--voxwid",
         metavar="1.0",
         type=float,
+        help="The cubic voxel width, in the same distance units as the projection data is specified in projgeom.json.",
         required=True,
-        help="The cubic voxel width, in the same distance units as the projection data is specified in proj_geom.json",
-        default=argparse.SUPPRESS,
-    )
-    group_mandatory_options.add_argument(
+    ),
+    ce.option(
         "--volshape",
         metavar="'(nX,nY,nZ)'",
-        type=lib.argparse_tools.IntTupleArgTypeFactory(numints=3),
-        help="Dimensions of the voxel grid on which to reconstruct",
+        type=lib.click_tools.IntTupleArgTypeFactory(numints=3),
+        help="Dimensions of the voxel grid on which to reconstruct.",
         required=True,
-        default=argparse.SUPPRESS,
-    )
-
-    group_geometry_options = parser.add_argument_group(
-        title="geometry options"
-    )
-    group_geometry_options.add_argument(
+    ),
+)
+@ce.option_group(
+    "geometry options",
+    ce.option(
         "--volpos",
         metavar="'(0.,0.,0.)'",
-        type=lib.argparse_tools.FloatTupleArgTypeFactory(numfloats=3),
+        type=lib.click_tools.FloatTupleArgTypeFactory(numfloats=3),
         help="Position of the middle of the volume.",
-        required=False,
         default=(0.0, 0.0, 0.0),
-    )
-    group_geometry_options.add_argument(
+    ),
+    ce.option(
         "--cyl-mask-rad",
         metavar="None",
-        type=lib.argparse_tools.MaybeType(float),
-        required=False,
-        default=None,
-    )
-
-    group_data_preprocessing = parser.add_argument_group(
-        title="data preprocessing"
-    )
-    group_data_preprocessing.add_argument(
+        type=lib.click_tools.MaybeType(click.FLOAT),
+        default="None",
+        help="Mask out the reconstruction outside the cylinder of this radius. Choose 'None' to have it match the radius of the reconstruction support.",
+    ),
+)
+@ce.option_group(
+    "data preprocessing",
+    ce.option(
         "--autorange-z",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
-        default=False,
+        type=bool,
         help="Autorange the z coordinates of the trajectory, so that the highest source point and the lowest source point are +-z0. This autoranging takes place before slicing of projection data.",
-    )
-    group_data_preprocessing.add_argument(
+    ),
+    ce.option(
         "--slice-projs",
         metavar="'(start, stop)'",
-        type=lib.argparse_tools.ContiguousSliceArgType,
+        type=lib.click_tools.ContiguousSliceArgType(),
         default=slice(None, None),
         help="Slice the projections to include those of index start to (stop-1), inclusive.",
-    )
-    # group_data_preprocessing.add_argument('--rot-xy', metavar="NUMRADIANS", type=lib.argparse_tools.MaybeType(float), default=None, help="Rotate the projection geometry about the z axis by this many radians.")
-    group_data_preprocessing.add_argument(
+    ),
+    ce.option(
         "--flip-x",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
-        default=False,
-        help="Flip the projection geometry about the xz plane.",
-    )
-    group_data_preprocessing.add_argument(
-        "--flip-y",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=False,
         help="Flip the projection geometry about the yz plane.",
-    )
-    group_data_preprocessing.add_argument(
+    ),
+    ce.option(
+        "--flip-y",
+        type=bool,
+        default=False,
+        help="Flip the projection geometry about the xz plane.",
+    ),
+    ce.option(
         "--flip-z",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=False,
         help="Flip the projection geometry about the xy plane.",
-    )
-    group_data_preprocessing.add_argument(
+    ),
+    ce.option(
         "--rotate-xy",
         metavar="0.0",
         type=float,
-        default=0,
+        default=0.0,
         help="Rotate the projection geometry by this many radians, around the z axis.",
-    )
-
-    group_fbp_options = parser.add_argument_group(title="FBP options")
-    # group_fbp_options.add_argument(
-    #     "--numits",
-    #     metavar="10",
-    #     type=lib.argparse_tools.MaybeType(int),
-    #     default=None,
-    #     required=False,
-    #     help="The number of iterations to use. None = iterate indefinitely, until a SIGINT is sent.",
-    # )
-    group_fbp_options.add_argument(
+    ),
+)
+@ce.option_group(
+    "FBP options",
+    ce.option(
         "--fan-beam",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=False,
-        required=False,
         help="Set to True to activate fan-beam reconstruction mode. This may avoid some other settings to make it work on 2D circular fan-beam data.",
-    )
-    group_fbp_options.add_argument(
+    ),
+    ce.option(
         "--two-sided",
-        metavar="True",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=True,
-        required=False,
         help="When True, this uses a combination of the ramp filter and Hilbert transform to correct for angular undersampling.",
-    )
-    group_fbp_options.add_argument(
+    ),
+    ce.option(
         "--limit-zeta",
         metavar="1.23",
-        type=lib.argparse_tools.MaybeType(float),
-        default=None,
-        required=False,
+        type=lib.click_tools.MaybeType(click.FLOAT),
+        default="None",
         help="Set this to impose a maximum value for zeta. This will limit the data used by this method.",
-    )
-    group_fbp_options.add_argument(
+    ),
+    ce.option(
         "--num-rot-angs",
         metavar="None",
-        type=lib.argparse_tools.MaybeType(int),
-        default=None,
-        required=False,
+        type=lib.click_tools.MaybeType(click.INT),
+        default="None",
         help="How many filtration directions to sample. Set to None to use a random single direction for each CB projection.",
-    )
-    group_fbp_options.add_argument(
+    ),
+    ce.option(
         "--interpolate-measurements",
-        metavar="True",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=True,
-        required=False,
         help="Whether to apply bilinear interpolation between measurement pixels, when backprojecting.",
-    )
-    group_fbp_options.add_argument(
+    ),
+    ce.option(
         "--superres",
         metavar="1",
         type=int,
         default=1,
-        required=False,
-        help="Reconstruct with a voxel size this many times smaller, then downsample.",
-    )
-
-    group_io_options = parser.add_argument_group(title="I/O options")
-    group_io_options.add_argument(
+        help="Reconstruction with a voxel size this many times smaller, then downsample.",
+    ),
+)
+@ce.option_group(
+    "I/O options",
+    ce.option(
         "--output",
         metavar="path/to/new/dir/",
-        type=lib.argparse_tools.MaybeType(pathlib.Path),
-        default=None,
+        type=lib.click_tools.MaybeType(click.Path(path_type=pathlib.Path)),
+        default="None",
         help="Path to a new directory to create and place output artefacts and log files.",
-    )
-    group_io_options.add_argument(
+    ),
+    ce.option(
         "--verbosity",
-        metavar="INFO",
-        type=logtools.LogLevel,
-        action=lib.argparse_tools.EnumAction,
+        type=click.Choice(logtools.LogLevel),
         default=logtools.LogLevel.INFO,
         help="The verbosity of output logging to stderr. Log files will not be affected by this setting.",
-    )
-    group_io_options.add_argument(
+    ),
+    ce.option(
         "--output-intermediates",
-        metavar="False",
-        type=lib.argparse_tools.BoolArgType,
+        type=bool,
         default=False,
         help="Whether to output intermediate reconstructions from each iteration.",
-        required=False,
-    )
-    group_io_options.add_argument(
+    ),
+    ce.option(
         "--plotmin",
         "--pmin",
         metavar="0.0",
-        type=lib.argparse_tools.MaybeType(float),
-        default=None,
-        required=False,
+        type=lib.click_tools.MaybeType(click.FLOAT),
+        default="None",
         help="The minimum for the plotting range. Set to None to select minimum value in each plot.",
-    )
-    group_io_options.add_argument(
+    ),
+    ce.option(
         "--plotmax",
         "--pmax",
         metavar="1.0",
-        type=lib.argparse_tools.MaybeType(float),
-        default=None,
-        required=False,
+        type=lib.click_tools.MaybeType(click.FLOAT),
+        default="None",
         help="The maximum for the plotting range. Set to None to select maximum value in each plot.",
-    )
-
-    group_resource_options = parser.add_argument_group(
-        title="resource options"
-    )
-    group_resource_options.add_argument(
+    ),
+)
+@ce.option_group(
+    "resource options",
+    ce.option(
         "--ne-threads",
-        type=lib.ne_tools.NETHREADS,
-        action=lib.argparse_tools.EnumAction,
+        type=click.Choice(lib.ne_tools.NETHREADS),
         default=lib.ne_tools.NETHREADS.ALL_LOGICAL_CORES,
-        required=False,
         help="Set the number of threads to be used by numexpr. This will attempt to override the env NUMEXPR_MAX_THREADS as necessary.",
-    )
+    ),
+)
+def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
+    """Parse input arguments using click."""
+    args = types.SimpleNamespace(**kwargs)
+    main_from_args(args)
 
-    return parser
 
-
-def validate_args(args: argparse.Namespace) -> None:
+def validate_args(args: types.SimpleNamespace) -> None:
     """Validate a set of args."""
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
@@ -483,11 +456,9 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     return pg, _gen(), R, L, recon_support_radius, final_multiplier
 
 
-def main() -> None:  # ruff: ignore[complex-structure]
+def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure]
     """Run the script."""
-    # Parse the input arguments
-    parser = _make_arg_parser()
-    args = parser.parse_args()
+    # Validate the input arguments
     validate_args(args)
 
     ##########################################################
@@ -531,6 +502,10 @@ def main() -> None:  # ruff: ignore[complex-structure]
     logger = logtools.make_logger(
         path=artefact_path, stderr_loglevel=args.verbosity
     )
+    logger.info(f"Currently executing file: '{__file__}'")
+    logger.info("Complete list of arguments passed to this method:")
+    for k, v in args.__dict__.items():
+        logger.info(f"    '{k:s}' value: '{v!s:s}'")
 
     ##########################################################
     ##### Set numexpr to use as many threads as possible #####
