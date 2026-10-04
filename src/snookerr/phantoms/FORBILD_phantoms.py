@@ -212,6 +212,18 @@ class _MetaPhantomContainer(type):
         )
 
     @property
+    def RockCanisterAlWithHoles(cls) -> FBVolume:
+        return FBVolume(
+            np.concatenate(
+                (
+                    cls.RockCanisterAl.shapes,
+                    cls.RockCanisterCavities1e5.shapes,
+                ),
+                axis=0,
+            )
+        )
+
+    @property
     def UnitCyl_z(cls) -> FBVolume:
         return FBVolume(
             ppf.convert_ph_file_to_shapes(
