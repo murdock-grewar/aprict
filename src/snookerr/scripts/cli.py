@@ -19,6 +19,7 @@ import click_extra as ce
 
 from ..lib import click_tools
 from ..version import version
+from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
 
 _progdesc: str = "Entry point for snookerr CLI."
@@ -77,3 +78,18 @@ main_fbp_cone = click_tools.command_with_option_substitutions(
     },
 )
 recon.add_command(cmd=main_fbp_cone)
+
+
+@ce.group(
+    name="project",
+    params=None,
+    help="Generate projection data.",
+    context_settings=_cs,
+)
+def project() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+main.add_command(project)
+
+project.add_command(cmd=main_project_cbfp, name="cbfp")

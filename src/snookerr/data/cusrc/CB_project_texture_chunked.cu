@@ -322,9 +322,9 @@ __device__ Tp exact_line_integral(
 }
 
 __device__ fvec3 detpos(
-        det_spec        dspec,
-        unsigned int    det_idx_x,
-        unsigned int    det_idx_y
+        det_spec    dspec,
+        float       det_idx_x_f,
+        float       det_idx_y_f
 )
 {
     fvec3 dpos;
@@ -332,8 +332,8 @@ __device__ fvec3 detpos(
         // Not implemented!
     } else if (dspec.type == 0) {
         // Flat panel detector
-        float xnum = ((float)det_idx_x - (dspec.nu-1)/2.);
-        float ynum = ((float)det_idx_y - (dspec.nv-1)/2.);
+        float xnum = (det_idx_x_f - (dspec.nu-1)/2.);
+        float ynum = (det_idx_y_f - (dspec.nv-1)/2.);
         dpos = dspec.pos + (dspec.u*xnum) + (dspec.v*ynum);
     }
     return dpos;
@@ -384,22 +384,46 @@ __global__ void project_CB_texture_chunked(
         output_projs_strides.x * proj_idx
     )/sizeof(Tp);
 
-    // Get the start and end points of the projection line
+    // Get the start point of the projection line
     fvec3 source_pos = projspec.sourcepos;
-    fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
+    // Get the index offsets between samples
+    unsigned int ssu = config.ssu;
+    unsigned int ssv = config.ssv;
+    float idx_offx = 1/(1.f + (float)ssu);
+    float idx_offy = 1/(1.f + (float)ssv);
 
-    // Calculate projection
-    // ...
-    Tp val = 0;
-    val = exact_line_integral<Tv, Tp>(
-        source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
-    val *= config.multiply_before_adding;
-    // Do things ...
-    //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+    Tp totval = 0;
+    for (unsigned int du_idx = 1; du_idx <= ssu; du_idx++) {
+        Tp accumulator = 0;
+        for (unsigned int dv_idx = 1; dv_idx <= ssv; dv_idx++) {
+            // Get the end point of the projection line
+            float det_idx_x_f = (float)det_idx_x - 0.5f + idx_offx*du_idx;
+            float det_idx_y_f = (float)det_idx_y - 0.5f + idx_offy*dv_idx;
+            fvec3 det_pos     = detpos(projspec.dspec, det_idx_x_f, det_idx_y_f);
+
+            // Calculate projection
+            // ...
+            Tp val = 0;
+            val = exact_line_integral<Tv, Tp>(
+                source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
+            val *= config.multiply_before_adding;
+            // Do things ...
+            //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+
+            accumulator += val;
+        }
+        if (ssv > 1) {
+            accumulator /= (Tp)ssv;
+        }
+        totval += accumulator;
+    }
+    if (ssu > 1) {
+        totval /= (Tp)ssu;
+    }
 
     // Add the result atomically.
     // (using atomicAdd allows us to launch other kernels concurrently, if desired)
-    atomicAdd(&output_projs[det_idx], val);
+    atomicAdd(&output_projs[det_idx], totval);
 }
 
 
@@ -467,91 +491,116 @@ __global__ void project_CB_FORBILD_shapes(
     }
     */
 
-    // Get the start and end points of the projection line
+    // Get the start point of the projection line
     fvec3 source_pos = projspec.sourcepos;
-    fvec3 det_pos    = detpos(projspec.dspec, det_idx_x, det_idx_y);
+    // Get the index offsets between samples
+    unsigned int ssu = config.ssu;
+    unsigned int ssv = config.ssv;
+    float idx_offx = 1/(1.f + (float)ssu);
+    float idx_offy = 1/(1.f + (float)ssv);
 
-    // Now calculate and store the intervals
-    fvec2 intervals[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
-    float rhos[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
-    __shared__ Ts ss[4];  // One shape for each of the four workers
-    unsigned int j = 0;
-    unsigned int num_shapes_relevant = 0;
-    const unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
-    for (unsigned int gnum = 0; gnum < groups; gnum++) {
-        unsigned int istop = min(num_shapes, 4*(gnum+1));
-        unsigned int id = 4*gnum;
-        __syncthreads();
-        // Attempting to turn this into a loop, even with a #pragmo unroll, results in a 100% performance penalty!
-        if ((id < num_shapes) && (is_block_worker_1)) {
-            ss[0] = shapes_glob[id];
-        }
-        id++;
-        if ((id < num_shapes) && (is_block_worker_2)) {
-            ss[1] = shapes_glob[id];
-        }
-        id++;
-        if ((id < num_shapes) && (is_block_worker_3)) {
-            ss[2] = shapes_glob[id];
-        }
-        id++;
-        if ((id < num_shapes) && (is_block_worker_4)) {
-            ss[3] = shapes_glob[id];
-        }
-        id = 4*gnum;
-        __syncthreads();
-        if (in_range) {
-            Ts s;
-            fvec2 interval;
-            #pragma unroll // I have no idea why it hurts performance so much to have this loop. It's about a 30% increase in computation time if the loop is not unrolled.
-            for (unsigned char offset_ind : {0, 1, 2, 3}) {
-                if (id + offset_ind < num_shapes) {
-                    s = ss[offset_ind];
-                    interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
-                    if (interval.x < interval.y) {
-                        //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                        intervals[j] = interval;
-                        rhos[j] = s.rho;
-                        j++;
-                        num_shapes_relevant++;
+    Tp totval = 0;
+    for (unsigned int du_idx = 1; du_idx <= ssu; du_idx++) {
+        Tp accumulator = 0;
+        for (unsigned int dv_idx = 1; dv_idx <= ssv; dv_idx++) {
+            // Get the end point of the projection line
+            float det_idx_x_f = (float)det_idx_x - 0.5f + idx_offx*du_idx;
+            float det_idx_y_f = (float)det_idx_y - 0.5f + idx_offy*dv_idx;
+            fvec3 det_pos     = detpos(projspec.dspec, det_idx_x_f, det_idx_y_f);
+
+
+
+            // Now calculate and store the intervals
+            fvec2 intervals[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+            float rhos[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+            __shared__ Ts ss[4];  // One shape for each of the four workers
+            unsigned int j = 0;
+            unsigned int num_shapes_relevant = 0;
+            const unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
+            for (unsigned int gnum = 0; gnum < groups; gnum++) {
+                unsigned int istop = min(num_shapes, 4*(gnum+1));
+                unsigned int id = 4*gnum;
+                __syncthreads();
+                // Attempting to turn this into a loop, even with a #pragmo unroll, results in a 100% performance penalty!
+                if ((id < num_shapes) && (is_block_worker_1)) {
+                    ss[0] = shapes_glob[id];
+                }
+                id++;
+                if ((id < num_shapes) && (is_block_worker_2)) {
+                    ss[1] = shapes_glob[id];
+                }
+                id++;
+                if ((id < num_shapes) && (is_block_worker_3)) {
+                    ss[2] = shapes_glob[id];
+                }
+                id++;
+                if ((id < num_shapes) && (is_block_worker_4)) {
+                    ss[3] = shapes_glob[id];
+                }
+                id = 4*gnum;
+                __syncthreads();
+                if (in_range) {
+                    Ts s;
+                    fvec2 interval;
+                    #pragma unroll // I have no idea why it hurts performance so much to have this loop. It's about a 30% increase in computation time if the loop is not unrolled.
+                    for (unsigned char offset_ind : {0, 1, 2, 3}) {
+                        if (id + offset_ind < num_shapes) {
+                            s = ss[offset_ind];
+                            interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
+                            if (interval.x < interval.y) {
+                                //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
+                                intervals[j] = interval;
+                                rhos[j] = s.rho;
+                                j++;
+                                num_shapes_relevant++;
+                            }
+                        }
                     }
                 }
             }
+
+            if (in_range) {  // Only do the below things if this isn't a mere worker thread
+
+                // Calculate projection
+                // ...
+                Tp val = 0;
+                if (config.overlap_addition) {
+                    /*
+                    for (unsigned int i = 0; i < num_shapes; i++) {
+                        val += exact_line_integral<Tp>(source_pos, det_pos, shapes_glob[i]);
+                    }
+                    */
+                    for (unsigned int j = 0; j < num_shapes_relevant; j++) {
+                        fvec2 interval = intervals[j];
+                        val += rhos[j] * (interval.y - interval.x);
+                    }
+                } else {
+                    val = exact_line_integral_prioritise_last(source_pos, det_pos, intervals, rhos, num_shapes_relevant);
+                }
+                val *= config.multiply_before_adding;
+                // Do things ...
+                //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+                accumulator += val;
+            }
         }
+        if (ssv > 1) {
+            accumulator /= (Tp)ssv;
+        }
+        totval += accumulator;
+    }
+    if (ssu > 1) {
+        totval /= (Tp)ssu;
     }
 
-    if (!in_range) {  // The worker threads are no longer needed.
-        return;
+    if (in_range) {
+        // Add the result atomically.
+        // (using atomicAdd allows us to launch other kernels concurrently, if desired)
+        // Get the index 'det_idx' of the detector data that this thread should write to
+        unsigned long det_idx = (
+            output_projs_strides.y * det_idx_x +
+            output_projs_strides.z * det_idx_y +
+            output_projs_strides.x * proj_idx
+        )/sizeof(Tp);
+        atomicAdd(&output_projs[det_idx], totval);
     }
-
-    // Calculate projection
-    // ...
-    Tp val = 0;
-    if (config.overlap_addition) {
-        /*
-        for (unsigned int i = 0; i < num_shapes; i++) {
-            val += exact_line_integral<Tp>(source_pos, det_pos, shapes_glob[i]);
-        }
-        */
-        for (unsigned int j = 0; j < num_shapes_relevant; j++) {
-            fvec2 interval = intervals[j];
-            val += rhos[j] * (interval.y - interval.x);
-        }
-    } else {
-        val = exact_line_integral_prioritise_last(source_pos, det_pos, intervals, rhos, num_shapes_relevant);
-    }
-    if (val == (Tp)0) { return; }
-    val *= config.multiply_before_adding;
-    // Do things ...
-    //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
-
-    // Add the result atomically.
-    // (using atomicAdd allows us to launch other kernels concurrently, if desired)
-    // Get the index 'det_idx' of the detector data that this thread should write to
-    unsigned long det_idx = (
-        output_projs_strides.y * det_idx_x +
-        output_projs_strides.z * det_idx_y +
-        output_projs_strides.x * proj_idx
-    )/sizeof(Tp);
-    atomicAdd(&output_projs[det_idx], val);
 }

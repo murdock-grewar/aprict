@@ -30,8 +30,11 @@ class config_cb_project(
     names=[
         "shrink_volume_factor",  # causes the whole volume to be shrunk by this factor, *with respect to the coordinate origin*, after being specified by whatever volume chunk spec object is relevant.
         "multiply_before_adding",  # multiply the projection by this constant before adding it to the data array
+        # Total number of line integral samples is ssu * ssv
+        "ssu",  # supersample along the du direction by taking this many samples
+        "ssv",  # supersample along the dv direction by taking this many samples
     ],
-    dtypes=[np.float32, np.float32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    dtypes=[np.float32, np.float32, np.uint32, np.uint32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
     pass
 

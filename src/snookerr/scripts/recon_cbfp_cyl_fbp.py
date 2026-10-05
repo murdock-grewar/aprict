@@ -504,7 +504,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     )
     logger.info(f"Currently executing file: '{__file__}'")
     logger.info("Complete list of arguments passed to this method:")
-    for k, v in args.__dict__.items():
+    keys = sorted(args.__dict__.keys())
+    for k in keys:
+        v = args.__dict__[k]
         logger.info(f"    '{k:s}' value: '{v!s:s}'")
 
     ##########################################################

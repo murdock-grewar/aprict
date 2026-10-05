@@ -69,6 +69,8 @@ def command_with_option_substitutions(
 
 
 class ContiguousSliceArgType(click.ParamType[slice]):
+    name: str = "(" + click.INT.name + "," + click.INT.name + ")"
+
     def convert(self, value, param, ctx) -> slice:  # ruff: ignore[unused-method-argument]
 
         if isinstance(value, slice):
@@ -122,6 +124,8 @@ def FloatTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-p
     T = tuple[*((float,) * numfloats)]  # ty: ignore[invalid-type-form]  # ruff: ignore[non-lowercase-variable-in-function]
 
     class _cls(click.ParamType[T]):  # ruff: ignore[invalid-class-name]
+        name: str = "(" + (click.FLOAT.name + ",") * numfloats + ")"
+
         def convert(self, value, param, ctx) -> T:  # ruff: ignore[unused-method-argument]
             if isinstance(value, tuple):
                 return value
@@ -159,6 +163,8 @@ def IntTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-pub
     T = tuple[*((int,) * numints)]  # ruff: ignore[non-lowercase-variable-in-function]  # ty: ignore[invalid-type-form]
 
     class _cls(click.ParamType[T]):  # ruff: ignore[invalid-class-name]
+        name: str = "(" + (click.INT.name + ",") * numints + ")"
+
         def convert(self, value, param, ctx) -> T:  # ruff: ignore[unused-method-argument]
             if isinstance(value, tuple):
                 return value
@@ -169,6 +175,8 @@ def IntTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-pub
 
 
 class BoolArgType(click.ParamType[bool]):
+    name: str = "BOOL"
+
     def convert(self, value, param, ctx) -> bool:  # ruff: ignore[unused-method-argument]
         if isinstance(value, bool):
             return value
@@ -190,6 +198,8 @@ def MaybeType[T](
     obj = instantiated_paramtype
 
     class _cls(click.ParamType[T | None]):  # ty: ignore[shadowed-type-variable]  # ruff: ignore[invalid-class-name]
+        name: str = "MAYBE_" + obj.name
+
         def convert(self, value, param, ctx) -> T | None:
             if value is None:
                 return None

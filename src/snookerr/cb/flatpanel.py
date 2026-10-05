@@ -777,15 +777,25 @@ class ConfigProject:
         *,
         shrink_volume_factor: int | float | None = None,
         multiply_before_adding: int | float | None = None,
+        ssu: int | None = None,
+        ssv: int | None = None,
     ) -> None:
         svf = shrink_volume_factor or 1  # coerce 'None' into 1
         mba = multiply_before_adding or 1
+        ssu = ssu or 1
+        ssv = ssv or 1
         self._contents = np.array(  # ty:ignore[invalid-assignment]
-            (np.float32(svf), np.float32(mba)), dtype=structs.config_cb_project
+            (np.float32(svf), np.float32(mba), np.uint32(ssu), np.uint32(ssv)),
+            dtype=structs.config_cb_project,
         )
         overlap_addition: bool = False  # The default behaviour of FORBILD is to prioritise later volumes, not to add them together. Leave this behaviour as is, by keeping this False.
         self._contents_fb = np.array(  # ty:ignore[invalid-assignment]
-            (np.float32(mba), np.bool(overlap_addition)),
+            (
+                np.float32(mba),
+                np.bool(overlap_addition),
+                np.uint32(ssu),
+                np.uint32(ssv),
+            ),
             dtype=structs.config_cb_project_FORBILD,
         )
 

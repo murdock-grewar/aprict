@@ -250,6 +250,10 @@ class FBVolume:
     def __init__(self, shapes: np.ndarray[np.dtype[fv.Shape]]) -> None:  # ty:ignore[invalid-type-arguments]
         self.shapes = shapes
 
+    def copy(self) -> FBVolume:
+        """Return a copy of this volume."""
+        return FBVolume(self.shapes.copy())
+
     @property
     def FORBILD_str(self) -> str:  # ruff: ignore[invalid-function-name]
         """A string representing this volume in FORBILD format."""

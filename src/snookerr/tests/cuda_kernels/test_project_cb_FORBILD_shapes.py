@@ -132,7 +132,9 @@ class TestCB_FORBILD_spheres:
         )
 
         # Set up configuration objects etc
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(1000)
         detwid: int = 1000
         dethei: int = 500
@@ -199,8 +201,8 @@ class TestCB_FORBILD_spheres:
 
     def test_project(self) -> None:
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
+        blockx = 8
+        blocky = 8
         blocklayer = 10
         # Launch the kernel
         num_shapes: int = self.spheres_cp_arr.size
@@ -287,7 +289,9 @@ class TestCB_FORBILD_boxes:
         )
 
         # Set up configuration objects etc
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(1000)
         detwid: int = 1000
         dethei: int = 500
@@ -354,8 +358,8 @@ class TestCB_FORBILD_boxes:
 
     def test_project(self) -> None:
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
+        blockx = 8
+        blocky = 8
         blocklayer = 10
         # Launch the kernel
         num_shapes: int = self.boxes_cp_arr.size
@@ -443,7 +447,9 @@ class TestCB_FORBILD_cyls:
         )
 
         # Set up configuration objects etc
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(1000)
         detwid: int = 1000
         dethei: int = 500
@@ -511,8 +517,8 @@ class TestCB_FORBILD_cyls:
 
     def test_project(self) -> None:
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
+        blockx = 8
+        blocky = 8
         blocklayer = 10
         # Launch the kernel
         num_shapes: int = self.cyls_cp_arr.size
@@ -597,7 +603,9 @@ class TestCB_FORBILD_ellipsoids:
         )
 
         # Set up configuration objects etc
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(1000)
         detwid: int = 1000
         dethei: int = 500
@@ -665,8 +673,8 @@ class TestCB_FORBILD_ellipsoids:
 
     def test_project(self) -> None:
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
+        blockx = 8
+        blocky = 8
         blocklayer = 10
         # Launch the kernel
         num_shapes: int = self.ellipsoids_cp_arr.size
@@ -747,7 +755,9 @@ class TestCB_FORBILD_cones:
         )
 
         # Set up configuration objects etc
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(1000)
         detwid: int = 1000
         dethei: int = 500
@@ -814,8 +824,8 @@ class TestCB_FORBILD_cones:
 
     def test_project(self) -> None:
         # Prepare the kernel
-        blockx = 10
-        blocky = 10
+        blockx = 8
+        blocky = 8
         blocklayer = 10
         # Launch the kernel
         num_shapes: int = self.shapes_cp_arr.size

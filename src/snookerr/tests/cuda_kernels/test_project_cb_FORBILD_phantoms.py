@@ -98,7 +98,9 @@ class TestCB_phantom_FORBILD_head:
 
         # Set up configuration objects etc
         add_attenuations = False
-        self.config = np.array((1.0, add_attenuations), dtype=ks_config.dtype)
+        self.config = np.array(
+            (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
+        )
         num_projs = np.uint32(numprojs)
         detwid: int = 800
         dethei: int = 800

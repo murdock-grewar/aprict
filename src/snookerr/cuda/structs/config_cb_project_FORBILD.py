@@ -31,8 +31,11 @@ class config_cb_project_FORBILD(
     names=[
         "multiply_before_adding",  # multiply the projection by this constant before adding it to the data array
         "overlap_addition",  # if True, then add the values of overlapping shapes. If False, then prioritise the last shape's value
+        # Total number of line integral samples is ssu * ssv
+        "ssu",  # supersample along the du direction by taking this many samples
+        "ssv",  # supersample along the dv direction by taking this many samples
     ],
-    dtypes=[np.float32, np.bool],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
+    dtypes=[np.float32, np.bool, np.uint32, np.uint32],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
     pass
 
