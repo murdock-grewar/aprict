@@ -199,7 +199,9 @@ class KernelStruct[T: np.dtype[typing.Any]](
         # Remove duplicates. Keep first appearance of each symbol.
         seen = set()
         dependent_ks = [
-            ks for ks in dependent_ks if not (ks in seen or seen.add(ks))
+            ks
+            for ks in dependent_ks
+            if not (ks in seen or seen.add(ks))  # ty: ignore[redundant-condition]
         ]
         # Add the structure layout code for each dependency, in the proper order
         for ks in dependent_ks:
@@ -330,7 +332,7 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
         cls.dependent_structs = [
             ks
             for ks in cls.dependent_structs
-            if not (ks in seen or seen.add(ks))
+            if not (ks in seen or seen.add(ks))  # ty: ignore[redundant-condition]
         ]
 
         dtype_to_cname_dict.update(

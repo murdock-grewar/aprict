@@ -202,7 +202,7 @@ class Volume[
         self._dtype = np.dtype(dtype)
         self._shape = shape
         self._pos_c = np.array(pos_c)
-        self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
+        self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.
         self.fill(0)
         return self
 

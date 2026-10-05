@@ -108,7 +108,7 @@ def generate_headers(
                 kslist = kslist[:i] + ks.dependent_structs + kslist[i:]
             # Now remove duplicates, keeping the first-encountered copy of each
             seen = set()
-            kslist = [ks for ks in kslist if not (ks in seen or seen.add(ks))]
+            kslist = [ks for ks in kslist if not (ks in seen or seen.add(ks))]  # ty: ignore[redundant-condition]
         else:
             # Order the structs within the one file so that they have correct dependencies
             kslist = [ks for _, ks in kernstructs]
@@ -121,7 +121,7 @@ def generate_headers(
             kslist = [
                 ks
                 for ks in kslist
-                if (ks in ksset) and not (ks in seen or seen.add(ks))
+                if (ks in ksset) and not (ks in seen or seen.add(ks))  # ty: ignore[redundant-condition]
             ]
         # Add the structure code, in order of dependency
         for ks in kslist:
