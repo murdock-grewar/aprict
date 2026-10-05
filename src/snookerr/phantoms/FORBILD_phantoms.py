@@ -551,7 +551,9 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         circularise: bool,
         alternate_with_g2: bool,
         randomise_parity: bool,  # effectively supersedes 'alternate_with_g2'
+        seed: int | None = None,
     ) -> np.ndarray[tuple[int, ...], np.dtype[fv.Shape]]:  # ty: ignore[invalid-type-arguments]
+        rng: np.random.Generator = np.random.default_rng(seed)
         shapes: list[np.ndarray[tuple[int, ...], np.dtype[fv.Shape]]] = []  # ty: ignore[invalid-type-arguments]
         s = np.array(0, dtype=fv.Shape)
         # ans: str = ""
@@ -610,7 +612,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
                 ax, ay, az = np.cos(theta), np.sin(theta), 0
                 for tx_, ty_ in zip(tx, ty):
                     if randomise_parity:
-                        theta += 0 if np.random.random() < 0.5 else np.pi  # ruff: ignore[numpy-legacy-random, redefined-loop-name]
+                        theta += 0 if rng.random() < 0.5 else np.pi  # ruff: ignore[redefined-loop-name]
                     ax, ay, az = np.cos(theta), np.sin(theta), 0
                     # ans += (
                     #    "{"
@@ -644,6 +646,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         circularise: bool = True,
         alternate_with_g2: bool = False,
         randomise_parity: bool = False,
+        seed: int | None = None,
     ) -> FBVolume:
         """Generate a disc-shaped resolution phantom."""
         if generation < 1:
@@ -663,6 +666,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
             circularise=circularise,
             alternate_with_g2=alternate_with_g2,
             randomise_parity=randomise_parity,
+            seed=seed,
         )
         # Create the shapes and return the constucted volume
         # return FBVolume(

@@ -40,6 +40,7 @@ class PHANTOM_PRESET(enum.Enum):  # ruff: ignore[invalid-class-name, undocumente
     HEAD = 1
     ROCK_CAN = 2
     UNIT_Z_CYL = 3
+    TALLY_HALL = 4
 
 
 class OUTPUT_DTYPE(enum.Enum):  # ruff: ignore[invalid-class-name, undocumented-public-class]
@@ -48,7 +49,7 @@ class OUTPUT_DTYPE(enum.Enum):  # ruff: ignore[invalid-class-name, undocumented-
     FP64 = 3
 
 
-def _ph_preset_to_phantom(preset: PHANTOM_PRESET) -> FBVolume:
+def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
     match preset:
         case PHANTOM_PRESET.HEAD:
             v = phantoms.FORBILD.HeadPhantom
@@ -61,6 +62,16 @@ def _ph_preset_to_phantom(preset: PHANTOM_PRESET) -> FBVolume:
             return phantoms.FORBILD.RockCanisterAlWithHoles
         case PHANTOM_PRESET.UNIT_Z_CYL:
             return phantoms.FORBILD.UnitCyl_z
+        case PHANTOM_PRESET.TALLY_HALL:
+            return phantoms.FORBILD.DiscResolutionPhantom(
+                4,
+                radius=2.95,
+                rho=0.20,
+                g2=10,
+                alternate_with_g2=False,
+                randomise_parity=True,
+                seed=seed,
+            )
         case _:
             raise ValueError()
 
@@ -172,10 +183,17 @@ def _outdtype_to_dtype(
     "random seeds",
     ce.option(
         "--seed-noise",
+        default=None,
         type=click_tools.MaybeType(click.INT),
         help="Seed to use for generating Poisson noise.",
     ),
-    help="Seeds to use for random number generation. Leave an option as None to use a pseudorandom seed.",
+    ce.option(
+        "--seed-vol",
+        default=1,
+        type=click_tools.MaybeType(click.INT),
+        help="Seed to use for generating the volume preset, if applicable.",
+    ),
+    help="Seeds to use for random number generation. Set an option to None to use a pseudorandom seed.",
 )
 @ce.option_group(
     "noise",
@@ -259,7 +277,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Load the phantom
     logger.debug("Loading the phantom...")
     if args.phantom_preset is not None:
-        v = _ph_preset_to_phantom(args.phantom_preset)
+        v = _ph_preset_to_phantom(args.phantom_preset, seed=args.seed_vol)
     else:
         v = FBVolume.load(args.phantom)
     logger.debug("Preprocessing the phantom...")

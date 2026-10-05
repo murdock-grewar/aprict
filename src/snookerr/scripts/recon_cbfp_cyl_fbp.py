@@ -55,20 +55,22 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         "max_content_width": 300,
     },
 )
-@ce.argument(
-    "projgeom",
-    metavar="projgeom.json",
-    type=click.Path(path_type=pathlib.Path),
-    help="Path to saved ProjGeom object.",
-)
-@ce.argument(
-    "projdata",
-    metavar="projdata.npy",
-    type=click.Path(path_type=pathlib.Path),
-    help="Path to the numpy array containing the transmission data.",
-)
 @ce.option_group(
     "required options",
+    ce.option(
+        "--geom",
+        required=True,
+        metavar="projgeom.json",
+        type=click.Path(path_type=pathlib.Path),
+        help="Path to saved ProjGeom object.",
+    ),
+    ce.option(
+        "--projs",
+        required=True,
+        metavar="projdata.npy",
+        type=click.Path(path_type=pathlib.Path),
+        help="Path to the numpy array containing the transmission data.",
+    ),
     ce.option(
         "--voxwid",
         metavar="1.0",
@@ -219,6 +221,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         type=lib.click_tools.MaybeType(click.FLOAT),
         default="None",
         help="The maximum for the plotting range. Set to None to select maximum value in each plot.",
+    ),
+    ce.option(
+        "--plot-afterwards",
+        type=lib.click_tools.BoolArgType(),
+        default=False,
+        help="Attempt to plot the reconstruction after it is complete.",
     ),
 )
 @ce.option_group(
@@ -521,8 +529,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Create the ProjectionSet objects corresponding to each ordered subset
     pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # ruff: ignore[non-lowercase-variable-in-function, unused-unpacked-variable]
         get_filtered_projectionset_generator(
-            projdata_path=args.projdata,
-            pg=cbfp.ProjGeom.load(args.projgeom),
+            projdata_path=args.projs,
+            pg=cbfp.ProjGeom.load(args.geom),
             fan_beam_mode=args.fan_beam,
             num_rot_angs=args.num_rot_angs,
             limit_zeta=args.limit_zeta,
@@ -726,3 +734,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Perform logging updates
     logger.info("Done.")
+
+    # Plot, if applicable
+    if args.plot_afterwards:
+        logger.info("Displaying plot...")
+        imview.plot_volume(
+            vol.as_numpy(), plotmin=args.plotmin, plotmax=args.plotmax
+        )

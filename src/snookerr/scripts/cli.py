@@ -19,6 +19,7 @@ import click_extra as ce
 
 from ..lib import click_tools
 from ..version import version
+from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
 
@@ -93,3 +94,18 @@ def project() -> None:  # ruff: ignore[undocumented-public-function]
 main.add_command(project)
 
 project.add_command(cmd=main_project_cbfp, name="cbfp")
+
+
+@ce.group(
+    name="make-geom",
+    params=None,
+    help="Make a geometry object.",
+    context_settings=_cs,
+)
+def make_geom() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+main.add_command(make_geom)
+
+make_geom.add_command(cmd=main_make_geom_fan_circ, name="fan-circ")
