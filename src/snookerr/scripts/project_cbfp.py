@@ -181,7 +181,7 @@ def _outdtype_to_dtype(
     "noise",
     ce.option(
         "--cfc-pixel",
-        type=click_tools.MaybeType(click.INT),
+        type=click_tools.MaybeType(click.FLOAT),
         default=None,
         help="Apply noise, with this many clearfield photons per pixel.",
     ),
