@@ -352,7 +352,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         vol_path_pha: pathlib.Path = artefact_path.joinpath("vol" + s + ".pha")
         v_.save(vol_path_pha)
         logger.info(f"Saved {tag:s} volume .pha at: '{vol_path_pha.name}'")
-        logger.info(
+        logger.debug(
             "(In the event of a conflict, the *.npy file is authoritative; the *.pha is meant to be an exact copy, but there is always a possibility for a software bug.)"
         )
 
@@ -381,6 +381,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         logger=logger,
         persist=False,
     ) as pbar:
+        out_of_mem_count: int = 0
         for chunk_index in range(
             (num_units + units_per_chunk - 1) // units_per_chunk
         ):
@@ -409,6 +410,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             assert (
                 projs.data is not None
             )  # helpful assertion for type-checking
+            if projs.out_of_mem_count > 0:
+                out_of_mem_count += projs.out_of_mem_count
+                logger.error(
+                    f"Insufficient memory to compute projection line(s) through all shapes. Total number of affected detector sites so far: {out_of_mem_count:d}"
+                )
+
             pout = output_projs[*sls]
             apply_noise_in_place(projs.data)
             pin = projs.data.get()

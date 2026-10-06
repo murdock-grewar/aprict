@@ -104,6 +104,7 @@ class TestCB_FORBILD_spheres:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         # Get the FORBILD boxes
         shapes = []
         spheres = []
@@ -204,6 +205,9 @@ class TestCB_FORBILD_spheres:
         blockx = 8
         blocky = 8
         blocklayer = 10
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         # Launch the kernel
         num_shapes: int = self.spheres_cp_arr.size
         self.kern(
@@ -214,6 +218,7 @@ class TestCB_FORBILD_spheres:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
@@ -258,6 +263,7 @@ class TestCB_FORBILD_boxes:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         # Get the FORBILD spheres
         shapes = []
         boxes = []
@@ -361,6 +367,9 @@ class TestCB_FORBILD_boxes:
         blockx = 8
         blocky = 8
         blocklayer = 10
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         # Launch the kernel
         num_shapes: int = self.boxes_cp_arr.size
         self.kern(
@@ -371,6 +380,7 @@ class TestCB_FORBILD_boxes:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
@@ -415,6 +425,7 @@ class TestCB_FORBILD_cyls:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         # Get the FORBILD cylinders
         shapes = []
         cyls = []
@@ -520,6 +531,9 @@ class TestCB_FORBILD_cyls:
         blockx = 8
         blocky = 8
         blocklayer = 10
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         # Launch the kernel
         num_shapes: int = self.cyls_cp_arr.size
         self.kern(
@@ -530,6 +544,7 @@ class TestCB_FORBILD_cyls:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
@@ -574,6 +589,7 @@ class TestCB_FORBILD_ellipsoids:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         # Get the FORBILD cylinders
         ellipsoids = []
         for _ in range(numellipsoids):
@@ -676,6 +692,9 @@ class TestCB_FORBILD_ellipsoids:
         blockx = 8
         blocky = 8
         blocklayer = 10
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         # Launch the kernel
         num_shapes: int = self.ellipsoids_cp_arr.size
         self.kern(
@@ -686,6 +705,7 @@ class TestCB_FORBILD_ellipsoids:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),
@@ -732,6 +752,7 @@ class TestCB_FORBILD_cones:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         # Get the FORBILD cylinders
         cones = []
         for _ in range(numcones):
@@ -827,6 +848,9 @@ class TestCB_FORBILD_cones:
         blockx = 8
         blocky = 8
         blocklayer = 10
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         # Launch the kernel
         num_shapes: int = self.shapes_cp_arr.size
         self.kern(
@@ -837,6 +861,7 @@ class TestCB_FORBILD_cones:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),

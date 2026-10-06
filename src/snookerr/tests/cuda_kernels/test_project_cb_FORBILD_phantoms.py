@@ -94,6 +94,7 @@ class TestCB_phantom_FORBILD_head:
     ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
+        self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
         self.shapes_cp_arr = cp.array(phantoms.FORBILD.HeadPhantom.shapes)
 
         # Set up configuration objects etc
@@ -177,6 +178,9 @@ class TestCB_phantom_FORBILD_head:
         # cp.cuda.runtime.deviceSetLimit(cp.cuda.runtime.cudaLimitStackSize, 2048)
         # stacksize = cp.cuda.runtime.deviceGetLimit(cp.cuda.runtime.cudaLimitStackSize)
         # print("stack size: ", stacksize)
+        cp.multiply(
+            self.out_of_mem_count_arr, 0, out=self.out_of_mem_count_arr
+        )
         self.kern(
             (
                 int(np.ceil(self.output_projs.shape[1] / blockx)),
@@ -185,6 +189,7 @@ class TestCB_phantom_FORBILD_head:
             ),  # gridDims:  (x,y,z)
             (blockx, blocky, blocklayer),  # blockDims: (x,y,z)
             (  # input args
+                self.out_of_mem_count_arr,
                 self.config,
                 self.projspec_array,
                 np.uint32(self.output_projs.shape[0]),

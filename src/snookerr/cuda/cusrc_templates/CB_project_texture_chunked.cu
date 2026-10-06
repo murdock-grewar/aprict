@@ -427,7 +427,7 @@ __global__ void project_CB_texture_chunked(
 }
 
 
-#define MAX_NUM_SHAPES_FOR_SHARED_MEMORY 300  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then a memory access violation will occur...
+#define MAX_INTERSECTIONS_PER_LINE 1000  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then a memory access violation will occur...
 // NOTE:
 // The blockDim.x must be AT LEAST 4, since 4 worker threads are used.
 // So the tiles must be at least 4 detector pixels wide.
@@ -438,6 +438,7 @@ template<
     typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera
 >
 __global__ void project_CB_FORBILD_shapes(
+        unsigned int*             out_of_mem_count,
         const config_CB_project_FORBILD   config,          // any miscellaneous config for the CB projection
         const proj_spec*          projspecs,       // contains the source and detector configurations
         const unsigned int        num_projs,       // length of projspecs array
@@ -499,6 +500,7 @@ __global__ void project_CB_FORBILD_shapes(
     float idx_offx = 1/(1.f + (float)ssu);
     float idx_offy = 1/(1.f + (float)ssv);
 
+    bool out_of_mem_flag = false;
     Tp totval = 0;
     for (unsigned int du_idx = 1; du_idx <= ssu; du_idx++) {
         Tp accumulator = 0;
@@ -508,11 +510,11 @@ __global__ void project_CB_FORBILD_shapes(
             float det_idx_y_f = (float)det_idx_y - 0.5f + idx_offy*dv_idx;
             fvec3 det_pos     = detpos(projspec.dspec, det_idx_x_f, det_idx_y_f);
 
-
+            __syncthreads();
 
             // Now calculate and store the intervals
-            fvec2 intervals[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
-            float rhos[MAX_NUM_SHAPES_FOR_SHARED_MEMORY];
+            fvec2 intervals[MAX_INTERSECTIONS_PER_LINE];
+            float rhos[MAX_INTERSECTIONS_PER_LINE];
             __shared__ Ts ss[4];  // One shape for each of the four workers
             unsigned int j = 0;
             unsigned int num_shapes_relevant = 0;
@@ -549,10 +551,16 @@ __global__ void project_CB_FORBILD_shapes(
                             interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
                             if (interval.x < interval.y) {
                                 //assert(j < MAX_NUM_SHAPES_FOR_SHARED_MEMORY);
-                                intervals[j] = interval;
-                                rhos[j] = s.rho;
-                                j++;
-                                num_shapes_relevant++;
+                                // TODO: if j >= MAX_NUM_SHAPES_FOR_SHARED_MEMORY,
+                                // then don't do anything here, and instead trigger an error flag
+                                if (j >= MAX_INTERSECTIONS_PER_LINE) {
+                                    out_of_mem_flag = true;
+                                } else {
+                                    intervals[j] = interval;
+                                    rhos[j] = s.rho;
+                                    j++;
+                                    num_shapes_relevant++;
+                                }
                             }
                         }
                     }
@@ -560,7 +568,6 @@ __global__ void project_CB_FORBILD_shapes(
             }
 
             if (in_range) {  // Only do the below things if this isn't a mere worker thread
-
                 // Calculate projection
                 // ...
                 Tp val = 0;
@@ -593,6 +600,9 @@ __global__ void project_CB_FORBILD_shapes(
     }
 
     if (in_range) {
+        if (out_of_mem_flag) {
+            atomicAdd(out_of_mem_count, 1);
+        }
         // Add the result atomically.
         // (using atomicAdd allows us to launch other kernels concurrently, if desired)
         // Get the index 'det_idx' of the detector data that this thread should write to

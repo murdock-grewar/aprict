@@ -666,6 +666,9 @@ class ProjectionSet:
     _data: (
         cp.ndarray[tuple[int, ...], cp.dtype[cp.float32 | cp.float64]] | None
     )
+    _out_of_mem_counter: cp.ndarray[
+        tuple[typing.Literal[1]], cp.dtype[cp.uint32]
+    ]
 
     @property
     def proj_geom(self) -> ProjGeom:
@@ -701,6 +704,18 @@ class ProjectionSet:
         """The underlying cupy array."""
         return self._data  # .copy() -- Too expensive to make a copy.
 
+    @property
+    def out_of_mem_count(self) -> int:
+        """The out-of-memory count."""
+        return self._out_of_mem_counter.get()[0]
+
+    @property
+    def out_of_mem_counter_cp(
+        self,
+    ) -> cp.ndarray[tuple[typing.Literal[1]], cp.dtype[cp.uint32]]:
+        """The out-of-memory counter. It's a (1,) array of type uint32."""
+        return self._out_of_mem_counter
+
     def __init__(
         self,
         pg: ProjGeom,
@@ -718,6 +733,7 @@ class ProjectionSet:
         self._proj_geom = pg
         self._proj_specs = proj_specs
         self._data = data
+        self._out_of_mem_counter = cp.zeros((1,), dtype=cp.uint32)
 
     def create_buffer(
         self,
@@ -856,7 +872,7 @@ def project(
     config: ConfigProject,
     volume: Volume | FBVolume,
     projs: ProjectionSet,
-    block: bool = False,
+    block: bool = False,  # Note that if not blocking, then the out-of-mem counter won't be checked! I should probably think of a better solution to check this even when block=False
 ) -> ProjectionSet:
     """Add the projection of the input volume to the output array."""
     projs.create_buffer(dtype=np.float32, existing_ok=True)
@@ -905,6 +921,9 @@ def project(
     input_proj_array_strides = np.array(
         projs.data.strides[-3:], dtype=structs.ulvec3.dtype
     )
+    input_out_of_mem_counter_ptr = np.uint64(
+        projs.out_of_mem_counter_cp.data.ptr
+    )
     # Compute the projection. Loop through higher dimensions of the passed array, if applicable.
     for index_tuple in itertools.product(
         *map(range, projs.proj_specs.shape[:-1])
@@ -952,6 +971,7 @@ def project(
             input_num_shapes_pruned = np.uint32(input_shapes_pruned.size)
 
             args = (  # input args
+                input_out_of_mem_counter_ptr,
                 config.contents_fb,
                 input_proj_specs_slice,
                 input_proj_array_len,
