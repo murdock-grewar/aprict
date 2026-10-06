@@ -373,6 +373,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     )
     output_projs[...] = 0
     logger.info("Done with allocating projection array.")
+    logger.info("Compiling/fetching CUDA kernels...")
+    cbfp.force_compile()
     logger.info("Beginning projection...")
     with logtools.ProgressBar(
         desc="Projection:",
