@@ -31,7 +31,6 @@ from ..cb import flatpanel as cbfp
 
 _progdesc = (
     "Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."
-    ""
 )
 
 
