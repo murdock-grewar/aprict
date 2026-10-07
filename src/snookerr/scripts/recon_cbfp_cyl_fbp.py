@@ -738,6 +738,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Plot, if applicable
     if args.plot_afterwards:
         logger.info("Displaying plot...")
-        imview.plot_volume(
-            vol.as_numpy(), plotmin=args.plotmin, plotmax=args.plotmax
+        x = vol.as_numpy()
+        x = lib.ne_tools.downbin(
+            x,
+            n=args.superres,
+            preserve_sum=False,
+            axis=(0, 1) if args.fan_beam else (0, 1, 2),
         )
+        imview.plot_volume(x, plotmin=args.plotmin, plotmax=args.plotmax)
