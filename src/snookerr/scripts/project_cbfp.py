@@ -53,7 +53,6 @@ def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
     match preset:
         case PHANTOM_PRESET.HEAD:
             v = phantoms.FORBILD.HeadPhantom
-            v.scale_len(1 / 10)  # convert from cm to mm
             v.multiply_attenuation(
                 0.0184
             )  # convert from multiples of water to a reasonable attenuation, corresponding to an X-ray energy of ~80 keV.
