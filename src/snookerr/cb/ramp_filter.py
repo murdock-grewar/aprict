@@ -666,6 +666,10 @@ class FBPFilterer:
                                 0,
                                 out=chunkmem[proj_index, :, idx_2 + 1 :],
                             )
+                    if _HOTFIX_DISABLE_ASYNCHRONICITY:
+                        # There is some kind of synchronicity bug preventing the windowing from applying
+                        # before the rotation step. So, let's wait here for it to be applied.
+                        stream.synchronize()
                     # Create event to mark completion of the above steps
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
