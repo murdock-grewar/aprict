@@ -19,6 +19,7 @@ import click_extra as ce
 
 from ..lib import click_tools
 from ..version import version
+from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
@@ -110,3 +111,4 @@ def make_geom() -> None:  # ruff: ignore[undocumented-public-function]
 main.add_command(make_geom)
 
 make_geom.add_command(cmd=main_make_geom_fan_circ, name="fan-circ")
+make_geom.add_command(cmd=main_make_geom_cone_cyl, name="cone-cyl")
