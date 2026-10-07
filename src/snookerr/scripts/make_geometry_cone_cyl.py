@@ -29,9 +29,7 @@ from snookerr.lib import click_tools
 
 from ..cb import flatpanel as cbfp
 
-_progdesc = (
-    "Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."
-)
+_progdesc = "Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."
 
 
 class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
@@ -219,7 +217,13 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
     )
 
     # Make geometry
-    zs = np.linspace(-args.h/2, args.h/2, num=args.num+2, endpoint=True, dtype=np.float64)[1:-1]
+    zs = np.linspace(
+        -args.h / 2,
+        args.h / 2,
+        num=args.num + 2,
+        endpoint=True,
+        dtype=np.float64,
+    )[1:-1]
     match args.type:
         case TYPE.GOLDEN_THETA:
             ts = (

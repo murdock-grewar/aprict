@@ -343,7 +343,9 @@ class FBPFilterer:
         *,
         L: float,  # ruff: ignore[invalid-argument-name]
         physpixwid: float,
-        proj_2d_shape: tuple[int | np.uint16 | np.uint32, int | np.uint16 | np.uint32],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
+        proj_2d_shape: tuple[
+            int | np.uint16 | np.uint32, int | np.uint16 | np.uint32
+        ],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
         projs_per_batch: int = 3,
         sampling_strategy: SamplingStrategy = SamplingStrategy.SINGLE_ROTATION_RANDOM_UNIFORM,
         limit_zeta: float
@@ -363,7 +365,10 @@ class FBPFilterer:
             self._max_abs_rotation_angle = min(
                 self._max_abs_rotation_angle, limit_zeta
             )
-        self.proj_2d_shape = tuple(map(int, proj_2d_shape))  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
+        self.proj_2d_shape = (
+            int(proj_2d_shape[0]),
+            int(proj_2d_shape[1]),
+        )  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
         self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
             proj_2d_shape, self._max_abs_rotation_angle, _hacky_fan_beam_mode
         )
@@ -460,12 +465,17 @@ class FBPFilterer:
     @classmethod
     def get_max_abs_rotation_angle(
         cls,
-        proj_2d_shape: tuple[int | np.uint16 | np.uint32, int | np.uint16 | np.uint32],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
+        proj_2d_shape: tuple[
+            int | np.uint16 | np.uint32, int | np.uint16 | np.uint32
+        ],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
         physpixwid: float,
         L: float,  # ruff: ignore[invalid-argument-name]
     ) -> float:
         """Get the maximum rotation angle which can be accomodated by an instance of this object."""
-        proj_2d_shape = tuple(map(int, proj_2d_shape))
+        proj_2d_shape = (
+            int(proj_2d_shape[0]),
+            int(proj_2d_shape[1]),
+        )  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
         # Compute the maximum rotation angle.
         # cone_angle_horz: float = 2*np.arctan2(proj_2d_shape[0]*physpixwid/2, L)
         cone_angle_vert: float = 2 * np.arctan2(
@@ -479,12 +489,17 @@ class FBPFilterer:
     @classmethod
     def get_expanded_proj_2d_shape(
         cls,
-        proj_2d_shape: tuple[int | np.uint16 | np.uint32, int | np.uint16 | np.uint32],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
+        proj_2d_shape: tuple[
+            int | np.uint16 | np.uint32, int | np.uint16 | np.uint32
+        ],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
         max_abs_rotation_angle: float,
         _hacky_fan_beam_mode: bool = False,
     ) -> tuple[int, int]:
         """Get the 2D shape of the expanded shape of the arrays. They need to be expanded in order to accommodate a rotation."""
-        proj_2d_shape = tuple(map(int, proj_2d_shape))
+        proj_2d_shape = (
+            int(proj_2d_shape[0]),
+            int(proj_2d_shape[1]),
+        )  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
         if _hacky_fan_beam_mode:
             return tuple(proj_2d_shape)
 

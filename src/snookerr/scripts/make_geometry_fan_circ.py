@@ -29,9 +29,7 @@ from snookerr.lib import click_tools
 
 from ..cb import flatpanel as cbfp
 
-_progdesc = (
-    "Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."
-)
+_progdesc = "Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."
 
 
 class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
