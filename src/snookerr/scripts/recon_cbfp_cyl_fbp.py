@@ -15,6 +15,7 @@
 
 """Script to perform FBP reconstruction from cylindrical flat-panel cone-beam transmission data."""
 
+import enum
 import logging
 import pathlib
 import types
@@ -41,6 +42,12 @@ except ModuleNotFoundError:
 
 from .. import Volume, cb, lib, logtools
 from ..cb import flatpanel as cbfp
+
+
+class ALG(enum.Enum):  # ruff: ignore[undocumented-public-class]
+    STANDARD = 1
+    NOOGREWAR = 2
+
 
 _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam transmission data."
 
@@ -146,16 +153,16 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
 @ce.option_group(
     "FBP options",
     ce.option(
+        "--alg",
+        type=click.Choice(ALG),
+        default=ALG.STANDARD,
+        help="The FBP algorithm to use.",
+    ),
+    ce.option(
         "--fan-beam",
         type=bool,
         default=False,
         help="Set to True to activate fan-beam reconstruction mode. This may avoid some other settings to make it work on 2D circular fan-beam data.",
-    ),
-    ce.option(
-        "--two-sided",
-        type=bool,
-        default=True,
-        help="When True, this uses a combination of the ramp filter and Hilbert transform to correct for angular undersampling.",
     ),
     ce.option(
         "--limit-zeta",
@@ -545,6 +552,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
+    two_sided = args.alg is ALG.NOOGREWAR
     # Create the ProjectionSet objects corresponding to each ordered subset
     pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # ruff: ignore[non-lowercase-variable-in-function, unused-unpacked-variable]
         get_filtered_projectionset_generator(
@@ -560,7 +568,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             flip_z=args.flip_z,
             rotate_xy=args.rotate_xy,
             logger=logger,
-            two_sided=args.two_sided,
+            two_sided=two_sided,
         )
     )
 
@@ -705,7 +713,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         if args.fan_beam:
             sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
         for sl, pss in sl_filtps_gen:
-            if args.two_sided:
+            if two_sided:
                 ps_ramp, ps_hilb = pss
                 cbfp.backproject(
                     config_bp_ramp_twosided, vol, ps_ramp, block=True
