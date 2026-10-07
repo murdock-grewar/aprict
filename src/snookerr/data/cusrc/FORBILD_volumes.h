@@ -474,13 +474,13 @@ __device__ fvec2 FORBILD_clip_line_segment(
         const float dy = dv.y;
         const float dz = dv.z;
         const float rdiff_on_l = rdiff/l;
-        const float a = dx*dx + dy*dy - (dz*rdiff_on_l * dz*rdiff_on_l);
+        const double a = dx*dx + dy*dy - (dz*rdiff_on_l * dz*rdiff_on_l);
         //const float a = max(dx*dx,0.000001f) + max(dy*dy,0.000001f) - (dz*rdiff_on_l * dz*rdiff_on_l);
-        const float b = (
+        const double b = (
             -(dz*rdiff/l)*(2*r1 + rdiff*(1 + 2*vz/l))
             + 2*(dx*vx + dy*vy)
         );
-        const float c = (
+        const double c = (
             - r1*r1 - r1*rdiff - 0.25f*rdiff*rdiff + vx*vx + vy*vy
             - (vz*rdiff/l)*(2*r1 + rdiff*(1 + vz/l)) // no factor of 2 next to vz/l
         );
@@ -507,14 +507,8 @@ __device__ fvec2 FORBILD_clip_line_segment(
             //const float disc = b*b - 4*a*c;// + 0.0001f;
             const float b_on_2a = b/a/2.;
 
-            // HOTFIX:
-            // I don't know why this works, but it does. Take the absolute value
-            // of the discriminant here. If I don't do this, then there is some kind of numerical instability
-            // that occurs when the discriminant is close to 0.
-            // For some strange reason, that instability is fixed when I take the absolute value.
-            // This may result in issues down the line, in which case I will have to revisit this hotfix.
-            // Try projecting and reconstructing the following phantom to test this and the original code
-            // without the absolute value:
+            // Numerical stability issue:
+            // Try projecting and reconstructing the following phantom to test this. Without helping the stability along for small discriminants, reconstructing this object will give black dots where three cone vertices meet.
             /*
             { [Cone: x=0.28867512941360474 y=-3.5352508240434326e-17 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-1.0,1.2246468525851679e-16,0.0)] rho=1.0 }
 { [Cone: x=0.14433756470680237 y=-0.25 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-0.5,0.8660253882408142,0.0)] rho=1.0 }
@@ -522,25 +516,52 @@ __device__ fvec2 FORBILD_clip_line_segment(
             */
             // Test that phantom by doing a fan-beam simulation with z=0.
             // In the original code, there is a dark spot at the intersection of the three cone vertices.
-            // This is completely fixed with the hotfixed code.
-
+            // Original code:
             //const float disc_on_4asq = b_on_2a*b_on_2a - (c/a);
-            const float disc_on_4asq = abs(b_on_2a*b_on_2a - (c/a));
 
-            if (disc_on_4asq <= 0) {  // no intersection
-                return fvec2(0.f, 0.f);
+            const float ac_on_bsq = a*c/(b*b);
+            if (abs(ac_on_bsq) < 0.025f) {
+                // This is probably unecessary, but it will improve on the floating point precision in some cases.
+                //
+                // Inspired by https://math.stackexchange.com/a/2007723,
+                // (this post seems to indicate the unstable root as the stable one...)
+                // we compute the stable root:
+                // r_1 = (-b + sgn(b) sqrt(b*b - 4ac))/(2a)
+                // Then use Vieta's formula for the product of roots, r_1 * r_2 = c/a
+                // so r_2 = c/(a * r_1)
+                // Note:
+                // use            sqrt(b*b - 4ac) = sqrt(b^2) sqrt(1 - 4ac/b^2)
+                // use            sqrt(b*b - 4ac) =  sgn(b) b sqrt(1 - 4ac/b^2)
+                //    ---> sgn(b) sqrt(b*b - 4ac) =         b sqrt(1 - 4ac/b^2)
+                //    ---> r_1 = ( -b + b sqrt(1 - 4ac/b^2)     ) / (2a)
+                //    ---> r_1 = ( -b/(2a) ) * (1 - sqrt(1 - 4ac/(b^2)))
+                // Then, I use the expansion
+                // 1 - sqrt(1 - 4ac/(b^2)) ~ 2*( ac_on_bsq + ac_on_bsq^2 + 2*ac_on_bsq^3 )
+                const float r_1 = -b_on_2a * 2*(
+                    ac_on_bsq +
+                    ac_on_bsq*ac_on_bsq +
+                    2*ac_on_bsq*ac_on_bsq*ac_on_bsq
+                );
+                lam1 = r_1;
+                lam2 = c / (a * r_1);
+            } else {
+                const float disc_on_4asq = max(0.f, b_on_2a*b_on_2a - (c/a));
+                // WARNING:
+                // I had previously returned fvec2(0.f, 0.f) when the disc_on_4asq was less than or equal to 0.
+                // This is incorrect, since we may need to select everything outside this region, so we still need to follow the below code which branches based on the sign of a.
+                const float pm_term_on_2a = sqrt(disc_on_4asq);
+                lam1 = -b_on_2a - pm_term_on_2a;
+                lam2 = -b_on_2a + pm_term_on_2a;
             }
-            const float pm_term_on_2a = sqrt(disc_on_4asq);
+            //const float disc_on_4asq = abs(b_on_2a*b_on_2a - (c/a));
+
+
             // Two possible cases:
             //  - the interval from (-b - pm_term)/(2a) to (-b + pm_term)/(2a)
             //  - everything excluding the above interval (think of a double-cone)
             // in the second case, we need to figure out which of the two remaining intervals
             // is the correct one for this cone.
             // The case is determined by the sign of a
-            //lam1 = (-b - pm_term)/(2*a);
-            //lam2 = (-b + pm_term)/(2*a);
-            lam1 = -b_on_2a - pm_term_on_2a;
-            lam2 = -b_on_2a + pm_term_on_2a;
             if (a > 0) {
                 interval.x = max(interval.x, min(lam1, lam2));
                 interval.y = min(interval.y, max(lam1, lam2));
