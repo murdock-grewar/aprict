@@ -339,11 +339,11 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     if not np.all(pg.nu == pg.nu[0]):
         msg = "Inconsistent horizontal resolution of detector."
         raise NotImplementedError(msg)
-    nu = pg.nu[0]
+    nu = int(pg.nu[0])
     if not np.all(pg.nv == pg.nv[0]):
         msg = "Inconsistent vertical resolution of detector."
         raise NotImplementedError(msg)
-    nv = pg.nv[0]
+    nv = int(pg.nv[0])
     pixwids = np.linalg.norm(pg.det_uvec, axis=1)
     if not np.all(np.isclose(pixwids, pixwids[0])):
         msg = "Inconsistent pixel widths of detector."
