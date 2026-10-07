@@ -473,7 +473,9 @@ __device__ fvec2 FORBILD_clip_line_segment(
         const float dx = dv.x;
         const float dy = dv.y;
         const float dz = dv.z;
-        const float a = dx*dx + dy*dy - (dz*rdiff/l * dz*rdiff/l);
+        const float rdiff_on_l = rdiff/l;
+        const float a = dx*dx + dy*dy - (dz*rdiff_on_l * dz*rdiff_on_l);
+        //const float a = max(dx*dx,0.000001f) + max(dy*dy,0.000001f) - (dz*rdiff_on_l * dz*rdiff_on_l);
         const float b = (
             -(dz*rdiff/l)*(2*r1 + rdiff*(1 + 2*vz/l))
             + 2*(dx*vx + dy*vy)
@@ -502,19 +504,43 @@ __device__ fvec2 FORBILD_clip_line_segment(
             // Cases:
             // a < 0: line is closer to vertical than the cone angle
             // a > 0: line is further from vertical than the cone angle
-            const float disc = b*b - 4*a*c;
-            if (disc <= 0) {  // no intersection
+            //const float disc = b*b - 4*a*c;// + 0.0001f;
+            const float b_on_2a = b/a/2.;
+
+            // HOTFIX:
+            // I don't know why this works, but it does. Take the absolute value
+            // of the discriminant here. If I don't do this, then there is some kind of numerical instability
+            // that occurs when the discriminant is close to 0.
+            // For some strange reason, that instability is fixed when I take the absolute value.
+            // This may result in issues down the line, in which case I will have to revisit this hotfix.
+            // Try projecting and reconstructing the following phantom to test this and the original code
+            // without the absolute value:
+            /*
+            { [Cone: x=0.28867512941360474 y=-3.5352508240434326e-17 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-1.0,1.2246468525851679e-16,0.0)] rho=1.0 }
+{ [Cone: x=0.14433756470680237 y=-0.25 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-0.5,0.8660253882408142,0.0)] rho=1.0 }
+{ [Cone: x=-0.14433756470680237 y=-0.25 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(0.5,0.8660253882408142,0.0)] rho=1.0 }
+            */
+            // Test that phantom by doing a fan-beam simulation with z=0.
+            // In the original code, there is a dark spot at the intersection of the three cone vertices.
+            // This is completely fixed with the hotfixed code.
+
+            //const float disc_on_4asq = b_on_2a*b_on_2a - (c/a);
+            const float disc_on_4asq = abs(b_on_2a*b_on_2a - (c/a));
+
+            if (disc_on_4asq <= 0) {  // no intersection
                 return fvec2(0.f, 0.f);
             }
-            const float pm_term = sqrt(disc);
+            const float pm_term_on_2a = sqrt(disc_on_4asq);
             // Two possible cases:
             //  - the interval from (-b - pm_term)/(2a) to (-b + pm_term)/(2a)
             //  - everything excluding the above interval (think of a double-cone)
             // in the second case, we need to figure out which of the two remaining intervals
             // is the correct one for this cone.
             // The case is determined by the sign of a
-            lam1 = (-b - pm_term)/(2*a);
-            lam2 = (-b + pm_term)/(2*a);
+            //lam1 = (-b - pm_term)/(2*a);
+            //lam2 = (-b + pm_term)/(2*a);
+            lam1 = -b_on_2a - pm_term_on_2a;
+            lam2 = -b_on_2a + pm_term_on_2a;
             if (a > 0) {
                 interval.x = max(interval.x, min(lam1, lam2));
                 interval.y = min(interval.y, max(lam1, lam2));
