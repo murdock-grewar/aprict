@@ -207,9 +207,16 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     "I/O options",
     ce.option(
         "--output",
-        metavar="path/to/new/dir/",
-        type=lib.click_tools.MaybeType(click.Path(path_type=pathlib.Path)),
-        default="None",
+        # Note that setting file_okay=False and dir_okay=False causes it to only accept uncreated paths
+        type=lib.click_tools.MaybeType(
+            click.Path(
+                path_type=pathlib.Path,
+                writable=True,
+                file_okay=False,
+                dir_okay=False,
+            )
+        ),
+        default=None,
         help="Path to a new directory to create and place output artefacts and log files.",
     ),
     ce.option(
