@@ -11,5 +11,8 @@ struct config_CB_backproject {
     bool approx_mode_direct_raycast;
     bool approx_mode_linear_interpolate;
     unsigned char backproj_weighting_preset;
+    unsigned int ssx;
+    unsigned int ssy;
+    unsigned int ssz;
 };
 

@@ -389,16 +389,16 @@ __global__ void project_CB_texture_chunked(
     // Get the index offsets between samples
     unsigned int ssu = config.ssu;
     unsigned int ssv = config.ssv;
-    float idx_offx = 1/(1.f + (float)ssu);
-    float idx_offy = 1/(1.f + (float)ssv);
+    float idx_offx = 1/((float)ssu);
+    float idx_offy = 1/((float)ssv);
 
     Tp totval = 0;
-    for (unsigned int du_idx = 1; du_idx <= ssu; du_idx++) {
+    for (unsigned int du_idx = 0; du_idx < ssu; du_idx++) {
         Tp accumulator = 0;
-        for (unsigned int dv_idx = 1; dv_idx <= ssv; dv_idx++) {
+        for (unsigned int dv_idx = 0; dv_idx < ssv; dv_idx++) {
             // Get the end point of the projection line
-            float det_idx_x_f = (float)det_idx_x - 0.5f + idx_offx*du_idx;
-            float det_idx_y_f = (float)det_idx_y - 0.5f + idx_offy*dv_idx;
+            float det_idx_x_f = (float)det_idx_x - 0.5f + idx_offx*(du_idx + 0.5f);
+            float det_idx_y_f = (float)det_idx_y - 0.5f + idx_offy*(dv_idx + 0.5f);
             fvec3 det_pos     = detpos(projspec.dspec, det_idx_x_f, det_idx_y_f);
 
             // Calculate projection

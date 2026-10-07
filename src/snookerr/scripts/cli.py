@@ -66,6 +66,7 @@ main_fbp_fan = click_tools.command_with_option_substitutions(
         "fan_beam": True,
         "limit_zeta": None,
         "num_rot_angs": None,
+        "ssz": 1,
     },
 )
 recon.add_command(cmd=main_fbp_fan)

@@ -178,11 +178,22 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         help="Whether to apply bilinear interpolation between measurement pixels, when backprojecting.",
     ),
     ce.option(
-        "--superres",
-        metavar="1",
+        "--ssx",
         type=int,
         default=1,
-        help="Reconstruction with a voxel size this many times smaller, then downsample.",
+        help="Sample this many x positions within a voxel. (Multplies to a grid with --ssy, --ssz.)",
+    ),
+    ce.option(
+        "--ssy",
+        type=int,
+        default=1,
+        help="Sample this many x positions within a voxel. (Multplies to a grid with --ssx, --ssz.)",
+    ),
+    ce.option(
+        "--ssz",
+        type=int,
+        default=1,
+        help="Sample this many x positions within a voxel. (Multplies to a grid with --ssx, --ssy.)",
     ),
 )
 @ce.option_group(
@@ -254,6 +265,14 @@ def validate_args(args: types.SimpleNamespace) -> None:
     # If outputting intermediates, then the user must also specify the --output directory
     if args.output_intermediates and not args.output:
         msg = "Cannot output intermediate tomograms when no output directory was specified. Specify an output directory with --output path/to/new/dir"
+        raise ValueError(msg)
+
+    if args.fan_beam and args.ssz != 1:
+        msg = "--ssz must be set to 1 for fan-beam mode, as otherwise the backprojection would sample things toward the top/bottom of a voxel, instead of just the center."
+        raise ValueError(msg)
+
+    if args.ssx <= 0 or args.ssy <= 0 or args.ssz <= 0:
+        msg = "--ssx, --ssy, --ssz must all be positive integers."
         raise ValueError(msg)
 
 
@@ -547,13 +566,13 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Create the working volume
     volshape = (
-        (*tuple(n * args.superres for n in args.volshape[0:2]), 1)
+        (*tuple(n for n in args.volshape[0:2]), 1)
         if args.fan_beam
-        else tuple(n * args.superres for n in args.volshape)
+        else tuple(n for n in args.volshape)
     )
     vol = Volume.zeros(
         volshape,
-        voxwid=args.voxwid / args.superres,
+        voxwid=args.voxwid,
         dtype=np.float32,  # ty:ignore[invalid-argument-type]
         pos_c=args.volpos,
     )
@@ -572,6 +591,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         backproj_weighting_preset=0,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
+        ssx=args.ssx,
+        ssy=args.ssy,
+        ssz=args.ssz,
     )
     # Configurations to backproject the ramp- and Hilbert-filtered data
     # Combine one of these preset pairs:
@@ -586,6 +608,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         backproj_weighting_preset=1,  # 1,#3,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
+        ssx=args.ssx,
+        ssy=args.ssy,
+        ssz=args.ssz,
     )
     config_bp_hilb_twosided = cbfp.ConfigBackproject(
         fast_approx=True,
@@ -595,15 +620,17 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         backproj_weighting_preset=6,  # 2,#4,
         approx_mode_direct_raycast=True,
         approx_mode_bilinear_interpolate=args.interpolate_measurements,
+        # Note: it probably isn't necessary to supersample the Hilbert transform part, since it's low frequency.
+        # I'll do it anyway, for simplicity in describing this method.
+        ssx=args.ssx,
+        ssy=args.ssy,
+        ssz=args.ssz,
     )
 
     ##########################################################
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
     logger.info(f"cyl mask radius: {cyl_mask_rad:.5g}")
-    logger.info(f"superres voxel width: {vol.voxwid!s:s}")
-    logger.info(f"superres volume shape: {vol.shape!s:s}")
-    logger.info(f"superres factor: {args.superres!s:s}")
     logger.debug(
         f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}"
     )
@@ -619,12 +646,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
         # Get the current volume
         x = vol.as_numpy()
-        x = lib.ne_tools.downbin(
-            x,
-            n=args.superres,
-            preserve_sum=False,
-            axis=(0, 1) if args.fan_beam else (0, 1, 2),
-        )
 
         # ty is not smart enough to understand that path_intms can be None only when path_output is None
         assert path_intms is not None
@@ -739,10 +760,4 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     if args.plot_afterwards:
         logger.info("Displaying plot...")
         x = vol.as_numpy()
-        x = lib.ne_tools.downbin(
-            x,
-            n=args.superres,
-            preserve_sum=False,
-            axis=(0, 1) if args.fan_beam else (0, 1, 2),
-        )
         imview.plot_volume(x, plotmin=args.plotmin, plotmax=args.plotmax)

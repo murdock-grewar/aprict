@@ -840,6 +840,9 @@ class ConfigBackproject:
         approx_mode_direct_raycast: bool = False,
         approx_mode_bilinear_interpolate: bool = False,
         backproj_weighting_preset: int = 0,
+        ssx: int = 1,
+        ssy: int = 1,
+        ssz: int = 1,
     ) -> None:
         r = cyl_mask_rad or 0  # coerce 'None' to 0
         sep = soften_det_edges_proportion or 0  # coerce 'None' to 0
@@ -863,6 +866,9 @@ class ConfigBackproject:
                 np.bool(approx_mode_direct_raycast),
                 np.bool(approx_mode_bilinear_interpolate),
                 np.uint8(backproj_weighting_preset),
+                np.uint32(ssx),
+                np.uint32(ssy),
+                np.uint32(ssz),
             ),
             dtype=structs.config_cb_backproject,
         )

@@ -40,6 +40,9 @@ class config_cb_backproject(
         "approx_mode_direct_raycast",
         "approx_mode_linear_interpolate",
         "backproj_weighting_preset",
+        "ssx",
+        "ssy",
+        "ssz",
     ],
     dtypes=[
         np.bool,
@@ -54,6 +57,9 @@ class config_cb_backproject(
         np.bool,
         np.bool,
         np.uint8,
+        np.uint32,
+        np.uint32,
+        np.uint32,
     ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
     pass

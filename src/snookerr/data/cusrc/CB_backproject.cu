@@ -273,11 +273,11 @@ __device__ Tv _backproject_CB_getval(
     }
 
     // Get the center position of this voxel
-    const fvec3 vox_pos = pos_000_c + (vol_idx * voxwid);
+    const fvec3 vox_pos_c = pos_000_c + (vol_idx * voxwid);
 
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
-        if ((vox_pos.x*vox_pos.x + vox_pos.y*vox_pos.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
+        if ((vox_pos_c.x*vox_pos_c.x + vox_pos_c.y*vox_pos_c.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
             return 0;
         }
     }
@@ -305,272 +305,299 @@ __device__ Tv _backproject_CB_getval(
         fvec3( 1./2.,  1./2., -1./2.) * voxwid,
         fvec3( 1./2.,  1./2.,  1./2.) * voxwid
     };
-    Tv accumulator = 0.;
-    Tv sub_accumulator = 0.;
-    for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
-        // Get the start point of the projection line
-        //proj_spec projspec = proj_tex_chunk_spec.projspecs[proj_idx];
-        proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
-        source_pos = projspec.sourcepos;
 
-        // Find the intersection with the detector of the ray passing through
-        // the center of the voxel
-        fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
+    const unsigned int ssx = config.ssx;
+    const unsigned int ssy = config.ssy;
+    const unsigned int ssz = config.ssz;
+    const float offx = 1./((float)ssx);
+    const float offy = 1./((float)ssy);
+    const float offz = 1./((float)ssz);
+    Tv ssx_accumulator = 0;
+    for (unsigned int ssi = 0; ssi < ssx; ssi++) {
+        Tv ssy_accumulator = 0;
+        for (unsigned int ssj = 0; ssj < ssy; ssj++) {
+            Tv ssz_accumulator = 0;
+            for (unsigned int ssk = 0; ssk < ssz; ssk++) {
 
-        sub_accumulator = (Tv)0;
+                Tv accumulator = 0.;
+                Tv sub_accumulator = 0.;
+                for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
 
-        if (exact) {
-            // Find the intersection with the detector of the ray passing through
-            // each of the eight corners of the voxel. These will define the range
-            // of pixels that are in range and need to be considered for backprojection.
-            fvec3 vox_pos_offset;
-            fvec2 det_coords;
-            fvec2 det_coords_min = det_coords_c;
-            fvec2 det_coords_max = det_coords_c;
-            for (const fvec3 &offset : _vox_corner_offsets) {
-                vox_pos_offset = vox_pos + offset;
-                det_coords = get_projected_detector_coords(vox_pos_offset, projspec);
-                det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
-                det_coords_max = {max(det_coords_max.x, det_coords.x), max(det_coords_max.y, det_coords.y)};
-            }
-            int det_idx_x_min = max(0, (int)floor(det_coords_min.x + projspec.dspec.nu/2.f));
-            int det_idx_y_min = max(0, (int)floor(det_coords_min.y + projspec.dspec.nv/2.f));
-            int det_idx_x_max = min(projspec.dspec.nu-1, (int)ceil(det_coords_max.x + projspec.dspec.nu/2.f));
-            int det_idx_y_max = min(projspec.dspec.nv-1, (int)ceil(det_coords_max.y + projspec.dspec.nv/2.f));
-            for (int det_idx_x = det_idx_x_min; det_idx_x <= det_idx_x_max; det_idx_x++) {
-                for (int det_idx_y = det_idx_y_min; det_idx_y <= det_idx_y_max; det_idx_y++) {
+                    const fvec3 vox_pos = vox_pos_c + fvec3(
+                        -1./2. + offx*(0.5f + ssi),
+                        -1./2. + offy*(0.5f + ssj),
+                        -1./2. + offz*(0.5f + ssk)
+                    ) * voxwid;
 
-                    fvec3 det_pos      = projspec.dspec.pos + (
-                        projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
-                        projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
-                    );
+                    // Get the start point of the projection line
+                    //proj_spec projspec = proj_tex_chunk_spec.projspecs[proj_idx];
+                    proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
+                    source_pos = projspec.sourcepos;
 
-                    float intersect_linelen = exact_line_integral_backproject_linelen(
-                        source_pos, det_pos, vox_pos, voxwid);
+                    // Find the intersection with the detector of the ray passing through
+                    // the center of the voxel
+                    fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
 
-                    if (intersect_linelen != 0.f) {
-                        // Find the detector value there
-                        Tp det_value;
-                        if (config.backproject_all_1s) {
-                            det_value = 1.;
-                        } else {
-                            det_idx = (
-                                input_projs_strides.y * det_idx_x +
-                                input_projs_strides.z * det_idx_y +
-                                input_projs_strides.x * proj_idx
-                            )/sizeof(Tp);
-                            det_value = input_projs[det_idx];
+                    sub_accumulator = (Tv)0;
+
+                    if (exact) {
+                        // Find the intersection with the detector of the ray passing through
+                        // each of the eight corners of the voxel. These will define the range
+                        // of pixels that are in range and need to be considered for backprojection.
+                        fvec3 vox_pos_offset;
+                        fvec2 det_coords;
+                        fvec2 det_coords_min = det_coords_c;
+                        fvec2 det_coords_max = det_coords_c;
+                        for (const fvec3 &offset : _vox_corner_offsets) {
+                            vox_pos_offset = vox_pos + offset;
+                            det_coords = get_projected_detector_coords(vox_pos_offset, projspec);
+                            det_coords_min = {min(det_coords_min.x, det_coords.x), min(det_coords_min.y, det_coords.y)};
+                            det_coords_max = {max(det_coords_max.x, det_coords.x), max(det_coords_max.y, det_coords.y)};
                         }
+                        int det_idx_x_min = max(0, (int)floor(det_coords_min.x + projspec.dspec.nu/2.f));
+                        int det_idx_y_min = max(0, (int)floor(det_coords_min.y + projspec.dspec.nv/2.f));
+                        int det_idx_x_max = min(projspec.dspec.nu-1, (int)ceil(det_coords_max.x + projspec.dspec.nu/2.f));
+                        int det_idx_y_max = min(projspec.dspec.nv-1, (int)ceil(det_coords_max.y + projspec.dspec.nv/2.f));
+                        for (int det_idx_x = det_idx_x_min; det_idx_x <= det_idx_x_max; det_idx_x++) {
+                            for (int det_idx_y = det_idx_y_min; det_idx_y <= det_idx_y_max; det_idx_y++) {
+
+                                fvec3 det_pos      = projspec.dspec.pos + (
+                                    projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
+                                    projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
+                                );
+
+                                float intersect_linelen = exact_line_integral_backproject_linelen(
+                                    source_pos, det_pos, vox_pos, voxwid);
+
+                                if (intersect_linelen != 0.f) {
+                                    // Find the detector value there
+                                    Tp det_value;
+                                    if (config.backproject_all_1s) {
+                                        det_value = 1.;
+                                    } else {
+                                        det_idx = (
+                                            input_projs_strides.y * det_idx_x +
+                                            input_projs_strides.z * det_idx_y +
+                                            input_projs_strides.x * proj_idx
+                                        )/sizeof(Tp);
+                                        det_value = input_projs[det_idx];
+                                    }
+
+                                    /*
+                                    float det_value = tex2DLayered<Tp>(
+                                        detector_texture,
+                                        det_idx_y + 1./2.f,
+                                        det_idx_x + 1./2.f,
+                                        proj_idx + tex_start_layer
+                                    );
+                                    */
+
+                                    // Compute the backprojection into this voxel
+                                    sub_accumulator += fcast<Tv>(fcast<float>(det_value) * intersect_linelen);
+                                }
+
+                            }
+                        }
+                        // Apply Z_factor_power, if applicable
+                        if (config.Z_on_L_factor_power != 0) {
+                            fvec3 Lvec = projspec.dspec.pos - source_pos;
+                            float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
+                            sub_accumulator *= fcast<Tv>(powint(Z_on_L, config.Z_on_L_factor_power));
+                        }
+                        if (config.Z_on_val_factor_power != 0) {
+                            float val = config.Z_on_val_factor_val;
+                            fvec3 Lvec = projspec.dspec.pos - source_pos;
+                            float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
+                            sub_accumulator *= fcast<Tv>(powint(Z_on_val, config.Z_on_val_factor_power));
+                        }
+                    } else {
+                        // config.exact is FALSE
+
+                        // In the approximate method, the voxel fetches the value from the detector
+                        // by casting a ray. We use zeroth-order interpolation on the detector.
 
                         /*
-                        float det_value = tex2DLayered<Tp>(
-                            detector_texture,
-                            det_idx_y + 1./2.f,
-                            det_idx_x + 1./2.f,
-                            proj_idx + tex_start_layer
-                        );
+                        // Zeroth-order interpolation
+                        // 3 voxels across: middle of detector is 0, which has index 1
+                        // 4 voxels across: middle of detector is 0, which has index (4-1)/2 = 1.5
+                        // below 1.5 should be rounded down to 1. above 1.5 should be rounded up to 2
+                        // So, we need to take floor(coord + N/2)
+                        int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
+                        if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
+                        int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));
+                        if ((det_idx_y < 0) || (det_idx_y >= projspec.dspec.nv)) { continue; }
+                        // Find the detector value there
+                        det_idx = (
+                            input_projs_strides.y * det_idx_x +
+                            input_projs_strides.z * det_idx_y +
+                            input_projs_strides.x * proj_idx
+                        )/sizeof(Tp);
+                        Tp det_value = input_projs[det_idx];
                         */
 
-                        // Compute the backprojection into this voxel
-                        sub_accumulator += fcast<Tv>(fcast<float>(det_value) * intersect_linelen);
-                    }
+                        // First-order interpolation (bilinear)
+                        float2 det_idx_f = float2({
+                            det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
+                            det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
+                        });
 
-                }
-            }
-            // Apply Z_factor_power, if applicable
-            if (config.Z_on_L_factor_power != 0) {
-                fvec3 Lvec = projspec.dspec.pos - source_pos;
-                float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
-                sub_accumulator *= fcast<Tv>(powint(Z_on_L, config.Z_on_L_factor_power));
-            }
-            if (config.Z_on_val_factor_power != 0) {
-                float val = config.Z_on_val_factor_val;
-                fvec3 Lvec = projspec.dspec.pos - source_pos;
-                float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
-                sub_accumulator *= fcast<Tv>(powint(Z_on_val, config.Z_on_val_factor_power));
-            }
-        } else {
-            // config.exact is FALSE
-
-            // In the approximate method, the voxel fetches the value from the detector
-            // by casting a ray. We use zeroth-order interpolation on the detector.
-
-            /*
-            // Zeroth-order interpolation
-            // 3 voxels across: middle of detector is 0, which has index 1
-            // 4 voxels across: middle of detector is 0, which has index (4-1)/2 = 1.5
-            // below 1.5 should be rounded down to 1. above 1.5 should be rounded up to 2
-            // So, we need to take floor(coord + N/2)
-            int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
-            if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
-            int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));
-            if ((det_idx_y < 0) || (det_idx_y >= projspec.dspec.nv)) { continue; }
-            // Find the detector value there
-            det_idx = (
-                input_projs_strides.y * det_idx_x +
-                input_projs_strides.z * det_idx_y +
-                input_projs_strides.x * proj_idx
-            )/sizeof(Tp);
-            Tp det_value = input_projs[det_idx];
-            */
-
-            // First-order interpolation (bilinear)
-            float2 det_idx_f = float2({
-                det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
-                det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
-            });
-
-            uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
-            ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
-            Tp det_value;
-            if (config.approx_mode_linear_interpolate) {
-                det_value = get_bilinear_interp(
-                    det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
-            } else {
-                det_value = get_zero_interp(
-                    det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
-            }
-
-            if (config.approx_mode_direct_raycast) {
-                Tp multiplier = 1;
-                if (
-                    (config.Z_on_L_factor_power != 0) ||
-                    (config.Z_on_val_factor_power != 0) ||
-                    (config.backproj_weighting_preset != 0)
-                ) {
-                    fvec3 Lvec = projspec.dspec.pos - source_pos;
-                    float Z = dot_prod((vox_pos - source_pos), Lvec) / norm_fvec3(Lvec);
-                    if (config.Z_on_L_factor_power != 0) {
-                        float Z_on_L = Z / norm_fvec3(Lvec);
-                        multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
-                    }
-                    if (config.Z_on_val_factor_power != 0) {
-                        float val = config.Z_on_val_factor_val;
-                        float Z_on_val = Z / val;
-                        multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
-                    }
-                    if (
-                        (config.backproj_weighting_preset == 1) ||
-                        (config.backproj_weighting_preset == 2) ||
-                        (config.backproj_weighting_preset == 3) ||
-                        (config.backproj_weighting_preset == 4) ||
-                        (config.backproj_weighting_preset == 5) ||
-                        (config.backproj_weighting_preset == 6)
-                    ) {
-                        // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
-                        float R = config.Z_on_val_factor_val;
-                        fvec3 r_minus_s = vox_pos - source_pos;
-                        float ell_on_R = norm_fvec3(fvec3(r_minus_s.x, r_minus_s.y, 0.f))/R;
-                        float Z_on_R = Z / R;
-                        float c_on_R = Z_on_R / ell_on_R;
-                        float dsigned_on_R = c_on_R - ell_on_R;  // positive if the source point is further away
-                        if (config.backproj_weighting_preset == 1) {
-                            // multiplier /= fcast<Tp>(2*powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
-                            multiplier /= fcast<Tp>(powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
+                        uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
+                        ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
+                        Tp det_value;
+                        if (config.approx_mode_linear_interpolate) {
+                            det_value = get_bilinear_interp(
+                                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+                        } else {
+                            det_value = get_zero_interp(
+                                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
                         }
-                        if (config.backproj_weighting_preset == 2) {
-                            float dsigned_on_c = dsigned_on_R / c_on_R;
-                            float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
-                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
-                            float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
-                            multiplier *= fcast<Tp>(
-                                -1 *
-                                2 *
-                                powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2) *
-                                (-vyrel_on_R) * (
-                                    1 + (
-                                        vxrel_on_R / Z_on_R
-                                    )
-                                ) /
-                                powint(ell_on_R, 2) /
-                                R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
-                                R // I don't know why this extra factor of R is needed.
+
+                        if (config.approx_mode_direct_raycast) {
+                            Tp multiplier = 1;
+                            if (
+                                (config.Z_on_L_factor_power != 0) ||
+                                (config.Z_on_val_factor_power != 0) ||
+                                (config.backproj_weighting_preset != 0)
+                            ) {
+                                fvec3 Lvec = projspec.dspec.pos - source_pos;
+                                float Z = dot_prod((vox_pos - source_pos), Lvec) / norm_fvec3(Lvec);
+                                if (config.Z_on_L_factor_power != 0) {
+                                    float Z_on_L = Z / norm_fvec3(Lvec);
+                                    multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                                }
+                                if (config.Z_on_val_factor_power != 0) {
+                                    float val = config.Z_on_val_factor_val;
+                                    float Z_on_val = Z / val;
+                                    multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                                }
+                                if (
+                                    (config.backproj_weighting_preset == 1) ||
+                                    (config.backproj_weighting_preset == 2) ||
+                                    (config.backproj_weighting_preset == 3) ||
+                                    (config.backproj_weighting_preset == 4) ||
+                                    (config.backproj_weighting_preset == 5) ||
+                                    (config.backproj_weighting_preset == 6)
+                                ) {
+                                    // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
+                                    float R = config.Z_on_val_factor_val;
+                                    fvec3 r_minus_s = vox_pos - source_pos;
+                                    float ell_on_R = norm_fvec3(fvec3(r_minus_s.x, r_minus_s.y, 0.f))/R;
+                                    float Z_on_R = Z / R;
+                                    float c_on_R = Z_on_R / ell_on_R;
+                                    float dsigned_on_R = c_on_R - ell_on_R;  // positive if the source point is further away
+                                    if (config.backproj_weighting_preset == 1) {
+                                        // multiplier /= fcast<Tp>(2*powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
+                                        multiplier /= fcast<Tp>(powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
+                                    }
+                                    if (config.backproj_weighting_preset == 2) {
+                                        float dsigned_on_c = dsigned_on_R / c_on_R;
+                                        float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
+                                        float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                                        float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
+                                        multiplier *= fcast<Tp>(
+                                            -1 *
+                                            2 *
+                                            powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2) *
+                                            (-vyrel_on_R) * (
+                                                1 + (
+                                                    vxrel_on_R / Z_on_R
+                                                )
+                                            ) /
+                                            powint(ell_on_R, 2) /
+                                            R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                                            R // I don't know why this extra factor of R is needed.
+                                        );
+                                    }
+                                    if (config.backproj_weighting_preset == 3) {
+                                        // Ramp filter term from alternative formula
+                                        multiplier /= fcast<Tp>(Z_on_R*powint(c_on_R, 2));
+                                    }
+                                    if (config.backproj_weighting_preset == 4) {
+                                        // Hilbert transform term from alternative formula
+                                        float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                                        multiplier *= fcast<Tp>((vyrel_on_R / Z_on_R) / Z_on_R);
+                                    }
+                                    if (config.backproj_weighting_preset == 6) {
+                                        float dsigned_on_c = dsigned_on_R / c_on_R;
+                                        float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
+                                        float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
+                                        float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
+                                        multiplier *= fcast<Tp>(
+                                            -1 *
+                                            2 *
+                                            powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2) /
+                                            (1 - dsigned_on_c) *
+                                            (-vyrel_on_R) * (
+                                                1 + (
+                                                    vxrel_on_R / Z_on_R
+                                                )
+                                            ) /
+                                            Z_on_R /
+                                            R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
+                                            R // I don't know why this extra factor of R is needed.
+                                        );
+                                    }
+                                }
+                            }
+                            sub_accumulator = fcast<Tv>(det_value * multiplier);
+                        } else {
+                            // Compute the physical distance to the source
+                            fvec3 det_pos      = projspec.dspec.pos + (
+                                projspec.dspec.u * det_coords_c.x +
+                                projspec.dspec.v * det_coords_c.y
                             );
+                            float dist_to_det = norm_fvec3(det_pos - source_pos);
+                            float dist_to_vox = norm_fvec3(vox_pos - source_pos);
+                            float mag = dist_to_det/dist_to_vox*voxwid;  // Need to divide by voxwid here
+                            float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
+                            Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
+
+                            if (config.Z_on_L_factor_power != 0) {
+                                fvec3 Lvec = projspec.dspec.pos - source_pos;
+                                float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
+                                multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                            }
+                            if (config.Z_on_val_factor_power != 0) {
+                                float val = config.Z_on_val_factor_val;
+                                fvec3 Lvec = projspec.dspec.pos - source_pos;
+                                float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
+                                multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
+                            }
+                            sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
                         }
-                        if (config.backproj_weighting_preset == 3) {
-                            // Ramp filter term from alternative formula
-                            multiplier /= fcast<Tp>(Z_on_R*powint(c_on_R, 2));
-                        }
-                        if (config.backproj_weighting_preset == 4) {
-                            // Hilbert transform term from alternative formula
-                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
-                            multiplier *= fcast<Tp>((vyrel_on_R / Z_on_R) / Z_on_R);
-                        }
-                        if (config.backproj_weighting_preset == 6) {
-                            float dsigned_on_c = dsigned_on_R / c_on_R;
-                            float rho_on_R = sqrt(powint(vox_pos.x, 2) + powint(vox_pos.y, 2))/R;
-                            float vyrel_on_R = (source_pos.x*vox_pos.y - source_pos.y*vox_pos.x)/R/R;
-                            float vxrel_on_R = (source_pos.x*vox_pos.x + source_pos.y*vox_pos.y)/R/R;
-                            multiplier *= fcast<Tp>(
-                                -1 *
-                                2 *
-                                powint((1 - powint(dsigned_on_c, 2))/(1 + powint(dsigned_on_c, 2)), 2) /
-                                (1 - dsigned_on_c) *
-                                (-vyrel_on_R) * (
-                                    1 + (
-                                        vxrel_on_R / Z_on_R
-                                    )
-                                ) /
-                                Z_on_R /
-                                R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
-                                R // I don't know why this extra factor of R is needed.
-                            );
-                        }
+
                     }
-                }
-                sub_accumulator = fcast<Tv>(det_value * multiplier);
-            } else {
-                // Compute the physical distance to the source
-                fvec3 det_pos      = projspec.dspec.pos + (
-                    projspec.dspec.u * det_coords_c.x +
-                    projspec.dspec.v * det_coords_c.y
-                );
-                float dist_to_det = norm_fvec3(det_pos - source_pos);
-                float dist_to_vox = norm_fvec3(vox_pos - source_pos);
-                float mag = dist_to_det/dist_to_vox*voxwid;  // Need to divide by voxwid here
-                float pixel_area = norm_fvec3(projspec.dspec.u) * norm_fvec3(projspec.dspec.v);
-                Tp multiplier = fcast<Tp>(powint(mag,2) / pixel_area);
 
-                if (config.Z_on_L_factor_power != 0) {
-                    fvec3 Lvec = projspec.dspec.pos - source_pos;
-                    float Z_on_L = dot_prod((vox_pos - source_pos), Lvec) / dot_prod(Lvec, Lvec);
-                    multiplier *= fcast<Tp>(powint(Z_on_L, config.Z_on_L_factor_power));
+                    // Apply softening toward detector edges, if applicable
+                    const float sep = config.soften_edge_proportion;
+                    if ((sep > 0.f) && (sub_accumulator != (Tv)0)) {
+                        // Define distances from center, from 0 to 1
+                        // float udist = abs((det_coords_c.x - (projspec.dspec.nu-1)/2.)/(projspec.dspec.nu/2.f));
+                        // float vdist = abs((det_coords_c.y - (projspec.dspec.nv-1)/2.)/(projspec.dspec.nv/2.f));
+                        float udist = abs(det_coords_c.x)/(projspec.dspec.nu/2.f);
+                        float vdist = abs(det_coords_c.y)/(projspec.dspec.nv/2.f);
+                        // Scale each from 0 to 1, where 0 is completely softened (set to 0), and 1 is not softened at all
+                        udist = max(0.f, min(1.f, (1.f - udist)/sep));
+                        vdist = max(0.f, min(1.f, (1.f - vdist)/sep));
+                        // Set each to the corresponding softening factor
+                        udist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - udist)))/2.f));
+                        vdist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - vdist)))/2.f));
+                        // Apply the softening factors
+                        sub_accumulator *= udist;
+                        sub_accumulator *= vdist;
+                    }
+                    accumulator += sub_accumulator;
                 }
-                if (config.Z_on_val_factor_power != 0) {
-                    float val = config.Z_on_val_factor_val;
-                    fvec3 Lvec = projspec.dspec.pos - source_pos;
-                    float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
-                    multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
-                }
-                sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
+                ssz_accumulator += accumulator;
             }
-
+            ssz_accumulator /= ssz;
+            ssy_accumulator += ssz_accumulator;
         }
-
-        // Apply softening toward detector edges, if applicable
-        const float sep = config.soften_edge_proportion;
-        if ((sep > 0.f) && (sub_accumulator != (Tv)0)) {
-            // Define distances from center, from 0 to 1
-            // float udist = abs((det_coords_c.x - (projspec.dspec.nu-1)/2.)/(projspec.dspec.nu/2.f));
-            // float vdist = abs((det_coords_c.y - (projspec.dspec.nv-1)/2.)/(projspec.dspec.nv/2.f));
-            float udist = abs(det_coords_c.x)/(projspec.dspec.nu/2.f);
-            float vdist = abs(det_coords_c.y)/(projspec.dspec.nv/2.f);
-            // Scale each from 0 to 1, where 0 is completely softened (set to 0), and 1 is not softened at all
-            udist = max(0.f, min(1.f, (1.f - udist)/sep));
-            vdist = max(0.f, min(1.f, (1.f - vdist)/sep));
-            // Set each to the corresponding softening factor
-            udist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - udist)))/2.f));
-            vdist = max(0.f, min(1.f, (1 + cos(3.1415926535898f * (1.f - vdist)))/2.f));
-            // Apply the softening factors
-            sub_accumulator *= udist;
-            sub_accumulator *= vdist;
-        }
-
-        accumulator += sub_accumulator;
+        ssy_accumulator /= ssy;
+        ssx_accumulator += ssy_accumulator;
     }
-
-
-    return accumulator;
+    ssx_accumulator /= ssx;
+    return ssx_accumulator;
 }
 
 

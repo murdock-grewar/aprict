@@ -328,6 +328,9 @@ class TestCB_BACKPROJ_randomnoise:
                 np.bool(False),
                 np.bool(True),
                 np.uint8(0),
+                np.uint32(1),
+                np.uint32(1),
+                np.uint32(1),
             ),
             dtype=ks_config.dtype,
         )
