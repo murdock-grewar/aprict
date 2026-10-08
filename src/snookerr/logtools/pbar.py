@@ -88,7 +88,7 @@ class ProgressBar:
             pbar = self._pbar
             gpu_perc = self._gpu_mon.gpu_perc
             gpu_perc_str = (
-                "--%" if gpu_perc is None else f"{round(gpu_perc): 3d}%"
+                "---%" if gpu_perc is None else f"{round(gpu_perc): >3d}%"
             )
             pbar.set_postfix_str(f"GPUs: {gpu_perc_str:s}", refresh=False)
             pbar.n = val
