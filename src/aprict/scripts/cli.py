@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""snookerr-cli: the main command-line interface to snookerr."""
+"""aprict-cli: the main command-line interface to aprict."""
 
 import click_extra as ce
 
@@ -24,7 +24,7 @@ from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
 
-_progdesc: str = "Entry point for snookerr CLI."
+_progdesc: str = "Entry point for aprict CLI."
 
 
 _cs = {
@@ -35,9 +35,7 @@ _cs = {
 }
 
 
-@ce.group(
-    name="snookerr-cli", params=None, help=_progdesc, context_settings=_cs
-)
+@ce.group(name="aprict-cli", params=None, help=_progdesc, context_settings=_cs)
 @ce.version_option(version=version)  # add --version from click_extra
 @ce.tree_option()  # add --tree option from click_extra
 # not including the man_option because it includes incorrect information, like possible exit codes etc.

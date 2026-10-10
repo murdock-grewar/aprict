@@ -3,11 +3,11 @@ requires = ['setuptools']
 build-backend = 'setuptools.build_meta'
 
 [project]
-name = "snookerr"
+name = "aprict"
 authors = [
     {name = "Murdock Grewar", email = "murdock.grewar@anu.edu.au"}
 ]
-description = 'Tools to reconstruct tomograms from the triangular X-ray apparatus.'
+description = 'Tools to simulate and reconstruct XCT transmission data.'
 readme = 'README.md'
 requires-python = '>=3.14'
 license = {file = 'LICENSE.txt'}
@@ -65,6 +65,6 @@ minversion = "6.0"
 addopts = "-ra" # -v --durations=10"  # unnecessary with the conftest.py file
 console_output_style = "progress"
 testpaths = [
-    "src/snookerr/tests",
+    "src/aprict/tests",
 ]
 

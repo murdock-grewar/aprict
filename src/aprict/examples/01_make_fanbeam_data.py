@@ -24,10 +24,10 @@ import time
 import numexpr as ne
 import numpy as np
 
-import snookerr
-from snookerr import imview, lib
-from snookerr.cb import flatpanel as cbfp
-from snookerr.logtools import ProgressBar
+import aprict
+from aprict import imview, lib
+from aprict.cb import flatpanel as cbfp
+from aprict.logtools import ProgressBar
 
 
 def parse_args() -> argparse.Namespace:
@@ -188,15 +188,15 @@ def make_projection_data(
     path_projs = args.output.joinpath("projs.npy")
 
     # Load and save phantom
-    # v = snookerr.phantoms.FORBILD.RockCanisterAl
+    # v = aprict.phantoms.FORBILD.RockCanisterAl
     if args.phantom is None:
-        v = snookerr.phantoms.FORBILD.HeadPhantom
+        v = aprict.phantoms.FORBILD.HeadPhantom
         # convert distances from millimeters to centimeters
         v.scale_len(1 / 10)
         # convert attenuation coefficient from multiples of water to multiples of 0.184 per cm
         v.multiply_attenuation(0.184)
     else:
-        v = snookerr.FBVolume.load(args.phantom)
+        v = aprict.FBVolume.load(args.phantom)
     v.multiply_attenuation(args.multiply_attenuation)
     with open(path_fbv_pha, mode="w+", encoding="utf-8") as f:
         f.write(v.FORBILD_str)

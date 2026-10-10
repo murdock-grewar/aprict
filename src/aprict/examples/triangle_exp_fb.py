@@ -23,9 +23,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-import snookerr
-from snookerr import liveplot
-from snookerr.cb import flatpanel as cbfp
+import aprict
+from aprict import liveplot
+from aprict.cb import flatpanel as cbfp
 
 
 def main() -> None:  # ruff: ignore[undocumented-public-function]
@@ -242,8 +242,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
-    # vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.HeadPhantom
-    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.CustomComposite
+    # vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite
     vol.scale_len(
         1 / voxwid_mm
     )  # factor to change from units of mm to units of voxel-lengths
@@ -384,8 +384,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
         proj_array = out_noised_attenuation_capped
     else:
         proj_array = projs.data
-    # snookerr.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
-    snookerr.imview.plot_projections(
+    # aprict.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
+    aprict.imview.plot_projections(
         proj_array.reshape(-1, *proj_array.shape[-2:]),
         title="max attenuation capped for plotting purposes",
     )
@@ -399,7 +399,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     vol_shape: tuple[int, int, int] = tuple(
         int(volwid_mm // voxwid_mm) for _ in range(3)
     )  # ty:ignore[invalid-assignment]  # ty is bugged here
-    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=np.float32)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=np.float32)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
@@ -431,8 +431,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Make a Landweber object
     working_vol.fill(0)
-    recon = snookerr.iterators.Landweber_flatpanel(
-        config=snookerr.iterators.Landweber_flatpanel.Config(
+    recon = aprict.iterators.Landweber_flatpanel(
+        config=aprict.iterators.Landweber_flatpanel.Config(
             fast_backproject=fast_backproj,
             soft_from_cylinder_relrad=0.95,
             bp_soft_from_detedge_relrad=0.95,
@@ -451,15 +451,15 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
             ).get()
         )
     v = recon.volume.as_numpy()
-    snookerr.imview.plot_projections(
+    aprict.imview.plot_projections(
         np.sum(v, axis=1)[np.newaxis, :, :],
         title=s + " -- projection through y axis",
     )
-    snookerr.imview.plot_volume(v, title=s + " -- top-down")
-    snookerr.imview.plot_volume(
+    aprict.imview.plot_volume(v, title=s + " -- top-down")
+    aprict.imview.plot_volume(
         v.transpose((0, 2, 1)), title=s + " -- through y axis"
     )
-    snookerr.imview.plot_volume(
+    aprict.imview.plot_volume(
         v.transpose((2, 1, 0)), title=s + " -- through x axis"
     )
 

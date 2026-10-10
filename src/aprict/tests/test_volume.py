@@ -18,7 +18,7 @@
 import numpy as np
 import pytest
 
-from .. import Volume  # import directoly from root snookerr namespace
+from .. import Volume  # import directoly from root aprict namespace
 
 
 @pytest.mark.dependency(name="volume_create", scope="session")

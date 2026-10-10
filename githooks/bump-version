@@ -8,10 +8,10 @@
 
 # This hook does the following:
 # - Check if the HEAD branch name is "dev"
-# - If it is "dev", then increment the version number in src/snookerr/version.py
+# - If it is "dev", then increment the version number in src/aprict/version.py
 
 # Config
-RELPATH_TO_VERSIONPY="src/snookerr/version.py" # Relative path to the version file. Relative to the git root.
+RELPATH_TO_VERSIONPY="src/aprict/version.py" # Relative path to the version file. Relative to the git root.
 BRANCHNAME_TO_APPLY_INCREMENT="dev" # Will only apply the version increment if we're committing to the branch with this name.
 
 # Calculate needed variables

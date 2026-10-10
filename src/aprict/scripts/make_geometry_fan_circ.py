@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."""
+"""Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."""
 
 import enum
 import pathlib
@@ -25,15 +25,16 @@ import click_extra as ce
 import cloup
 import numpy as np
 
-from snookerr.lib import click_tools
+from aprict.lib import click_tools
 
 from ..cb import flatpanel as cbfp
 
-_progdesc = "Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."
+_progdesc = "Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."
 
 
 class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
-    GOLDEN_THETA = 1
+    EQUISPACED = 1
+    GOLDEN = 2
 
 
 @ce.command(
@@ -49,7 +50,7 @@ class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
 @ce.option(
     "--type",
     type=click.Choice(TYPE),
-    default=TYPE.GOLDEN_THETA,
+    default=TYPE.EQUISPACED,
     help="How the source points should be distributed.",
 )
 @ce.option(
@@ -137,13 +138,7 @@ class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
     "R",  # makes it go into args.R instead of args.r
     required=True,
     type=click.FLOAT,
-    help="Radius of cylinder.",
-)
-@ce.option(
-    "--h",
-    required=True,
-    type=click.FLOAT,
-    help="Height of cylinder.",
+    help="Radius of circle.",
 )
 @ce.option(
     "--L-minus-R",
@@ -217,15 +212,17 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
     )
 
     # Make geometry
-    zs = np.linspace(
-        -args.h / 2,
-        args.h / 2,
-        num=args.num + 2,
-        endpoint=True,
-        dtype=np.float64,
-    )[1:-1]
+    zs = np.zeros((args.num,), dtype=np.float64)
     match args.type:
-        case TYPE.GOLDEN_THETA:
+        case TYPE.EQUISPACED:
+            ts = np.linspace(
+                theta_start,
+                theta_start + 2 * np.pi * (-1 if args.clockwise else 1),
+                endpoint=False,
+                num=args.num,
+                dtype=np.float64,
+            )
+        case TYPE.GOLDEN:
             ts = (
                 theta_start
                 + (-1 if args.clockwise else 1)

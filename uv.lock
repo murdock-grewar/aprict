@@ -1285,7 +1285,7 @@ wheels = [
 ]
 
 [[package]]
-name = "snookerr"
+name = "aprict"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

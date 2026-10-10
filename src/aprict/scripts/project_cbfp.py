@@ -28,7 +28,7 @@ import cupy as cp
 import numexpr as ne
 import numpy as np
 
-from snookerr.lib import click_tools
+from aprict.lib import click_tools
 
 from .. import FBVolume, imview, logtools, phantoms
 from ..cb import flatpanel as cbfp

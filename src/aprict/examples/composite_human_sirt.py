@@ -25,9 +25,9 @@ import cupy as cp
 import matplotlib.pyplot as plt
 import numpy as np
 
-import snookerr
-from snookerr import liveplot
-from snookerr.cb import flatpanel as cbfp
+import aprict
+from aprict import liveplot
+from aprict.cb import flatpanel as cbfp
 
 
 def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-function]
@@ -137,7 +137,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     zs, ts = np.array(
         list(
             itertools.islice(
-                snookerr.lib.lds.lds_cyl(zmin=zmin_mm, zmax=zmax_mm, rad=R_mm),
+                aprict.lib.lds.lds_cyl(zmin=zmin_mm, zmax=zmax_mm, rad=R_mm),
                 num_sources,
             )
         ),
@@ -174,14 +174,14 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     print("Voxel width (mm):        ", voxwid_mm)
     print()
     print("Creating volume... ", end="", flush=True)
-    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.CustomComposite
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite
     if plot_volume:
         print("plotting volume... ", end="", flush=True)
         xs = np.linspace(-300, 300, num=601, endpoint=True)
         ys = np.linspace(-200, 200, num=401, endpoint=True)
         zs = np.linspace(-750, 500, num=1251, endpoint=True)
         xvol = vol.to_numpy(xs, ys, zs)
-        snookerr.imview.plot_volume(
+        aprict.imview.plot_volume(
             xvol.transpose((2, 1, 0)), title="Side profile of whole volume"
         )
         # Plot region of interest (ROI)
@@ -204,7 +204,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
             endpoint=True,
         )
         xvol = vol.to_numpy(xs, ys, zs)
-        snookerr.imview.plot_volume(
+        aprict.imview.plot_volume(
             xvol, title="Region of interest (axial slices)"
         )
         del xvol
@@ -226,7 +226,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
                 dtype=np.float32,
             ),
         )
-        snookerr.imview.plot_volume(vol_numpy)
+        aprict.imview.plot_volume(vol_numpy)
         exit(0)
         del vol_numpy
     print("Number of shapes in volume: ", len(vol.shapes))
@@ -312,7 +312,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     else:
         proj_array = projs.data
     if show_plots_before_recon:
-        snookerr.imview.plot_projections(
+        aprict.imview.plot_projections(
             proj_array.reshape(-1, *proj_array.shape[-2:]),
             title="max attenuation capped for plotting purposes",
         )
@@ -339,9 +339,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
             int((volwid_mm // voxwid_mm) * 2 / 4),
         )
         print("Working volume shape: ", vol_shape)
-        working_vol = snookerr.Volume.zeros(
-            vol_shape, voxwid=1, dtype=vol_dtype
-        )
+        working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)
 
         # Backproject into the working volume
         config_backproject = cbfp.ConfigBackproject(
@@ -361,15 +359,13 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         print(
             f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True
         )
-        # snookerr.imview.plot_volume(working_vol.as_numpy())
+        # aprict.imview.plot_volume(working_vol.as_numpy())
 
         # Make a SIRT object
-        working_vol = snookerr.Volume.zeros(
-            vol_shape, voxwid=1, dtype=vol_dtype
-        )
+        working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)
         working_vol.fill(0)
-        recon = snookerr.iterators.SIRT_flatpanel(
-            config=snookerr.iterators.SIRT_flatpanel.Config(
+        recon = aprict.iterators.SIRT_flatpanel(
+            config=aprict.iterators.SIRT_flatpanel.Config(
                 fast_backproject=fast_approx_backprojection,
                 soft_from_cylinder_relrad=0.95,
             ),
@@ -408,11 +404,11 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         if save_volume_path is not None:
             np.save(save_volume_path, v)
         if False:
-            snookerr.imview.plot_volume(
+            aprict.imview.plot_volume(
                 v.transpose(0, 2, 1),
                 title=s + " -- view of y slices",
             )
-            snookerr.imview.plot_volume(
+            aprict.imview.plot_volume(
                 v,
                 title=s + " -- view of z slices",
             )

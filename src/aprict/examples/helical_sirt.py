@@ -15,7 +15,6 @@
 
 """Simulate an example experiment with a helical scan."""
 
-import pathlib
 import sys
 import time
 
@@ -23,52 +22,35 @@ import cupy as cp
 import matplotlib.pyplot as plt
 import numpy as np
 
-import snookerr
-from snookerr import liveplot
-from snookerr.cb import flatpanel as cbfp
+import aprict
+from aprict import liveplot
+from aprict.cb import flatpanel as cbfp
 
 
-def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-function]
+def main() -> None:  # ruff: ignore[undocumented-public-function]
     cbfp.force_compile()  # force the relevant CUDA kernels to compile first, so that the compilation time isn't included in the timings
 
     ### Configurable parameters ###
-    lung_generations: int = 10 if len(sys.argv) < 2 else int(sys.argv[1])
-    lung_scale_factor: float | None = 0.8  # Set to None for default
-    lung_taper: bool | None = True  # Set to None for default
-    lung_fix: bool | None = True  # Set to None for default
     live_plot: bool = True
-    # default_plot_range_HU: list[int | float] = [0, 1000]
-    default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
-    voxwid_mm: float = 0.5  # the voxel width of the head phantom
+    voxwid_mm: float = 0.3  # the voxel width of the head phantom
     scale_phantom_size: float = (
         # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
         1
     )
     apply_noise: bool = False
-    R_mm: float = 500  # ruff: ignore[non-lowercase-variable-in-function]
-    L_mm: float = R_mm + 500  # ruff: ignore[non-lowercase-variable-in-function]
-    num_sources: int = 100
-    total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
-    detwid_mm: float = 1200  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
-    dethei_mm: float = 500
-    pixel_wid_mm: float = 0.66
-    num_helix_turns: float = 2
+    R_mm: float = 175  # ruff: ignore[non-lowercase-variable-in-function]
+    L_mm: float = 425  # ruff: ignore[non-lowercase-variable-in-function]
+    num_sources: int = 500
+    num_turns: float = 0.618 * num_sources
+    total_clearfield_photons: float = 1e13  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
+    detwid_mm: float = 850  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
+    dethei_mm: float = 850
+    pixel_wid_mm: float = 0.425
     fast_approx_backprojection: bool = True
-    numits: int = 100 if len(sys.argv) < 3 else int(sys.argv[2])
+    numits: int = 100 if len(sys.argv) < 2 else int(sys.argv[1])
     vol_dtype = np.float32  # either np.float16 or np.float32
     proj_dtype = np.float32  # either np.float16 or np.float32 or np.float64. np.float16 seems to not have enough precision
-    save_volume_path: pathlib.Path | None = (
-        None if len(sys.argv) < 4 else pathlib.Path(sys.argv[3])
-    )
-    show_plots_before_recon: bool = True
     ###############################
-
-    if save_volume_path is not None:
-        if save_volume_path.exists():
-            msg = (
-                f"File at output path '{save_volume_path!s:s}' already exists."
-            )
-            raise FileExistsError(msg)
 
     # Derived quantities
     det_numpixwid: int = int(detwid_mm / pixel_wid_mm)
@@ -95,16 +77,9 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     # )
     # zs = np.linspace(-300, 300, endpoint=True, num=num_sources, dtype=np.float32)
     zs = np.linspace(
-        -150, 150, endpoint=True, num=num_sources, dtype=np.float32
+        -673 / 2, 673 / 2, endpoint=True, num=num_sources, dtype=np.float32
     )
-    # ts = 0.618 * 2 * np.pi * np.arange(num_sources, dtype=np.float32)
-    ts = (
-        2
-        * np.pi
-        * num_helix_turns
-        / num_sources
-        * np.arange(num_sources, dtype=np.float32)
-    )
+    ts = 0.618 * zs * 2 * np.pi * num_turns / (zs.max() - zs.min())
     source_pos_arr = np.array(
         [R_mm * np.cos(ts), R_mm * np.sin(ts), zs], dtype=np.float32
     ).transpose()
@@ -130,52 +105,41 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
-    print()
-    print("Creating volume... ", end="", flush=True)
-    vol: snookerr.FBVolume = snookerr.phantoms.FORBILD.LungPhantom(
-        generation=lung_generations,
-        scale_factor=lung_scale_factor,
-        taper=lung_taper,
-        fix=lung_fix,
-    )
-    print("done.")
-    print("Number of shapes in volume: ", len(vol.shapes))
-    vol.translate(axis="z", amount=150)
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
     vol.scale_len(1 / voxwid_mm)
-    volwid_mm = 500  # in the future, fetch from the phantom
+    volwid_mm = 250  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
     volwid_mm *= scale_phantom_size
 
     ### Do plotting of the imaging geometry
-    if show_plots_before_recon:
-        # Prepare the 3D plot
-        ax = plt.figure().add_subplot(projection="3d")
-        ax.set_xlim(-R_mm, R_mm)
-        ax.set_ylim(-R_mm, R_mm)
-        ax.set_zlim(zs.min(), zs.max())
-        ax.set_xlabel("X (mm)")
-        ax.set_ylabel("Y (mm)")
-        ax.set_zlabel("Z (mm)")
-        ax.view_init(elev=20.0, azim=-35, roll=0)
-        ax.set_aspect("equal")
-        # Plot X-ray sources
-        ax.scatter(
-            source_pos_arr[..., 0],
-            source_pos_arr[..., 1],
-            source_pos_arr[..., 2],
-            marker="x",
-            label="X-ray source",
-        )
-        # Plot the sphere representing the object
-        u = np.linspace(0, 2 * np.pi, 100)
-        v = np.linspace(0, np.pi, 100)
-        x = volwid_mm / 2 * np.outer(np.cos(u), np.sin(v))
-        y = volwid_mm / 2 * np.outer(np.sin(u), np.sin(v))
-        z = volwid_mm / 2 * np.outer(np.ones(np.size(u)), np.cos(v))
-        ax.plot_surface(x, y, z, color="black", alpha=0.3, label="object")
-        ax.legend()
-        plt.show()
+    # Prepare the 3D plot
+    ax = plt.figure().add_subplot(projection="3d")
+    ax.set_xlim(-R_mm, R_mm)
+    ax.set_ylim(-R_mm, R_mm)
+    ax.set_zlim(zs.min(), zs.max())
+    ax.set_xlabel("X (mm)")
+    ax.set_ylabel("Y (mm)")
+    ax.set_zlabel("Z (mm)")
+    ax.view_init(elev=20.0, azim=-35, roll=0)
+    ax.set_aspect("equal")
+    # Plot X-ray sources
+    ax.scatter(
+        source_pos_arr[..., 0],
+        source_pos_arr[..., 1],
+        source_pos_arr[..., 2],
+        marker="x",
+        label="X-ray source",
+    )
+    # Plot the sphere representing the object
+    u = np.linspace(0, 2 * np.pi, 100)
+    v = np.linspace(0, np.pi, 100)
+    x = volwid_mm / 2 * np.outer(np.cos(u), np.sin(v))
+    y = volwid_mm / 2 * np.outer(np.sin(u), np.sin(v))
+    z = volwid_mm / 2 * np.outer(np.ones(np.size(u)), np.cos(v))
+    ax.plot_surface(x, y, z, color="black", alpha=0.3, label="object")
+    ax.legend()
+    plt.show()
 
     ## Call the projection code on the prepared geometry ##
     config_project = cbfp.ConfigProject(
@@ -220,14 +184,14 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         )
         print("done.", flush=True)
         print()
-        proj_array = out_noised_attenuation_capped.astype(proj_dtype)
+        proj_array = out_noised_attenuation_capped
     else:
         proj_array = projs.data
-    if show_plots_before_recon:
-        snookerr.imview.plot_projections(
-            proj_array.reshape(-1, *proj_array.shape[-2:]),
-            title="max attenuation capped for plotting purposes",
-        )
+    # aprict.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
+    aprict.imview.plot_projections(
+        proj_array.get().reshape(-1, *proj_array.shape[-2:]),
+        title="max attenuation capped for plotting purposes",
+    )
     if numits == 0:
         return
 
@@ -237,13 +201,11 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         out_noised_attenuation, out_noised_transmission, out_
 
     # Set up the working volume
-    vol_shape: tuple[int, int, int] = (
-        int(volwid_mm // voxwid_mm),
-        int(volwid_mm // voxwid_mm),
-        int((volwid_mm // voxwid_mm) * 3 / 4),
-    )
+    vol_shape: tuple[int, int, int] = tuple(
+        int(volwid_mm // voxwid_mm) for _ in range(3)
+    )  # ty:ignore[invalid-assignment]  # ty is bugged here
     print("Working volume shape: ", vol_shape)
-    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
@@ -261,13 +223,13 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     t2 = time.time()
     elapsed_milliseconds: float = (t2 - t1) * 1000
     print(f"Backrojection time (ms): {elapsed_milliseconds:.1f}", flush=True)
-    # snookerr.imview.plot_volume(working_vol.as_numpy())
+    # aprict.imview.plot_volume(working_vol.as_numpy())
 
     # Make a SIRT object
-    working_vol = snookerr.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
+    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
     working_vol.fill(0)
-    recon = snookerr.iterators.SIRT_flatpanel(
-        config=snookerr.iterators.SIRT_flatpanel.Config(
+    recon = aprict.iterators.SIRT_flatpanel(
+        config=aprict.iterators.SIRT_flatpanel.Config(
             fast_backproject=fast_approx_backprojection,
             soft_from_cylinder_relrad=0.95,
         ),
@@ -278,37 +240,28 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     # Set up live plot
     if live_plot:
         _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
-            title="Live plot -- projection along Y axis",
-            histogram_label="Line Attenuation",
-            plotmin=default_plot_range_line_attenuation[0],
-            plotmax=default_plot_range_line_attenuation[1],
-            # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
-            # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
+            title="Live plot",
+            histogram_label="Attenuation coefficient",
+            plotmin=0.0184 * voxwid_mm,
+            plotmax=1.1 * 0.0184 * voxwid_mm,
             show=False,
         )
 
     # Run the recon
-    liveplot_arr = cp.empty(
-        (working_vol.shape[0], working_vol.shape[2]), dtype=vol_dtype
-    )
     for i in range(numits + 1):
         s = f"Iteration {i:04d}/{numits:04d}"
         print(s + "   -- UNIX time: ", time.time(), flush=True)
         recon.iterate()
         # Live plot update
         if live_plot:
-            recon.volume.sum_to_cupy_array(axis=1, out=liveplot_arr)
-            a = liveplot_arr.get()
-            lp_dispatcher.update_image(a[:, :, np.newaxis])
+            lp_dispatcher.update_image(
+                np.flip(
+                    recon.volume.as_numpy().transpose(2, 0, 1), axis=(1, 2)
+                )
+            )
             if i == 0:
                 lp_dispatcher.set_visible(True)
-    v = recon.volume.as_numpy()
-    if save_volume_path is not None:
-        np.save(save_volume_path, v)
-    snookerr.imview.plot_volume(
-        v.transpose(0, 2, 1),
-        title=s,
-    )
+    aprict.imview.plot_volume(recon.volume.as_numpy(), title=s)
 
 
 if __name__ == "__main__":

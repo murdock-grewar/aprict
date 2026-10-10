@@ -18,7 +18,7 @@
 
 import numpy as np
 
-from .. import (  # import directly from root snookerr namespace
+from .. import (  # import directly from root aprict namespace
     FBVolume,
     phantoms,
 )

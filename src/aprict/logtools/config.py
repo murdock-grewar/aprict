@@ -24,7 +24,7 @@ import time
 
 from ..version import version
 
-_module_name = "snookerr"
+_module_name = "aprict"
 
 
 class LogLevel(enum.Enum):

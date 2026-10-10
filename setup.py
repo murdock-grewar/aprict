@@ -20,7 +20,7 @@ import os
 
 from setuptools import setup
 
-my_module_name = "snookerr"
+my_module_name = "aprict"
 my_src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 my_module_dir = os.path.join(my_src_dir, my_module_name)
 my_script_dir = os.path.join(my_module_dir, "scripts")

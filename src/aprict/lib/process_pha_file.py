@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""A hacked together script to convert some .pha files to a list of Shapes for use in snookerr."""
+"""A hacked together script to convert some .pha files to a list of Shapes for use in aprict."""
 
 import functools
 import io
