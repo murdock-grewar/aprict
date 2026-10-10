@@ -20,6 +20,7 @@ import logging
 import rich.progress
 
 from ..lib import gpu_tools
+from . import rich_custombar
 
 
 class ProgressBar:
@@ -90,7 +91,9 @@ class ProgressBar:
                 rich.progress.TextColumn(
                     "[progress.description]{task.description}"
                 ),
-                rich.progress.BarColumn(bar_width=None),
+                rich_custombar.CustomBarColumn(
+                    bar_chars=rich_custombar.BAR_CHARS_BIGBLOCK, bar_width=None
+                ),
                 rich.progress.TaskProgressColumn(),
                 *extracolumns,
                 rich.progress.TimeRemainingColumn(),
