@@ -1,1 +1,2 @@
 recursive-include src/aprict/data *
+recursive-include src/aprict/cuda/structs/cu *

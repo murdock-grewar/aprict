@@ -6,8 +6,7 @@ struct FORBILD_Box {
     float dx;
     float dy;
     float dz;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Box box
 )
@@ -91,8 +90,7 @@ struct FORBILD_ClipAxisSpec {
     fvec3 axis;
     float dotprod;
     unsigned char mode;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_ClipAxisSpec cas
 )
@@ -162,8 +160,7 @@ struct FORBILD_Cylinder {
     float r;
     float l;
     fvec3 axis;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cylinder cylinder
 )
@@ -294,8 +291,7 @@ struct FORBILD_Cylinder_z {
     float z;
     float r;
     float l;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cylinder_z cylinder_z
 )
@@ -347,8 +343,7 @@ struct FORBILD_Cone_z {
     float l;
     float r1;
     float r2;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cone_z cone_z
 )
@@ -598,8 +593,7 @@ struct FORBILD_Cone {
     float r1;
     float r2;
     fvec3 axis;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cone cone
 )
@@ -679,8 +673,7 @@ struct FORBILD_Cylinder_x {
     float z;
     float r;
     float l;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cylinder_x cylinder_x
 )
@@ -732,8 +725,7 @@ struct FORBILD_Cone_x {
     float l;
     float r1;
     float r2;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cone_x cone_x
 )
@@ -793,8 +785,7 @@ struct FORBILD_Cylinder_y {
     float z;
     float r;
     float l;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cylinder_y cylinder_y
 )
@@ -846,8 +837,7 @@ struct FORBILD_Cone_y {
     float l;
     float r1;
     float r2;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Cone_y cone_y
 )
@@ -906,8 +896,7 @@ struct FORBILD_Sphere {
     float y;
     float z;
     float r;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Sphere sphere
 )
@@ -998,8 +987,7 @@ struct FORBILD_Ellipsoid {
     float dx;
     float dy;
     float dz;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipsoid ellipsoid
 )
@@ -1062,8 +1050,7 @@ struct FORBILD_Ellipsoid_free {
     fvec3 a_x;
     fvec3 a_y;
     fvec3 a_z;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipsoid_free ef
 )
@@ -1147,8 +1134,7 @@ struct FORBILD_Ellipt_Cyl {
     fvec3 axis;
     fvec3 a_x;
     fvec3 a_y;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipt_Cyl ecyl
 )
@@ -1231,8 +1217,7 @@ struct FORBILD_Ellipt_Cyl_x {
     float l;
     float dy;
     float dz;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipt_Cyl_x ecylx
 )
@@ -1295,8 +1280,7 @@ struct FORBILD_Ellipt_Cyl_y {
     float l;
     float dx;
     float dz;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipt_Cyl_y ecyly
 )
@@ -1359,8 +1343,7 @@ struct FORBILD_Ellipt_Cyl_z {
     float l;
     float dx;
     float dy;
-};
-__device__ bool _in_region(
+};__device__ bool _in_region(
     fvec3 v,
     FORBILD_Ellipt_Cyl_z ecylz
 )
@@ -1435,8 +1418,7 @@ struct FORBILD_Shape {
     fvec3 a_y;
     fvec3 a_z;
     fvec3 axis;
-};
-__device__ FORBILD_Box _to_Box(const FORBILD_Shape s)
+};__device__ FORBILD_Box _to_Box(const FORBILD_Shape s)
 {
     FORBILD_Box box;
     box.rho = s.rho;
