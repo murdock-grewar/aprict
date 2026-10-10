@@ -222,7 +222,7 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     ce.option(
         "--verbosity",
         type=click.Choice(logtools.LogLevel),
-        default=logtools.LogLevel.INFO,
+        default=logtools.LogLevel.WARN,
         help="The verbosity of output logging to stderr. Log files will not be affected by this setting.",
     ),
     ce.option(

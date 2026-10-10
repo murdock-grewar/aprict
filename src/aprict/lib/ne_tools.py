@@ -25,6 +25,14 @@ import numexpr as ne
 import numpy as np
 
 
+def set_array_to_constant(
+    arr: np.ndarray | np.memmap, *, const: int | float
+) -> None:
+    """Fill an array with a constant value."""
+    const_arr = const * np.ones(((1,) * arr.ndim), dtype=arr.dtype)
+    ne.evaluate("const_arr", out=arr, local_dict={"const_arr": const_arr})
+
+
 def downbin(  # ruff: ignore[complex-structure]
     x: np.ndarray,
     *,

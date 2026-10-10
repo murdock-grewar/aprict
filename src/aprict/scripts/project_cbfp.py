@@ -27,6 +27,7 @@ import cloup
 import cupy as cp
 import numexpr as ne
 import numpy as np
+import rich.console
 
 from aprict.lib import click_tools
 
@@ -209,7 +210,7 @@ def _outdtype_to_dtype(
     ce.option(
         "--verbosity",
         type=click.Choice(logtools.LogLevel),
-        default=logtools.LogLevel.INFO,
+        default=logtools.LogLevel.WARN,
         help="The verbosity of output logging to stderr. Log files will not be affected by this setting.",
     ),
     ce.option(
@@ -262,6 +263,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         v = args.__dict__[k]
         logger.info(f"    '{k:s}' value: '{v!s:s}'")
 
+    # Set up the rich console object
+    # Needed for showing spinners , etc.
+    rich_console = rich.console.Console(stderr=True)
+
     ##########################################################
     ###################### Preparation #######################
     ##########################################################
@@ -274,14 +279,17 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     pg: cbfp.ProjGeom = cbfp.ProjGeom.load(args.geom)
 
     # Load the phantom
-    logger.debug("Loading the phantom...")
+    msg = "Loading the phantom..."
+    logger.debug(msg)
     if args.phantom_preset is not None:
         v = _ph_preset_to_phantom(args.phantom_preset, seed=args.seed_vol)
     else:
         v = FBVolume.load(args.phantom)
-    logger.debug("Preprocessing the phantom...")
-    v_org = v.copy()
-    v = _preprocess_phantom(v, args)
+    msg = "Preprocessing the phantom..."
+    logger.debug(msg)
+    with rich_console.status(msg, spinner="dots"):
+        v_org = v.copy()
+        v = _preprocess_phantom(v, args)
 
     # Validate args
     # validate_args(args)
@@ -363,25 +371,38 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     #################### Begin projection ####################
     ##########################################################
     logger.info("")
-    logger.info("Allocating the projection array and filling with zeros...")
-    output_projs = np.lib.format.open_memmap(
-        args.output.joinpath("projs.npy"),
-        "w+",
-        dtype=proj_dtype,
-        shape=tuple(map(int, (*pg.projs_list_shape, nu, nv))),
-    )
-    output_projs[...] = 0
+    msg = "Allocating and zeroing the output array..."
+    logger.info(msg)
+    with rich_console.status(msg, spinner="dots"):
+        output_projs = np.lib.format.open_memmap(
+            args.output.joinpath("projs.npy"),
+            "w+",
+            dtype=proj_dtype,
+            shape=tuple(map(int, (*pg.projs_list_shape, nu, nv))),
+        )
+        output_projs[...] = 0
+        # ne_tools.set_array_to_constant(output_projs, const=0)
     logger.info("Done with allocating projection array.")
-    logger.info("Compiling/fetching CUDA kernels...")
-    cbfp.force_compile()
+    msg = "Compiling/fetching CUDA kernels..."
+    logger.info(msg)
+    with rich_console.status(msg, spinner="dots"):
+        cbfp.force_compile()
     logger.info("Beginning projection...")
     with logtools.ProgressBar(
         desc="Projection:",
-        maxval=num_projs,
+        # maxval=num_projs,
+        # Instead, count bytes. It's convenient for seeing how much space will be taken up.
+        maxval=output_projs.size * output_projs.itemsize,
         valunit="proj",
+        unit_is_bytes=True,
         logger=logger,
         persist=False,
     ) as pbar:
+        bytes_per_proj: int = (
+            output_projs.itemsize
+            * output_projs.shape[-1]
+            * output_projs.shape[-2]
+        )
         out_of_mem_count: int = 0
         for chunk_index in range(
             (num_units + units_per_chunk - 1) // units_per_chunk
@@ -423,7 +444,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             ne.evaluate("pin", out=pout, local_dict={"pin": pin})
 
             # Perform logging updates
-            pbar.update_to(sls[-1].stop * projs_per_unit)
+            pbar.update_to(sls[-1].stop * projs_per_unit * bytes_per_proj)
     logger.info("Done.")
     if args.plot_afterwards:
         logger.info("Displaying plot...")

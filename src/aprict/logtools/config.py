@@ -27,6 +27,11 @@ from ..version import version
 _module_name = "aprict"
 
 
+class _STREAM_TYPE(enum.Enum):  # ruff: ignore[invalid-class-name]
+    STDOUT = 1
+    STDERR = 2
+
+
 class LogLevel(enum.Enum):
     """Enum of log levels."""
 
@@ -34,6 +39,36 @@ class LogLevel(enum.Enum):
     WARN = 20
     INFO = 30
     DEBUG = 40
+
+
+# The 'rich' package needs a custom stream handler which doesn't use a stale reference
+# to sys.stderr or sys.stdout.
+# If we don't do this, and we just use the standard logging.StreamHandler, then logging
+# breaks progress bars.
+# See the discussion here:
+# https://github.com/Textualize/rich/discussions/1578
+class _CustomStreamHandler(logging.Handler):
+    _type: _STREAM_TYPE
+
+    def __init__(self, type: _STREAM_TYPE) -> None:
+        """Initialize a Textual logging handler.
+
+        Args:
+            stderr: Log to stderr when there is no active app.
+            stdout: Log to stdout when there is no active app.
+        """
+        super().__init__()
+        self._type = type
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Invoke by logging."""
+        match self._type:
+            case _STREAM_TYPE.STDOUT:
+                stream = sys.stdout
+            case _STREAM_TYPE.STDERR:
+                stream = sys.stderr
+        message = self.format(record)
+        print(message, file=stream)
 
 
 def make_logger(  # ruff: ignore[complex-structure]
@@ -82,7 +117,8 @@ def make_logger(  # ruff: ignore[complex-structure]
     )
 
     # Adjust the stderr handler to the specified log level
-    stderr_handler = logging.StreamHandler(stream=sys.stderr)
+    # stderr_handler = logging.StreamHandler(stream=sys.stderr)
+    stderr_handler = _CustomStreamHandler(type=_STREAM_TYPE.STDERR)
     stderr_handler.setLevel(stderr_loglevel_)
     stderr_handler.setFormatter(formatter)
     stderr_handler.addFilter(filter)
