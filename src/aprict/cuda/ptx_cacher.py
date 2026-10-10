@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# ty: ignore[unresolved-attribute]  # I do not know why, but ty complains about missing symbols from cuda.core, since I updated cuda-core from ~0.8.0 to ~1.2.0. This is in spite of the fact that the new cuda-core still works without any code modifications required.
 """Tools to generate, cache and load CUDA PTX code."""
 
 import functools

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 resolution-markers = [
     "sys_platform == 'linux'",
@@ -22,6 +22,93 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b6/e2/1c866404ddbd280efedff4a9f15abfe943cb83cde6e895022370f3a61f85/ansicon-1.89.0.tar.gz", hash = "sha256:e4d039def5768a47e4afec8e89e83ec3ae5a26bf00ad851f914d1240b444d2b1", size = 67312, upload-time = "2019-04-29T20:23:57.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/75/f9/f1c10e223c7b56a38109a3f2eb4e7fe9a757ea3ed3a166754fb30f65e466/ansicon-1.89.0-py2.py3-none-any.whl", hash = "sha256:f1def52d17f65c2c9682cf8370c03f541f410c1752d6a14029f97318e4b9dfec", size = 63675, upload-time = "2019-04-29T20:23:53.83Z" },
+]
+
+[[package]]
+name = "aprict"
+source = { editable = "." }
+dependencies = [
+    { name = "click" },
+    { name = "click-extra" },
+    { name = "cuda-core", extra = ["cu13"] },
+    { name = "cupy-cuda13x", extra = ["ctk"] },
+    { name = "gpustat" },
+    { name = "imageio" },
+    { name = "numexpr" },
+    { name = "numpy" },
+    { name = "pcpp" },
+    { name = "pydantic" },
+    { name = "regex" },
+    { name = "scipy" },
+    { name = "tqdm" },
+]
+
+[package.optional-dependencies]
+gui = [
+    { name = "imageio" },
+    { name = "matplotlib" },
+    { name = "pyqt6" },
+    { name = "pyqtgraph" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "bandit" },
+    { name = "ipython" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-dependency" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+    { name = "setuptools" },
+    { name = "tuna" },
+    { name = "ty" },
+]
+gui = [
+    { name = "imageio" },
+    { name = "pyqt6" },
+    { name = "pyqtgraph" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.5.0" },
+    { name = "click-extra", specifier = ">=9.4.0" },
+    { name = "cuda-core", extras = ["cu13"], specifier = ">=1.2.0" },
+    { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.2.0" },
+    { name = "gpustat", specifier = ">=1.1.1" },
+    { name = "imageio", specifier = ">=2.37.3" },
+    { name = "imageio", marker = "extra == 'gui'", specifier = ">=2.37.3" },
+    { name = "matplotlib", marker = "extra == 'gui'", specifier = ">=3.10.8" },
+    { name = "numexpr", specifier = ">=2.14.1" },
+    { name = "numpy", specifier = ">=2.4.3" },
+    { name = "pcpp", specifier = ">=1.30" },
+    { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pyqt6", marker = "extra == 'gui'", specifier = ">=6.10.2" },
+    { name = "pyqtgraph", marker = "extra == 'gui'", specifier = ">=0.14.0" },
+    { name = "regex", specifier = ">=2026.4.4" },
+    { name = "scipy", specifier = ">=1.17.1" },
+    { name = "tqdm", specifier = ">=4.68.3" },
+]
+provides-extras = ["gui"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit", specifier = ">=1.9.4" },
+    { name = "ipython", specifier = ">=9.11.0" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-dependency", specifier = ">=0.6.1" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "ruff", specifier = "==0.16.10" },
+    { name = "setuptools", specifier = ">=82.0.1" },
+    { name = "tuna", specifier = ">=0.5.13" },
+    { name = "ty", specifier = "==0.0.84" },
+]
+gui = [
+    { name = "imageio", specifier = ">=2.37.3" },
+    { name = "pyqt6", specifier = ">=6.10.2" },
+    { name = "pyqtgraph", specifier = ">=0.14.0" },
 ]
 
 [[package]]
@@ -194,24 +281,27 @@ all = [
 
 [[package]]
 name = "cuda-core"
-version = "0.7.0"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cuda-pathfinder" },
     { name = "numpy" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/87/f42a4b9cac013e8db14070bf5359247e3695ab1c310280333d65db247451/cuda_core-0.7.0-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c50c18363cb132e2925cad1f3843471c6699b8d6b3df6b8d21a3d0f0e3cf528e", size = 29888711, upload-time = "2026-04-08T17:03:34.439Z" },
-    { url = "https://files.pythonhosted.org/packages/2a/ad/2050bea962f4bded68d3367b093c9ced51db87633fd3a2681b179d6090a7/cuda_core-0.7.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9a76af173fb686bc7579230699b011d825320e640b6963776b305a94b584c0c1", size = 30150682, upload-time = "2026-04-08T17:03:37.909Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/ed/4735a1d0832bc51f891aa3665a6ff2d11e5089e68c576705fbfb69bbd75c/cuda_core-0.7.0-cp314-cp314-win_amd64.whl", hash = "sha256:0cb4c757cc068dfd8e83b8a8fe56ffb357e12753112bc648b53e3244d7a6e63f", size = 4180956, upload-time = "2026-04-08T17:03:40.4Z" },
-    { url = "https://files.pythonhosted.org/packages/6b/0a/e5d8eab0b0f8a7df7ba51982f0a4dcf33e79f96c0b1f867aa7379b6b2ace/cuda_core-0.7.0-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:2301155335c9b8d50e642f49fb2c1dbf250c33a243bf05e01d54f52363b2a5aa", size = 31511256, upload-time = "2026-04-08T17:03:43.018Z" },
-    { url = "https://files.pythonhosted.org/packages/31/f1/fc7c37a3ff229d864ce0b57a1254aaa9cd7af674ed390bef5bb3b030bd23/cuda_core-0.7.0-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:6ae3250b756f262f70bf435b9f505435f8739698884a15db482c46bf714b0de2", size = 31023677, upload-time = "2026-04-08T17:03:46.055Z" },
-    { url = "https://files.pythonhosted.org/packages/50/46/4107da6334f9f32c3c04a0b2925c78f06bfc36b0872682370234fb11a122/cuda_core-0.7.0-cp314-cp314t-win_amd64.whl", hash = "sha256:57f2391ec036185a9bf189effda3d538a6e78d97e220c12254f96ebc1db7a009", size = 4879151, upload-time = "2026-04-08T17:03:49.052Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/e9/5316d89fab1e62f8f16cd500843500f406cb8e8073968a79547fca4c2e5c/cuda_core-1.2.1-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:84d93ff9055fd9b942024d852d30de8a225357cc898a93c9beab62eb70ae9656", size = 6234451, upload-time = "2026-09-23T19:12:42.303Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/68/7482871b9da7d2239f512192339fad405d83af8fb8915319b31afeb42071/cuda_core-1.2.1-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:cfa6b43cd62560f707f11a63d88cefa8f8acf98ccb338a6a747b4a02ff6a0c66", size = 6597153, upload-time = "2026-09-23T19:12:43.889Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/6e/5b0195a8a03c208972f43bb438e7c711f6720f7354ef81a872e42a15ea24/cuda_core-1.2.1-cp314-cp314-win_amd64.whl", hash = "sha256:5cbcaa2cc68a1e3b8961cad8b8eb35d1b769a91e3c2ac35eb23e4115cf2b97dd", size = 6053151, upload-time = "2026-09-23T19:12:45.803Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/b0/b32fe5bd90b011b3ccd9633744ae7d980e6e1a25576b2ed5b79d6809d83a/cuda_core-1.2.1-cp314-cp314-win_arm64.whl", hash = "sha256:29d9ff2b61677afa8c3a45c702a38c650f57eb1a8bb8665cd528b79adc3d5637", size = 3061836, upload-time = "2026-09-23T19:12:47.412Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/d8/0279a7b6c5c5dd713ca1c0487d20187604b95cae82fb99af71a602c1c41c/cuda_core-1.2.1-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:54d0232ec9e7b64ae743db5dccd491994cb9f1c4e19d89fcc1b7e03851ee7a90", size = 6408965, upload-time = "2026-09-23T19:12:48.924Z" },
+    { url = "https://files.pythonhosted.org/packages/03/b8/fb80b6558e96319816d2b31a1402c7e08fd6efa91b86f0b068b5e42ea0c8/cuda_core-1.2.1-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bc5125ef049f8a808744eabb9a935ef8748b90070c933d26fc40eb4b0d1a5707", size = 6684352, upload-time = "2026-09-23T19:12:50.547Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/e9/1971e7e23676a8e1e14b8c69d6fb70c8b354704cff4c398b7085fa9b0211/cuda_core-1.2.1-cp314-cp314t-win_amd64.whl", hash = "sha256:dde8b47a8e86084dc4f7655a7bd00ca2f42d661a22d751e21b9ee3d20f1b7479", size = 6973682, upload-time = "2026-09-23T19:12:52.23Z" },
+    { url = "https://files.pythonhosted.org/packages/36/43/1e5a9366830ce61a4df5fc3ff3cd90c70d1bfa1955cbbff62319e61e019c/cuda_core-1.2.1-cp314-cp314t-win_arm64.whl", hash = "sha256:0b33d216625eb7c6143a7bcf3c6389dfb0a96ab4c0f439f68d113b93140d640a", size = 3232385, upload-time = "2026-09-23T19:12:53.968Z" },
 ]
 
 [package.optional-dependencies]
 cu13 = [
     { name = "cuda-bindings", extra = ["all"] },
+    { name = "cuda-toolkit" },
 ]
 
 [[package]]
@@ -1282,93 +1372,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "aprict"
-source = { editable = "." }
-dependencies = [
-    { name = "click" },
-    { name = "click-extra" },
-    { name = "cuda-core", extra = ["cu13"] },
-    { name = "cupy-cuda13x", extra = ["ctk"] },
-    { name = "gpustat" },
-    { name = "imageio" },
-    { name = "numexpr" },
-    { name = "numpy" },
-    { name = "pcpp" },
-    { name = "pydantic" },
-    { name = "regex" },
-    { name = "scipy" },
-    { name = "tqdm" },
-]
-
-[package.optional-dependencies]
-gui = [
-    { name = "imageio" },
-    { name = "matplotlib" },
-    { name = "pyqt6" },
-    { name = "pyqtgraph" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "bandit" },
-    { name = "ipython" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-dependency" },
-    { name = "pytest-mock" },
-    { name = "ruff" },
-    { name = "setuptools" },
-    { name = "tuna" },
-    { name = "ty" },
-]
-gui = [
-    { name = "imageio" },
-    { name = "pyqt6" },
-    { name = "pyqtgraph" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.5.0" },
-    { name = "click-extra", specifier = ">=9.4.0" },
-    { name = "cuda-core", extras = ["cu13"], specifier = "~=0.7.0" },
-    { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.2.0" },
-    { name = "gpustat", specifier = ">=1.1.1" },
-    { name = "imageio", specifier = ">=2.37.3" },
-    { name = "imageio", marker = "extra == 'gui'", specifier = ">=2.37.3" },
-    { name = "matplotlib", marker = "extra == 'gui'", specifier = ">=3.10.8" },
-    { name = "numexpr", specifier = ">=2.14.1" },
-    { name = "numpy", specifier = ">=2.4.3" },
-    { name = "pcpp", specifier = ">=1.30" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pyqt6", marker = "extra == 'gui'", specifier = ">=6.10.2" },
-    { name = "pyqtgraph", marker = "extra == 'gui'", specifier = ">=0.14.0" },
-    { name = "regex", specifier = ">=2026.4.4" },
-    { name = "scipy", specifier = ">=1.17.1" },
-    { name = "tqdm", specifier = ">=4.68.3" },
-]
-provides-extras = ["gui"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "bandit", specifier = ">=1.9.4" },
-    { name = "ipython", specifier = ">=9.11.0" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-dependency", specifier = ">=0.6.1" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
-    { name = "ruff", specifier = "==0.16.10" },
-    { name = "setuptools", specifier = ">=82.0.1" },
-    { name = "tuna", specifier = ">=0.5.13" },
-    { name = "ty", specifier = "==0.0.84" },
-]
-gui = [
-    { name = "imageio", specifier = ">=2.37.3" },
-    { name = "pyqt6", specifier = ">=6.10.2" },
-    { name = "pyqtgraph", specifier = ">=0.14.0" },
 ]
 
 [[package]]

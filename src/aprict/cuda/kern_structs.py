@@ -27,12 +27,12 @@ import cupy as cp
 import numpy as np
 import numpy.typing as npt
 from cuda.core import (  # ruff: ignore[unused-import]
-    Device,
-    LaunchConfig,
-    ObjectCode,
-    Program,
-    ProgramOptions,
-    launch,
+    Device,  # ty: ignore[unresolved-import]
+    LaunchConfig,  # ty: ignore[unresolved-import]
+    ObjectCode,  # ty: ignore[unresolved-import]
+    Program,  # ty: ignore[unresolved-import]
+    ProgramOptions,  # ty: ignore[unresolved-import]
+    launch,  # ty: ignore[unresolved-import]
 )
 
 from . import dtype_cacher, ptx_cacher
