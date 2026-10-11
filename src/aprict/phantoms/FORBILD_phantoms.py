@@ -194,7 +194,8 @@ class _MetaPhantomContainer(type):
             ppf.convert_ph_file_to_shapes(
                 path_to_FORBILD_src.joinpath(
                     "custom_other/rock_canister_01.pha"
-                )
+                ),
+                skip_preprocessing=True,  # I know that this file doesn't require preprocessing
             )
         )
         # Scale the attenuation coefficient so that the canister has a value of around 0.55 mm^{-1} for aluminium
@@ -207,21 +208,29 @@ class _MetaPhantomContainer(type):
             ppf.convert_ph_file_to_shapes(
                 path_to_FORBILD_src.joinpath(
                     "custom_other/rock_canister_01_cavities_1e5.pha"
-                )
+                ),
+                skip_preprocessing=True,  # I know that this file doesn't require preprocessing
             )
         )
 
     @property
     def RockCanisterAlWithHoles(cls) -> FBVolume:
-        return FBVolume(
-            np.concatenate(
-                (
-                    cls.RockCanisterAl.shapes,
-                    cls.RockCanisterCavities1e5.shapes,
+        fbv = FBVolume(
+            ppf.convert_ph_file_to_shapes(
+                path_to_FORBILD_src.joinpath(
+                    "custom_other/rock_canister_01.pha"
                 ),
-                axis=0,
+                append_files=(
+                    path_to_FORBILD_src.joinpath(
+                        "custom_other/rock_canister_01_cavities_1e5.pha"
+                    ),
+                ),
+                skip_preprocessing=True,  # I know that this file doesn't require preprocessing
             )
         )
+        # Scale the attenuation coefficient so that the canister has a value of around 0.55 mm^{-1} for aluminium
+        fbv.multiply_attenuation(0.55)
+        return fbv
 
     @property
     def UnitCyl_z(cls) -> FBVolume:

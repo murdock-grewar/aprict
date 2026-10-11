@@ -88,8 +88,16 @@ def _preprocess_str(s: str) -> str:
 
 def convert_ph_file_to_shapes(  # ruff: ignore[undocumented-public-function]
     fn: str | pathlib.Path,
+    skip_preprocessing: bool = False,
+    append_files: tuple[pathlib.Path, ...] | list[pathlib.Path] | None = None,
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
-    return _convert_preprocessed_ph_str_to_shapes(_preprocess_file(fn))
+    with open(fn, mode="r", encoding="ISO-8859-1") as f:
+        s = f.read()
+    if append_files is not None:
+        for p in append_files:
+            with open(p, mode="r", encoding="ISO-8859-1") as f:
+                s += "\n" + f.read()
+    return convert_ph_str_to_shapes(s, skip_preprocessing=skip_preprocessing)
 
 
 def convert_ph_str_to_shapes(  # ruff: ignore[undocumented-public-function]

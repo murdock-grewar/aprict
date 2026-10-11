@@ -285,7 +285,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         v = _ph_preset_to_phantom(args.phantom_preset, seed=args.seed_vol)
     else:
         v = FBVolume.load(args.phantom)
-    msg = "Preprocessing the phantom..."
+    msg = "Transforming the phantom..."
     logger.debug(msg)
     with rich_console.status(msg, spinner="dots"):
         v_org = v.copy()
