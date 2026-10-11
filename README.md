@@ -192,7 +192,7 @@ aprict-cli project cbfp \
 ````
 The option `--plot-afterwards True` will display a plot window of the projection data (a sinogram) after it is created. (This will not be available if the module was not installed with the `[gui]` option.) 
 
-You will find a copy of the `ROCK_CAN` phantom in the output directory `projs`, beside the projection data. The phantom is always copied to the output directory, to ensure a good record of the inputs to the simulation. The phantom contains a great number of primitive shapes, so most of the data generation time may actually be spent processing the input `.pha` file in this case. (_I hope to speed up the processing of `.pha` files in the future._)
+You will find a copy of the `ROCK_CAN` phantom in the output directory `projs`, beside the projection data. The phantom is always copied to the output directory, to ensure a good record of the inputs to the simulation.
 
 Finally, let's perform a reconstruction using a filtered backprojection (FBP) method for this geometry:
 ```bash
