@@ -26,7 +26,6 @@ import pathlib  # ruff: ignore[typing-only-standard-library-import]
 import re
 import sys
 
-import numexpr as ne
 import numpy as np
 import pcpp
 import regex  # replaces standard 're' module. Needed for the ability to do balanced matching of parentheses
@@ -50,17 +49,23 @@ _typedict = {
     "Cone_z": fv.Cone_z,
 }
 
-re_obj = re.compile(r"{[^}]*}")
-re_key = re.compile(r"(?<=[ \[])[^= ]+=\s*[^ ]+(?=[ \]])")
-re_shape = re.compile(r"\[[^\]]*\]")
-re_shape_name = re.compile(r"(?<=[\[ ])[^ \]:]*(?=:)")
-re_clip_plane = re.compile(r"(?<=[\[ \{])[^ <>:=]+[<>][^ <>:=]+(?=[ \]\}])")
-# re_define_pragma = re.compile(r"\s*#define\s+([^\s]+)\s+([^\s].*)")
-re_float3 = re.compile(
-    r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^ <>:=,]+?),([^ <>:=,]+?),([^ <>:=,]+)\)"  # assume no spaces inside (...)
-    # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^<>:=,]+)\)"  # works for lungs phantom
-    # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^ <>:=,]+)\)"  # works for the head phantom
-)
+
+def _math_eval(s: str) -> float:
+    # This still has issues.
+    # I guess it's a bug in both numexpr and asteval, in the way they interact with multiple processes.
+    # To help mitigate this issue, I'll handle the simplest case manually, so that we reduce the number of
+    # calls on either asteval or numexpr.
+    # As a bonus, this also provides a big speed boost.
+    try:
+        return float(s)
+    except ValueError:
+        import asteval  # ruff: ignore[import-outside-top-level]
+
+        return asteval.Interpreter()(s)
+
+        # Could go back to numexpr like this:
+        # import numexpr as ne
+        # return ne.evaluate(s)
 
 
 def _preprocess_file(fn: str | pathlib.Path) -> str:
@@ -161,14 +166,25 @@ def _convert_preprocessed_ph_str_to_shapes(
     s = re.sub(r"\[", lambda _: " [ ", s)
     s = re.sub(r"\]", lambda _: " ] ", s)
 
+    re_obj = re.compile(r"{[^}]*}")
     objs = re_obj.findall(s)
-    nprocs = max(1, 2 * int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
+    nprocs = max(1, 1 * int(os.cpu_count()))  # ty:ignore[invalid-argument-type]
     # groupsize = (len(objs) + (nprocs - 1)) // nprocs
-    groupsize = 300
+    groupsize = 10  # this many objects will be processed at one time. The groups will be batched and distributed among processes
+    chunksize = 1  # number of groups to be processed by each process, before returning a progress update
     numobjs = len(objs)
     if len(objs) <= groupsize:
         shapes = _objs_to_shape(objs)
     else:
+        # WARNING
+        # I've had problems with the pool.map(...) hanging unexpectedly.
+        # I can't figure out what is causing this.
+        # The only workaround I know of is to increase the groupsize/chunksize enough that only
+        # 1 process is launched.
+        # Types of pools that can be used:
+        # - multiprocess.Pool(nprocs)  --- this is what I want to use, but has problems
+        # - concurrent.futures.ThreadPoolExecutor(nprocs)  --- only uses one thread; limited by lack of free-threading
+        # - concurrent.futures.ProcessPoolExecutor(nprocs)  --- suffers from the same problems as multiprocessing.Pool !
         with (
             multiprocessing.Pool(nprocs) as p,
             logtools.ProgressBar(
@@ -180,11 +196,13 @@ def _convert_preprocessed_ph_str_to_shapes(
             shapes_lists = []
             batches = itertools.batched(objs, groupsize)
             for superbatchindex, superbatch in enumerate(
-                itertools.batched(batches, nprocs)
+                itertools.batched(batches, chunksize * nprocs)
             ):
                 shapes_lists.extend(
                     list(
-                        p.imap(_objs_to_shape, superbatch, chunksize=groupsize)
+                        p.map_async(
+                            _objs_to_shape, superbatch, chunksize=chunksize
+                        ).get()
                     )
                 )
                 pbar.update_to(
@@ -210,6 +228,23 @@ def _remove_spaces_from_parentheticals(s: str) -> str:
 # Need this to be at the top-level so it can be used in multiprocessing.Pool.map
 def _objs_to_shape(objs):  # ruff: ignore[missing-type-function-argument, missing-return-type-private-function, complex-structure]
     shape_objs = []
+
+    # WARNING: previously, I had declared these at the top of the module
+    # However, this seemed to cause problems with multiprocessing.map, which would non-deterministically hang
+    # I think it's safer to declare everything needed by this function inside the function itself.
+    re_key = re.compile(r"(?<=[ \[])[^= ]+=\s*[^ ]+(?=[ \]])")
+    re_shape = re.compile(r"\[[^\]]*\]")
+    re_shape_name = re.compile(r"(?<=[\[ ])[^ \]:]*(?=:)")
+    re_clip_plane = re.compile(
+        r"(?<=[\[ \{])[^ <>:=]+[<>][^ <>:=]+(?=[ \]\}])"
+    )
+    # re_define_pragma = re.compile(r"\s*#define\s+([^\s]+)\s+([^\s].*)")
+    re_float3 = re.compile(
+        r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^ <>:=,]+?),([^ <>:=,]+?),([^ <>:=,]+)\)"  # assume no spaces inside (...)
+        # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^<>:=,]+)\)"  # works for lungs phantom
+        # r"(?<=[\[\{ ])([^ <>:=,()]+)\(([^<>:=,]+?),([^<>:=,]+?),([^ <>:=,]+)\)"  # works for the head phantom
+    )
+
     for obj in objs:
         obj = _remove_spaces_from_parentheticals(obj)  # ruff: ignore[redefined-loop-name]
         shape = re_shape.findall(obj)[0]
@@ -228,14 +263,14 @@ def _objs_to_shape(objs):  # ruff: ignore[missing-type-function-argument, missin
         ]:
             if k in ("formel", "formula"):
                 continue
-            val = ne.evaluate(v.strip())
+            val = _math_eval(v.strip())
             shape_obj[k] = val
         for m in re_float3.finditer(shape):
             name, x, y, z = m.groups()
             if name == "r":
                 # In this case, this is actually part of a clipping plane and will already be handled.
                 continue
-            x, y, z = [ne.evaluate(thing.strip()) for thing in (x, y, z)]
+            x, y, z = [_math_eval(thing.strip()) for thing in (x, y, z)]
             vec = np.array((x, y, z), dtype=fv.fvec3)
             shape_obj[name] = vec
 
@@ -296,7 +331,7 @@ def _objs_to_shape(objs):  # ruff: ignore[missing-type-function-argument, missin
                         match = re_float3.search(" " + k)
                         _, x, y, z = match.groups()  # ty:ignore[unresolved-attribute]
                         axis_np = np.array(
-                            [ne.evaluate(expr) for expr in [x, y, z]],
+                            [_math_eval(expr) for expr in [x, y, z]],
                             dtype=np.float32,
                         )
                         axis_np /= np.linalg.norm(axis_np)
@@ -310,7 +345,7 @@ def _objs_to_shape(objs):  # ruff: ignore[missing-type-function-argument, missin
                     mode = 2
                 case _:
                     raise NotImplementedError()
-            dotprod = ne.evaluate(v)
+            dotprod = _math_eval(v)
             cas = np.array((axis, dotprod, mode), dtype=fv.ClipAxisSpec)
             clip_plane_counter += 1
             match clip_plane_counter:

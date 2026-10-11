@@ -28,6 +28,7 @@ wheels = [
 name = "aprict"
 source = { editable = "." }
 dependencies = [
+    { name = "asteval" },
     { name = "click" },
     { name = "click-extra" },
     { name = "cuda-core", extra = ["cu13"] },
@@ -73,6 +74,7 @@ gui = [
 
 [package.metadata]
 requires-dist = [
+    { name = "asteval", specifier = ">=1.0.10" },
     { name = "click", specifier = ">=8.5.0" },
     { name = "click-extra", specifier = ">=9.4.0" },
     { name = "cuda-core", extras = ["cu13"], specifier = ">=1.2.0" },
@@ -111,6 +113,15 @@ gui = [
     { name = "imageio", specifier = ">=2.37.3" },
     { name = "pyqt6", specifier = ">=6.10.2" },
     { name = "pyqtgraph", specifier = ">=0.14.0" },
+]
+
+[[package]]
+name = "asteval"
+version = "1.0.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/65/9a/e10e062c83de2219c5f9ef9d684dac39323c052de140e257afd0f60f8ca7/asteval-1.0.10.tar.gz", hash = "sha256:46a4ed13cc2e4a29a21418f89dedd57db70d98eb96db0fb4c441d4edb2f5afed", size = 59581, upload-time = "2026-08-21T21:07:06.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/92/16/e78d6e60ecd1b3cf446fad45985ad6cda22f46ad2cffabb644d77b317bc4/asteval-1.0.10-py3-none-any.whl", hash = "sha256:8d805fa8084aa12204715f799430f0012a0db38b42e997f9f11a9637ad59855f", size = 23466, upload-time = "2026-08-21T21:07:05.678Z" },
 ]
 
 [[package]]

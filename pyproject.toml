@@ -17,6 +17,7 @@ classifiers = [
     'Programming Language :: Python :: 3',
 ]
 dependencies = [
+    "asteval>=1.0.10",
     "click>=8.5.0",
     "click-extra>=9.4.0",
     "cuda-core[cu13]>=1.2.0",
