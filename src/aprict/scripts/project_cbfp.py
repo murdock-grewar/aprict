@@ -271,6 +271,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ###################### Preparation #######################
     ##########################################################
 
+    # Validate args
+    # validate_args(args)
+    if args.ssu < 1 or args.ssv < 1:
+        msg = "--ssu and --ssv must be positive integers."
+        raise ValueError(msg)
+
     # Get the output dtype
     proj_dtype = _outdtype_to_dtype(args.out_dtype)
 
@@ -290,12 +296,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     with rich_console.status(msg, spinner="dots"):
         v_org = v.copy()
         v = _preprocess_phantom(v, args)
-
-    # Validate args
-    # validate_args(args)
-    if args.ssu < 1 or args.ssv < 1:
-        msg = "--ssu and --ssv must be positive integers."
-        raise ValueError(msg)
 
     ##########################################################
     ############### Preparation for projection ###############
@@ -347,25 +347,32 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ################### Saving input data ####################
     ##########################################################
-    for v_, tag in zip([v_org, v], ["original", "preprocessed"]):
-        s: str = "" if tag == "original" else f"_{tag:s}"
-        vol_path_npy: pathlib.Path = artefact_path.joinpath(
-            "vol" + s + "_fbv_shapes.npy"
-        )
-        np.save(vol_path_npy, v_.shapes)
-        logger.info(
-            f"Saved {tag:s} volume shapes array at: '{vol_path_npy.name}'"
-        )
-        vol_path_pha: pathlib.Path = artefact_path.joinpath("vol" + s + ".pha")
-        v_.save(vol_path_pha)
-        logger.info(f"Saved {tag:s} volume .pha at: '{vol_path_pha.name}'")
-        logger.debug(
-            "(In the event of a conflict, the *.npy file is authoritative; the *.pha is meant to be an exact copy, but there is always a possibility for a software bug.)"
-        )
+    with rich_console.status(
+        "Saving input geometry and phantom to artefact_dir...", spinner="dots"
+    ):
+        # Save phantom in various formats, before and after transformation
+        for v_, tag in zip([v_org, v], ["original", "preprocessed"]):
+            s: str = "" if tag == "original" else f"_{tag:s}"
+            vol_path_npy: pathlib.Path = artefact_path.joinpath(
+                "vol" + s + "_fbv_shapes.npy"
+            )
+            np.save(vol_path_npy, v_.shapes)
+            logger.info(
+                f"Saved {tag:s} volume shapes array at: '{vol_path_npy.name}'"
+            )
+            vol_path_pha: pathlib.Path = artefact_path.joinpath(
+                "vol" + s + ".pha"
+            )
+            v_.save(vol_path_pha)
+            logger.info(f"Saved {tag:s} volume .pha at: '{vol_path_pha.name}'")
+            logger.debug(
+                "(In the event of a conflict, the *.npy file is authoritative; the *.pha is meant to be an exact copy, but there is always a possibility for a software bug.)"
+            )
 
-    geom_path: pathlib.Path = artefact_path.joinpath("projgeom.json")
-    pg.save(geom_path)
-    logger.info(f"Saved projection geometry at: '{geom_path.name}'")
+        # Save geometry
+        geom_path: pathlib.Path = artefact_path.joinpath("projgeom.json")
+        pg.save(geom_path)
+        logger.info(f"Saved projection geometry at: '{geom_path.name}'")
 
     ##########################################################
     #################### Begin projection ####################
@@ -447,15 +454,19 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             pbar.update_to(sls[-1].stop * projs_per_unit * bytes_per_proj)
     logger.info("Done.")
     if args.plot_afterwards:
-        logger.info("Displaying plot...")
-        # Be clever: if the data has the shape of fan-beam data, then plot the sinogram instead.
-        if len(output_projs.shape) == 3 and output_projs.shape[2] == 1:
-            imview.plot_projections(
-                output_projs.copy()[np.newaxis, :, :, 0].transpose((0, 2, 1)),
-                title="Sinogram",
-            )
-        else:
-            imview.plot_projections(output_projs.copy())
+        msg = "Displaying plot..."
+        logger.info(msg)
+        with rich_console.status(msg, spinner="dots10"):
+            # Be clever: if the data has the shape of fan-beam data, then plot the sinogram instead.
+            if len(output_projs.shape) == 3 and output_projs.shape[2] == 1:
+                imview.plot_projections(
+                    output_projs.copy()[np.newaxis, :, :, 0].transpose(
+                        (0, 2, 1)
+                    ),
+                    title="Sinogram",
+                )
+            else:
+                imview.plot_projections(output_projs.copy())
 
 
 def _preprocess_phantom(v: FBVolume, args: types.SimpleNamespace) -> FBVolume:

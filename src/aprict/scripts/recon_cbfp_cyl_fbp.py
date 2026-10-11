@@ -25,6 +25,7 @@ import click
 import click_extra as ce
 import cupy as cp
 import numpy as np
+import rich.console
 
 # Try to load some modules
 try:
@@ -550,6 +551,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         v = args.__dict__[k]
         logger.info(f"    '{k:s}' value: '{v!s:s}'")
 
+    # Set up the rich console object
+    # Needed for showing spinners , etc.
+    rich_console = rich.console.Console(stderr=True)
+
     ##########################################################
     ##### Set numexpr to use as many threads as possible #####
     ##########################################################
@@ -773,6 +778,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Plot, if applicable
     if args.plot_afterwards:
-        logger.info("Displaying plot...")
-        x = vol.as_numpy()
-        imview.plot_volume(x, plotmin=args.plotmin, plotmax=args.plotmax)
+        msg = "Displaying plot..."
+        logger.info(msg)
+        with rich_console.status(msg, spinner="dots10"):
+            x = vol.as_numpy()
+            imview.plot_volume(x, plotmin=args.plotmin, plotmax=args.plotmax)
