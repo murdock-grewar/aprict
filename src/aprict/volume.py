@@ -455,30 +455,24 @@ class FBVolume:
                 msg = f"Unknown axis: {axis}"
                 raise ValueError(msg)
         s = shape.copy()
+        # First, translate the shape center
         for key in relevant_number_subkeys:
             s[key] += amount
+        # Second, we need to translate the clipping planes
+        for key in ("cas1", "cas2", "cas3"):
+            s[key]["dotprod"] += amount * s[key]["axis"][axis]
         return s
 
     def translate(self, axis: int | str, amount: float) -> None:
         """Translate the phantom along the given axis, by the given amount."""
-        newshapes = self.shapes.copy()
-        match axis:
-            case 0 | "x":
-                axis_str = "x"
-            case 1 | "y":
-                axis_str = "y"
-            case 2 | "z":
-                axis_str = "z"
-            case _:
-                msg = f"Unknown axis: {axis}"
-                raise ValueError(msg)
-        view = newshapes[:][axis_str]
-        ne.evaluate(
-            "view + amount",
-            out=view,
-            local_dict={"view": view, "amount": amount},
+        """Translate the phantom along the given axis, by the given amount."""
+        self.shapes = np.array(
+            [
+                FBVolume._translate_shape(shape, axis=axis, amount=amount)
+                for shape in self.shapes
+            ],
+            dtype=fv.Shape,
         )
-        self.shapes = newshapes
 
     @classmethod
     def _multiply_attenuation_shape(cls, shape, amount: float):  # ruff: ignore[missing-type-function-argument, missing-return-type-class-method]
@@ -487,7 +481,7 @@ class FBVolume:
         return s
 
     def multiply_attenuation(self, amount: float) -> None:
-        """Multilpy the phantom's attenuation coefficient by this amount."""
+        """Multiply the phantom's attenuation coefficient by this amount."""
         newshapes = self.shapes.copy()
         view = newshapes[:]["rho"]
         ne.evaluate(
