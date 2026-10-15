@@ -133,9 +133,9 @@ aprict-cli project cbfp \
     --ssu 3 \
     --ssv 3 \
     --output projs \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ````
-The option `--plot-afterwards True` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
+The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
 
 Now, let's reconstruct with three different algorithms:
  1. Global Backprojection-Convolution (GBC)
@@ -151,10 +151,9 @@ aprict-cli recon gbc-cone-cyl \
     --volshape '(525,525,525)' \
     --alg GREWAR \
     --output recon_gbc \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ```
 (Time on my machine: ~03m10s)
-Once again, the option `--plot-afterwards True` ensures that a plot window will pop up once the reconstruction is done.
 
 To perform an FBP reconstruction, we do:
 ```bash
@@ -165,7 +164,7 @@ aprict-cli recon fbp-cone-cyl \
     --volshape '(525,525,525)' \
     --alg STANDARD \
     --output recon_fbp \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ```
 (Time on my machine: ~00m33s)
 
@@ -178,7 +177,7 @@ aprict-cli recon fbp-cone-cyl \
     --volshape '(525,525,525)' \
     --alg NOOGREWAR \
     --output recon_fbp-vw \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ```
 (Time on my machine: ~01m03s)
 
@@ -223,9 +222,9 @@ aprict-cli project cbfp \
     --ssu 100 \
     --ssv 1 \
     --output projs \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ````
-The option `--plot-afterwards True` will display a plot window of the projection data (a sinogram) after it is created. (This will not be available if the module was not installed with the `[gui]` option.) 
+The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data (a sinogram) after it is created. (This will not be available if the module was not installed with the `[gui]` option.) 
 
 You will find a copy of the `ROCK_CAN` phantom in the output directory `projs`, beside the projection data. The phantom is always copied to the output directory, to ensure a good record of the inputs to the simulation.
 
@@ -240,9 +239,9 @@ aprict-cli recon fbp-fan-circ \
     --output recon_standard \
     --plotmin -0.25 \
     --plotmax 2.25 \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ```
-Once again, the option `--plot-afterwards True` ensures that a plot window will pop up once the reconstruction is done. Note the `--plotmin -0.25` and `--plotmax 2.25` options here, which control the plotting range of the saved `*.png` files in the output directory. The whole volume is stored as a numpy array (`*.npy`), but it's useful to have some preview PNGs generated as well.
+Once again, the option `--plot-mode PYQTGRAPH` ensures that a plot window will pop up once the reconstruction is done. Note the `--plotmin -0.25` and `--plotmax 2.25` options here, which control the plotting range of the saved `*.png` files in the output directory. The whole volume is stored as a numpy array (`*.npy`), but it's useful to have some preview PNGs generated as well.
 
 
 The previous reconstruction contains a lot of undersampling artefacts, due to the small number of projections (`300`). To a lesser extent, it also contains aliasing artefacts, due to the (de)magnified pixel size subceeding the voxel size. So, let's try an alternative algorithm that better handles this situation, at the expensive of reduced sharpness on the edges. This can be done by specifying `--alg NOOGREWAR`:
@@ -256,7 +255,7 @@ aprict-cli recon fbp-fan-circ \
     --output recon_noogrewar \
     --plotmin -0.25 \
     --plotmax 2.25 \
-    --plot-afterwards True
+    --plot-mode PYQTGRAPH
 ```
 
 </details>

@@ -50,6 +50,12 @@ class ALG(enum.Enum):  # ruff: ignore[undocumented-public-class]
     GREWAR = 1
 
 
+class PLOTMODE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+    NONE = 1
+    PYQTGRAPH = 2
+    NEUROGLANCER = 3
+
+
 _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam transmission data."
 
 
@@ -272,10 +278,16 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         help="The maximum for the plotting range. Set to None to select maximum value in each plot.",
     ),
     ce.option(
-        "--plot-afterwards",
-        type=lib.click_tools.BoolArgType(),
-        default=False,
-        help="Attempt to plot the reconstruction after it is complete.",
+        "--plot-mode",
+        type=click.Choice(PLOTMODE),
+        default=PLOTMODE.NONE,
+        help="How to plot.",
+    ),
+    ce.option(
+        "--web-port",
+        type=click.INT,
+        default=8080,
+        help="Port to use for serving things via a web interface, if applicable.",
     ),
 )
 @ce.option_group(
@@ -305,7 +317,7 @@ def validate_args(args: types.SimpleNamespace) -> None:
         msg = "Cannot output intermediate tomograms when no output directory was specified. Specify an output directory with --output path/to/new/dir"
         raise ValueError(msg)
 
-    if not args.output and not args.plot_afterwards:
+    if not args.output and args.plot_mode is PLOTMODE.NONE:
         msg = "No output directory specified and no plotting option chosen. There is no point running the recon."
         raise ValueError(msg)
 
@@ -801,6 +813,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:
             copy_to_array=None,  # Should be a contiguous array. E.g., not an arbitrary view.
             lowres_correction_array=minivol_correction_cp,
         )
+        del minivol_correction_cp, ndarray_container
 
         # Now estimate the DC component by looking at the voxels on the boundary.
         # Due to the lowres correction interpolating on the edges, we want to move in
@@ -838,6 +851,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:
         # Fetch it now as a numpy array
         vol_filtered = vol_filtered_cp.get()  # ty: ignore[unresolved-attribute]
 
+        # Clean up
+        del vol_filtered_cp
+        lib.gpu_tools.clear_cache()
+
     if path_output is not None:
         msg = "Saving volume to disk..."
         logger.info(msg)
@@ -850,11 +867,31 @@ def main_from_args(args: types.SimpleNamespace) -> None:
     logger.info("Done.")
 
     # Plot, if applicable
-    if args.plot_afterwards:
-        msg = "Displaying plot..."
-        logger.info(msg)
-        with rich_console.status(msg, spinner="dots"):
-            imview.plot_volume(vol_filtered, title="Filtered volume")
-            imview.plot_volume(
-                vol_filtered.transpose((2, 1, 0)), title="Filtered volume"
-            )
+    match args.plot_mode:
+        case PLOTMODE.NONE:
+            pass
+        case PLOTMODE.PYQTGRAPH:
+            msg = "Displaying plot..."
+            logger.info(msg)
+            with rich_console.status(msg, spinner="dots10"):
+                imview.plot_volume(vol_filtered, title="Filtered volume")
+                imview.plot_volume(
+                    vol_filtered.transpose((2, 1, 0)), title="Filtered volume"
+                )
+        case PLOTMODE.NEUROGLANCER:
+            msg = "Displaying plot..."
+            logger.info(msg)
+            with lib.ng_tools.ArrayViewer3D(
+                vol_filtered,
+                plotmin=args.plotmin,
+                plotmax=args.plotmax,
+                port=args.web_port,
+                voxwid_mm=vol_voxwid,
+                wait_for_input_before_exit_prompt=None,
+            ) as av:
+                msg = f"Displaying plot at URL: {av.url} ..."
+                logger.info(msg)
+                with rich_console.status(
+                    msg + " press Enter to quit.", spinner="dots10"
+                ):
+                    input()

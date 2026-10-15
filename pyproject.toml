@@ -41,6 +41,7 @@ gui = [
     "matplotlib>=3.10.8",
     "pyqt6>=6.10.2",
     "pyqtgraph>=0.14.0",
+    "neuroglancer>=2.41.0",
 ]
 
 [dependency-groups]
