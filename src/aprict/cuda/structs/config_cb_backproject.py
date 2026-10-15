@@ -43,6 +43,10 @@ class config_cb_backproject(
         "ssx",
         "ssy",
         "ssz",
+        "soft_vartheta_v",
+        "soft_vartheta_v_softspan",
+        "soft_vartheta_h",
+        "soft_vartheta_h_softspan",
     ],
     dtypes=[
         np.bool,
@@ -60,6 +64,10 @@ class config_cb_backproject(
         np.uint32,
         np.uint32,
         np.uint32,
+        np.float32,
+        np.float32,
+        np.float32,
+        np.float32,
     ],  # ty: ignore[invalid-argument-type]  # ty is bugged: see https://github.com/astral-sh/ty/issues/3198
 ):
     pass

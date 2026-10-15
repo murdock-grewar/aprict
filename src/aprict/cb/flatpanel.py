@@ -843,9 +843,15 @@ class ConfigBackproject:
         ssx: int = 1,
         ssy: int = 1,
         ssz: int = 1,
+        soft_vartheta_v: float | None = None,
+        soft_vartheta_v_softspan: float | None = None,
+        soft_vartheta_h: float | None = None,
+        soft_vartheta_h_softspan: float | None = None,
     ) -> None:
         r = cyl_mask_rad or 0  # coerce 'None' to 0
-        sep = soften_det_edges_proportion or 0  # coerce 'None' to 0
+        sep = (
+            soften_det_edges_proportion or 0
+        )  # coerce 'None' to 0. Note that '0' will be used by the kernel to disable softening, except where otherwise specified by the backproj_weighting_preset.
         self._contents = np.array(  # ty:ignore[invalid-assignment]
             (
                 np.bool(
@@ -869,6 +875,10 @@ class ConfigBackproject:
                 np.uint32(ssx),
                 np.uint32(ssy),
                 np.uint32(ssz),
+                np.float32(soft_vartheta_v or 0),
+                np.float32(soft_vartheta_v_softspan or 0),
+                np.float32(soft_vartheta_h or 0),
+                np.float32(soft_vartheta_h_softspan or 0),
             ),
             dtype=structs.config_cb_backproject,
         )
@@ -1012,6 +1022,8 @@ def backproject(
     summand_multiplier: Volume | None = None,
     logger: logging.Logger | None = None,
     enable_pbar: bool = False,
+    secondary_volume: Volume
+    | None = None,  # this may be required depending on the configuration
 ) -> Volume:
     """Add the backprojection of the projection array to the input volume."""
     # Assert that the projection data is supplied
@@ -1125,6 +1137,9 @@ def backproject(
                     if summand_multiplier is None
                     else summand_multiplier._texture.surfobj,  # ruff: ignore[private-member-access]
                     input_proj_chunk_spec,
+                    None
+                    if secondary_volume is None
+                    else secondary_volume._texture.surfobj,  # used for some configurations of the backprojection  # ruff: ignore[private-member-access]
                 )
                 kern(grid_dims, block_dims, args)
                 pbar.update_to(

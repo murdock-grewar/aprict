@@ -25,6 +25,27 @@ import numexpr as ne
 import numpy as np
 
 
+def fastcopy(
+    *,
+    dst: np.ndarray | np.memmap,
+    src: np.ndarray | np.memmap | int | float | bool,
+) -> None:
+    (
+        """Copy data from `src` to `dst`.
+
+    Parameters
+    ----------
+    dst : np.ndarray | np.memmap
+        The destination numpy array view. Can be a view into a memory-mapped array.
+    src : np.ndarray | np.memmap | int | float | bool
+        The source of the data. Can be a numpy array view of matching shape, or a constant.
+
+    """
+        ""
+    )
+    ne.evaluate("src", out=dst, casting="same_kind", local_dict={"src": src})
+
+
 def set_array_to_constant(
     arr: np.ndarray | np.memmap, *, const: int | float
 ) -> None:

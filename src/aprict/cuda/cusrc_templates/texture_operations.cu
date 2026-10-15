@@ -149,6 +149,8 @@ __global__ void multiplicatively_invert_surface(
     // Read the existing value
     T value = read_from_surf3D<T>(surface, idx);
     if (ignore_zeros && (value == (T)0)) { return; }
+    // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
+    // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
     if (eps > 0.f) {
         value = value + (T)(eps * exp(-(float)value/eps));
     }
@@ -287,14 +289,43 @@ __global__ void multiply_surfaces(
     cudaSurfaceObject_t         surface1,
     cudaSurfaceObject_t         surface2,
     cudaSurfaceObject_t         surfaceOut,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,
+    const bool                  broadcast_surface2_over_z_axis
 )
 {
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
+    // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
     TO val = read_from_surf3D<T1>(surface1, idx);
-    val *= (TO)read_from_surf3D<T2>(surface2, idx);
+    if (broadcast_surface2_over_z_axis) {
+        val *= (TO)read_from_surf3D<T2>(surface2, uint3({idx.x, idx.y, 0}));
+    } else {
+        val *= (TO)read_from_surf3D<T2>(surface2, idx);
+    }
     write_to_surf3D(val, surfaceOut, idx);
+}
+
+template <typename T1, typename T2, typename TO>
+__global__ void divide_surfaces_softzero(
+    cudaSurfaceObject_t         surface1,
+    cudaSurfaceObject_t         surface2,
+    cudaSurfaceObject_t         surfaceOut,
+    uint3                       surfaceDimensions,
+    float                       eps
+)
+{
+    const uint3 idx = get_vol_idx();
+    if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
+    // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
+    // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
+    TO val = read_from_surf3D<T1>(surface1, idx);
+    TO val2 = read_from_surf3D<T2>(surface2, idx);
+    if (eps > 0.f) {
+        val2 = val2 + (TO)(eps*exp(-(float)val2/eps));
+    }
+    val2 = powint(val2, -1);
+    write_to_surf3D(val * val2, surfaceOut, idx);
 }
 
 template <typename T1, typename T2, typename TO>

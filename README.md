@@ -28,7 +28,9 @@ It is strongly recommended to use high-speed mass storage, such as an NVMe drive
 Known limitations
 ---
 
-The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
+* The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
+
+* Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
 
 </details>
 
@@ -49,7 +51,7 @@ You can install `aprict` like you would any python package, using `pip install`.
 Example installation using `uv`: 
 ```bash
 $ uv venv -p 3.14
-$ uv pip install ~/downloads/aprict-0.0.6.dev2.tar.gz[gui]
+$ uv pip install ~/downloads/aprict-0.0.9.tar.gz[gui]
 ```
 You should now have several executables available on `$PATH`. Try `aprict-cli --help` to see the polished commandline interface. 
 
@@ -74,7 +76,7 @@ Activate the environment:
 ```bash
 source .venv/bin/activate
 ```
-Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.6.dev2`:
+Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.9`:
 ```
 Usage: aprict-cli [OPTIONS] COMMAND [ARGS]...
 
@@ -135,7 +137,26 @@ aprict-cli project cbfp \
 ````
 The option `--plot-afterwards True` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
 
-Finally, let's perform a reconstruction using a filtered backprojection (FBP) method for this geometry:
+Now, let's reconstruct with three different algorithms:
+ 1. Global Backprojection-Convolution (GBC)
+ 2. Filtered backprojection (FBP)
+ 3. Filtered backprojection with volumetric weightings (FBP-VW)
+
+To perform a GBC reconstruction, we do:
+```bash
+aprict-cli recon gbc-cone-cyl \
+    --geom projs/projgeom.json \
+    --projs projs/projs.npy \
+    --voxwid 0.5 \
+    --volshape '(525,525,525)' \
+    --alg GREWAR \
+    --output recon_gbc \
+    --plot-afterwards True
+```
+(Time on my machine: ~03m10s)
+Once again, the option `--plot-afterwards True` ensures that a plot window will pop up once the reconstruction is done.
+
+To perform an FBP reconstruction, we do:
 ```bash
 aprict-cli recon fbp-cone-cyl \
     --geom projs/projgeom.json \
@@ -143,10 +164,24 @@ aprict-cli recon fbp-cone-cyl \
     --voxwid 0.5 \
     --volshape '(525,525,525)' \
     --alg STANDARD \
-    --output recon_standard \
+    --output recon_fbp \
     --plot-afterwards True
 ```
-Once again, the option `--plot-afterwards True` ensures that a plot window will pop up once the reconstruction is done.
+(Time on my machine: ~00m33s)
+
+To perform an FBP-VM reconstruction, we change `--alg` to `NOOGREWAR`:
+```bash
+aprict-cli recon fbp-cone-cyl \
+    --geom projs/projgeom.json \
+    --projs projs/projs.npy \
+    --voxwid 0.5 \
+    --volshape '(525,525,525)' \
+    --alg NOOGREWAR \
+    --output recon_fbp-vw \
+    --plot-afterwards True
+```
+(Time on my machine: ~01m03s)
+
 
 </details>
 

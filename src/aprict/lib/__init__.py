@@ -20,4 +20,6 @@ from . import click_tools as click_tools
 from . import gpu_tools as gpu_tools
 from . import lds as lds
 from . import ne_tools as ne_tools
+from . import np_tools as np_tools
+from . import texture_tools as texture_tools
 from .empty_context_manager import EmptyContextManager as EmptyContextManager

@@ -30,6 +30,7 @@ exclude = [
     # Actual source files
     "src/*/phantoms/FORBILD_head.py",
     "conftest.py",
+    "src/*/gbc/filters.py",  # vendored from legacy `apricot` module
 ]
 
 line-length = 79

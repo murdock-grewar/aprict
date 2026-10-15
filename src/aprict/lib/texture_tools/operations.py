@@ -16,6 +16,8 @@
 """Operation to apply on/betwen CUDA textures/surfaces."""
 
 __all__ = [
+    "divide_textures",
+    "divide_textures_softzero",
     "fill",
     "inner_prod",
     "invert",
@@ -75,6 +77,12 @@ def _get_module() -> cp.RawModule:
         ]
         + [
             f"multiply_surfaces<{t1},{t2},{t3}>"
+            for (t1, t2, t3) in itertools.product(
+                *itertools.repeat(["half", "float"], 3)
+            )
+        ]
+        + [
+            f"divide_surfaces_softzero<{t1},{t2},{t3}>"
             for (t1, t2, t3) in itertools.product(
                 *itertools.repeat(["half", "float"], 3)
             )
@@ -185,7 +193,46 @@ def norm(t: Texture) -> float:
 
 
 def multiply_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
-    """Fill a Texture object with a constant value."""
+    """Multiply two textures together, value-by-value. t2 is permitted to be of length 1 in the z axis, in which case it will be broadcast."""
+    if not tout.is_surface_included:
+        msg = "The input texture has no surface descriptor, and therefore cannot be written to."
+        raise ValueError(msg)
+    # No need for a texture to be present.
+    if not t1.is_surface_included or not t2.is_surface_included:
+        msg = "One or more of the input textures does not include a surface."
+        raise NotImplementedError(msg)
+
+    # Check that it's a volume
+    if len(t1.shape) != 3 or len(t2.shape) != 3 or len(tout.shape) != 3:
+        msg = "Input texture was expected to be a volume, but it has an incorrect number of dimensions."
+        raise ValueError(msg)
+    if t1.shape[:2] != t2.shape[:2] or t1.shape != tout.shape:
+        msg = "Input textures do not have matching shape. t2 can be of length 1 in the z axis."
+        raise ValueError(msg)
+    if t1.shape != t2.shape and t2.shape[2] != 1:
+        msg = "Input textures do not have matching shape. t2 can be of length 1 in the z axis."
+        raise ValueError(msg)
+
+    ctypes = list(map(_get_c_type_name, (t1, t2, tout)))
+    kern = _module.get_function(
+        f"multiply_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
+    )
+
+    broadcast_t2_over_t1 = (t1.shape[2] != 1) and (t2.shape[2] == 1)
+    args = (
+        t1.surfobj,
+        t2.surfobj,
+        tout.surfobj,
+        _shape_to_uint3(t1.shape),
+        np.bool(broadcast_t2_over_t1),
+    )
+    kern(*_get_grid_block_dims(t1), args)
+
+
+def divide_textures_softzero(
+    t1: Texture, t2: Texture, tout: Texture, eps: float
+) -> None:
+    """Divide t1 by t2, value-by-value, using `eps` to soften division by zero."""
     if not tout.is_surface_included:
         msg = "The input texture has no surface descriptor, and therefore cannot be written to."
         raise ValueError(msg)
@@ -204,11 +251,22 @@ def multiply_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
 
     ctypes = list(map(_get_c_type_name, (t1, t2, tout)))
     kern = _module.get_function(
-        f"multiply_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
+        f"divide_surfaces_softzero<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
-    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))
+    args = (
+        t1.surfobj,
+        t2.surfobj,
+        tout.surfobj,
+        _shape_to_uint3(t1.shape),
+        np.float32(eps),
+    )
     kern(*_get_grid_block_dims(t1), args)
+
+
+def divide_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
+    """Divide t1 by t2, value-by-value."""
+    return divide_textures_softzero(t1, t2, tout, eps=0)
 
 
 def add_textures(t1: Texture, t2: Texture, tout: Texture) -> None:

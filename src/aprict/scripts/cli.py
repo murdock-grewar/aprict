@@ -23,6 +23,7 @@ from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
+from .recon_cbfp_cyl_gbc import main as main_gbc
 
 _progdesc: str = "Entry point for aprict CLI."
 
@@ -79,6 +80,14 @@ main_fbp_cone = click_tools.command_with_option_substitutions(
     },
 )
 recon.add_command(cmd=main_fbp_cone)
+
+main_gbc_cone = click_tools.command_with_option_substitutions(
+    main_gbc,
+    name="gbc-cone-cyl",
+    help="Global Backprojection-Convolution for a cone-beam geometry with a cylindrical source locus.",
+    fixed_option_values={},
+)
+recon.add_command(cmd=main_gbc_cone)
 
 
 @ce.group(

@@ -14,5 +14,9 @@ struct config_CB_backproject {
     unsigned int ssx;
     unsigned int ssy;
     unsigned int ssz;
+    float soft_vartheta_v;
+    float soft_vartheta_v_softspan;
+    float soft_vartheta_h;
+    float soft_vartheta_h_softspan;
 };
 

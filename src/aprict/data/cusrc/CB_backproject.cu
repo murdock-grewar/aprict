@@ -252,10 +252,50 @@ __device__ Tp get_zero_interp(
 
 }
 
+__device__ float cossq_soft(
+        const float a,  // e.g. vartheta_v
+        const float b,  // e.g. theta_soft
+        float c         // e.g. theta_el
+)
+{
+    // A softening with a cos^2 window.
+    // The formula has been copied from the appendix of the GBC paper.
+    // It is represented in that paper as s(a,b;c)
+    //
+    // Assumptions:
+    //    a > b > 0
+    //
+    // Description of behaviour:
+    // Returns a softening factor in [0,1] which goes from 1 to 0 as
+    // the value `abs(c)` approaches `a`.
+    // The softening kicks in at `abs(c) == a - b`.
+
+    // If outside the range, set to 0.
+    if (abs(c) > a) {
+        return 0.f;
+    }
+    // If inside the range, set to 1.
+    if (abs(c) < a - b) {
+        return 1.f;
+    }
+
+    // In the remaining cases, we need to apply a softening.
+    // The formula is 3x^2 - 2x^3, where
+    // x = gamma * sin(|c|) - chi
+    const float gamma = 1./(
+        sin(a - b) - sin(a)
+    );
+    const float chi = gamma * sin(a);
+    float x = gamma * sin(abs(c)) - chi;
+    // Ensure that the answer is clamped to the range [0,1]
+    // This may be necessary in the event of floating point precision problems
+    return max(0.f, min(1.f, 3*x*x - 2*x*x*x));
+}
+
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
-__device__ Tv _backproject_CB_getval(
+__device__ double2 _backproject_CB_getval(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
         const uivec3                    vol_chunk_shape,
@@ -264,12 +304,14 @@ __device__ Tv _backproject_CB_getval(
         const float                     voxwid
 )
 {
+    // Returns two values. Usually, we just want the first value, and to cast it to type Tv.
+    // However, we might also compute a secondary value at the same time, since this is more efficient.
 
     // Return 0 if block is out of range
     if ((vol_idx.x >= vol_chunk_shape.x) ||
         (vol_idx.y >= vol_chunk_shape.y) ||
         (vol_idx.z >= vol_chunk_shape.z)) {
-        return 0.;
+        return double2({0., 0.});
     }
 
     // Get the center position of this voxel
@@ -278,7 +320,7 @@ __device__ Tv _backproject_CB_getval(
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
         if ((vox_pos_c.x*vox_pos_c.x + vox_pos_c.y*vox_pos_c.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
-            return 0;
+            return double2({0., 0.});
         }
     }
 
@@ -313,14 +355,19 @@ __device__ Tv _backproject_CB_getval(
     const float offy = 1./((float)ssy);
     const float offz = 1./((float)ssz);
     Tv ssx_accumulator = 0;
+    Tv ssx_accumulator_secondary = 0;
     for (unsigned int ssi = 0; ssi < ssx; ssi++) {
         Tv ssy_accumulator = 0;
+        Tv ssy_accumulator_secondary = 0;
         for (unsigned int ssj = 0; ssj < ssy; ssj++) {
             Tv ssz_accumulator = 0;
+            Tv ssz_accumulator_secondary = 0;
             for (unsigned int ssk = 0; ssk < ssz; ssk++) {
 
                 Tv accumulator = 0.;
                 Tv sub_accumulator = 0.;
+                Tv accumulator_secondary = 0.;
+                Tv sub_accumulator_secondary = 0.;
                 for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
 
                     const fvec3 vox_pos = vox_pos_c + fvec3(
@@ -339,6 +386,7 @@ __device__ Tv _backproject_CB_getval(
                     fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
 
                     sub_accumulator = (Tv)0;
+                    sub_accumulator_secondary = (Tv)0;
 
                     if (exact) {
                         // Find the intersection with the detector of the ray passing through
@@ -443,14 +491,6 @@ __device__ Tv _backproject_CB_getval(
 
                         uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
                         ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
-                        Tp det_value;
-                        if (config.approx_mode_linear_interpolate) {
-                            det_value = get_bilinear_interp(
-                                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
-                        } else {
-                            det_value = get_zero_interp(
-                                det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
-                        }
 
                         if (config.approx_mode_direct_raycast) {
                             Tp multiplier = 1;
@@ -476,14 +516,16 @@ __device__ Tv _backproject_CB_getval(
                                     (config.backproj_weighting_preset == 3) ||
                                     (config.backproj_weighting_preset == 4) ||
                                     (config.backproj_weighting_preset == 5) ||
-                                    (config.backproj_weighting_preset == 6)
+                                    (config.backproj_weighting_preset == 6) ||
+                                    (config.backproj_weighting_preset == 7)
                                 ) {
                                     // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
                                     float R = config.Z_on_val_factor_val;
                                     fvec3 r_minus_s = vox_pos - source_pos;
                                     float ell_on_R = norm_fvec3(fvec3(r_minus_s.x, r_minus_s.y, 0.f))/R;
+                                    // Note: "Z" here is the distance from s to r, projected onto the source-to-detector axis
                                     float Z_on_R = Z / R;
-                                    float c_on_R = Z_on_R / ell_on_R;
+                                    float c_on_R = max(0.f, min(1.f, abs(Z_on_R / ell_on_R)));
                                     float dsigned_on_R = c_on_R - ell_on_R;  // positive if the source point is further away
                                     if (config.backproj_weighting_preset == 1) {
                                         // multiplier /= fcast<Tp>(2*powint(c_on_R, 2)*(powint(c_on_R, 2) + powint(dsigned_on_R, 2)));
@@ -532,14 +574,57 @@ __device__ Tv _backproject_CB_getval(
                                                     vxrel_on_R / Z_on_R
                                                 )
                                             ) /
-                                            Z_on_R /
+                                            Z_on_R
+                                            /* Commenting out / R * R:
+                                            /
                                             R * // Need to divide by R because the formula takes a derivative with respect to u in the midplane coordinates, i.e. d/d(uR)
                                             R // I don't know why this extra factor of R is needed.
+                                            */
                                         );
+                                    }
+                                    if (
+                                            (config.backproj_weighting_preset == 7)
+                                    ) {
+                                        // Backprojection weighting for GBC formula with cylindral source locus
+                                        // The weighting is eq. (23) from the GBC paper.
+                                        // preset 7 applies the weighting to the backprojected detector value
+                                        // preset 8 pretends the detector value was "1".
+
+                                        // c_on_R = |cos(\theta_h)|
+                                        float cos_theta_el = max(0.f, min(1.f, 1. / sqrt(
+                                            1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2)
+                                        )));
+                                        float weight = (
+                                            powint(cos_theta_el, 3) * c_on_R / (
+                                                max(1e-9, powint(c_on_R, 2) + powint(dsigned_on_R, 2))
+                                            )
+                                        );
+                                        float softfactor = (
+                                            cossq_soft(config.soft_vartheta_v, config.soft_vartheta_v_softspan, acos(cos_theta_el)) *
+                                            cossq_soft(config.soft_vartheta_h, config.soft_vartheta_h_softspan, acos(c_on_R))
+                                        );
+                                        multiplier *= fcast<Tp>(weight * softfactor);
                                     }
                                 }
                             }
-                            sub_accumulator = fcast<Tv>(det_value * multiplier);
+                            if (config.backproj_weighting_preset == 7) {
+                                // Store the weight only. Don't care about the detector avlue.
+                                sub_accumulator_secondary = fcast<Tv>(multiplier);
+                            }
+                            if (multiplier == (Tp)0) {
+                                // Don't bother reading from the memory etc if the multiplier is 0 anyway.
+                                sub_accumulator = 0;
+                            } else {
+                                Tp det_value;
+                                if (config.approx_mode_linear_interpolate) {
+                                    det_value = get_bilinear_interp(
+                                        det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+                                } else {
+                                    det_value = get_zero_interp(
+                                        det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+                                }
+                                sub_accumulator = fcast<Tv>(det_value * multiplier);
+                            }
                         } else {
                             // Compute the physical distance to the source
                             fvec3 det_pos      = projspec.dspec.pos + (
@@ -563,7 +648,26 @@ __device__ Tv _backproject_CB_getval(
                                 float Z_on_val = dot_prod((vox_pos - source_pos) / val, Lvec) / norm_fvec3(Lvec);
                                 multiplier *= fcast<Tp>(powint(Z_on_val, config.Z_on_val_factor_power));
                             }
-                            sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
+
+                            if (config.backproj_weighting_preset == 7) {
+                                // Store the weight only. Don't care about the detector avlue.
+                                sub_accumulator_secondary = voxwid_Tv * fcast<Tv>(multiplier);
+                            }
+
+                            if (multiplier == (Tp)0) {
+                                // Don't bother reading from the memory etc if the multiplier is 0 anyway.
+                                sub_accumulator = 0;
+                            } else {
+                                Tp det_value;
+                                if (config.approx_mode_linear_interpolate) {
+                                    det_value = get_bilinear_interp(
+                                        det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+                                } else {
+                                    det_value = get_zero_interp(
+                                        det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)]);
+                                }
+                                sub_accumulator = voxwid_Tv * fcast<Tv>(det_value * multiplier);
+                            }
                         }
 
                     }
@@ -585,19 +689,28 @@ __device__ Tv _backproject_CB_getval(
                         // Apply the softening factors
                         sub_accumulator *= udist;
                         sub_accumulator *= vdist;
+                        sub_accumulator_secondary *= udist;
+                        sub_accumulator_secondary *= vdist;
                     }
                     accumulator += sub_accumulator;
+                    accumulator_secondary += sub_accumulator_secondary;
                 }
                 ssz_accumulator += accumulator;
+                ssz_accumulator_secondary += accumulator_secondary;
             }
             ssz_accumulator /= ssz;
             ssy_accumulator += ssz_accumulator;
+            ssz_accumulator_secondary /= ssz;
+            ssy_accumulator_secondary += ssz_accumulator_secondary;
         }
         ssy_accumulator /= ssy;
         ssx_accumulator += ssy_accumulator;
+        ssy_accumulator_secondary /= ssy;
+        ssx_accumulator_secondary += ssy_accumulator_secondary;
     }
     ssx_accumulator /= ssx;
-    return ssx_accumulator;
+    ssx_accumulator_secondary /= ssx;
+    return double2({(double)ssx_accumulator, (double)ssx_accumulator_secondary});
 }
 
 
@@ -620,7 +733,7 @@ __global__ void backproject_CB_volmem(
     const uivec3 vol_chunk_shape = volchunkspec.shape;
     const fvec3  pos_000_c       = volchunkspec.pos_000;
 
-    const Tv value = _backproject_CB_getval<Tv,Tp>(
+    const double2 values = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
@@ -628,6 +741,7 @@ __global__ void backproject_CB_volmem(
         vol_idx,
         1.f
     );
+    const float value = fcast<Tv>(values.x);
 
     // Write the value to the surface memory and leave
     if (value == (Tv)0) { return; }  // Generally not safe to typecast a number to the half type, but OK when 0.
@@ -652,7 +766,8 @@ __global__ void backproject_CB_voltex(
         const vol_tex_chunk_spec        voltexchunkspec,
         const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
         const cudaSurfaceObject_t       summand_multiplier_surface,  // if configured to do so, then the backprojection will be multiplied by the corresponding value in this multiplier before being added to the volume
-        const proj_chunk_spec_maxlen10  proj_chunk_spec
+        const proj_chunk_spec_maxlen10  proj_chunk_spec,
+        const cudaSurfaceObject_t       volume_surface_secondary
 )
 {
     // Get the position within the chunk
@@ -666,7 +781,7 @@ __global__ void backproject_CB_voltex(
     const fvec3  pos_000_c       = voltexchunkspec.texpos + (
             fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets)*voxwid;
 
-    Tv value = _backproject_CB_getval<Tv,Tp>(
+    const double2 values = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
@@ -675,12 +790,44 @@ __global__ void backproject_CB_voltex(
         voxwid
     );
 
-    // Write the value to the surface memory and leave
-    if (value == (Tv)0) { return; }  // Generally not safe to typecast a number to the half type, but OK when 0.
-    // Multiply by the multiplier, if applicable
+    const bool secondary_volume_expected = (config.backproj_weighting_preset == 7);
+
+    // Return early without reading surfaces, if there's nothing to do.
+    if (
+        (values.x == 0.) &&
+        (
+            (!secondary_volume_expected) ||
+            (values.y == 0.)
+        )
+    ) { return; }
+
+    // Read the summand multiplier once, to save on reading for both output volumes.
+    Tv summand_multiplier;
     if (config.apply_summand_multiplier) {
-        value *= read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+    } else {
+        summand_multiplier = fcast<Tv>(1.);
     }
-    value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
-    write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
+
+
+    Tv value;
+    value = fcast<Tv>(values.x);
+    // Write the value to the surface memory and leave
+    if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
+        // Multiply by the multiplier, if applicable
+        value *= summand_multiplier;
+        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
+        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
+    }
+
+    if (secondary_volume_expected) {
+        value = fcast<Tv>(values.y);
+        // Write the value to the surface memory and leave
+        if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
+            // Multiply by the multiplier, if applicable
+            value *= summand_multiplier;
+            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+        }
+    }
 }

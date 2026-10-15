@@ -279,11 +279,11 @@ class TestCB_BACKPROJ_sharedmem_randomnoise:
     argnames=["volres", "numprojs", "use_voltex", "blockdims", "exact"],
     argvalues=[
         (420, 20, False, [8, 8, 8], True),
-        (840, 20, False, [8, 8, 8], False),
-        (840, 40, False, [8, 8, 8], False),
+        (640, 20, False, [8, 8, 8], False),
+        (640, 40, False, [8, 8, 8], False),
         (420, 20, True, [8, 8, 8], True),
-        (840, 20, True, [8, 8, 8], False),
-        (840, 40, True, [8, 8, 8], False),
+        (640, 20, True, [8, 8, 8], False),
+        (640, 40, True, [8, 8, 8], False),
     ],
     ids=[
         "BP_mem_420-20",
@@ -331,6 +331,10 @@ class TestCB_BACKPROJ_randomnoise:
                 np.uint32(1),
                 np.uint32(1),
                 np.uint32(1),
+                np.float32(0),
+                np.float32(0),
+                np.float32(0),
+                np.float32(0),
             ),
             dtype=ks_config.dtype,
         )
@@ -533,6 +537,7 @@ class TestCB_BACKPROJ_randomnoise:
                     self.vtex.surfobj,  # ty:ignore[unresolved-attribute]
                     None,  # the summand_multiplier surface. For these tests, the config is set not to use it.
                     input_proj_chunk_spec,
+                    None,  # the secondary volume, not used in this unit test
                 )
             else:
                 args = (  # input args

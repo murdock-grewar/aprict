@@ -16,5 +16,6 @@
 """End-user interfaces to the cone-beam projection and backprojection CUDA code."""
 
 from . import flatpanel as flatpanel
+from .noop_filter import NoOpFilterer as NoOpFilterer
 from .ramp_filter import FBPFilterer as FBPFilterer
 from .ramp_filter_cpu import FBPFiltererCPU as FBPFiltererCPU

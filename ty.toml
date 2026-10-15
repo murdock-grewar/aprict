@@ -1,0 +1,4 @@
+[src]
+exclude = [
+    "src/*/gbc/filters.py",  # vendored from legacy `apricot` module
+]

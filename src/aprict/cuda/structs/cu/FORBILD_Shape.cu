@@ -313,6 +313,11 @@ __device__ fvec2 FORBILD_clip_line_segment(
     FORBILD_Shape shape
 )
 {
+    // Return early if shape is null shape
+    if (shape.type == 0) {
+        return fvec2(0.f, 0.f);
+    }
+
     fvec2 interval;
     float minf, maxf;
     interval = FORBILD_clip_line_segment(v1, v2, shape.cas1);
@@ -324,9 +329,14 @@ __device__ fvec2 FORBILD_clip_line_segment(
     interval = FORBILD_clip_line_segment(v1, v2, shape.cas3);
     minf = max(minf, interval.x);  // first  component
     maxf = min(maxf, interval.y);  // second component
+    maxf = max(minf, maxf);  // ensure maxf is greater than or equal to minf
+    // Return early if interval is empty
+    if (minf == maxf) {
+        return fvec2(0.f, 0.f);
+    }
 
     switch (shape.type) {
-        case 0:
+        case 0:  // Should already be handled above, but oh well
             return fvec2(0.f, 0.f);
         case 1:
             interval = FORBILD_clip_line_segment(v1, v2, _to_Box(shape));

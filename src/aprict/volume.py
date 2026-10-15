@@ -120,9 +120,55 @@ class Volume[
         """Object cleanup."""
         gpu_tools.clear_cache()  # Ensure that CuPy cleans up the used memory.
 
+    @property
+    def xs_ys_zs(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """The xs, ys, zs arrays corresponding to the voxel centres of this volume."""
+        shape = self._shape
+        xs = self._pos_c[0] + self._voxwid * (
+            np.arange(shape[0], dtype=self._dtype) - (shape[0] - 1) / 2
+        )
+        ys = self._pos_c[1] + self._voxwid * (
+            np.arange(shape[1], dtype=self._dtype) - (shape[1] - 1) / 2
+        )
+        zs = self._pos_c[2] + self._voxwid * (
+            np.arange(shape[2], dtype=self._dtype) - (shape[2] - 1) / 2
+        )
+        return xs, ys, zs
+
     def multiply(self, f: float) -> None:
         """Multiply the volume in-place by a value."""
         tops.multiply(self._texture, f)
+
+    def multiply_by_xygrid(self, xygrid: np.ndarray | cp.ndarray) -> None:
+        """Multiply the volume in-place by broadcasting an xy-grid over the z coordinate."""
+        xygrid_ = xygrid if type(xygrid) is cp.ndarray else cp.array(xygrid)
+        if xygrid_.shape != self._shape[:2]:
+            msg = "Input array should be 2-dimensional and match the shape[:2] of this volume."
+            raise ValueError(msg)
+        xygrid_tex3d = texture_tools.Texture(
+            xygrid_[:, :, cp.newaxis],
+            address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
+            filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+            layered=False,
+            normalise_coordinates=False,
+            include_texture=True,
+            include_surface=True,
+        )
+        tops.multiply_textures(
+            t1=self._texture,
+            t2=xygrid_tex3d,
+            tout=self._texture,
+        )
+
+    def divide(self, vol: Volume) -> None:
+        """Divide the volume by another volume."""
+        tops.divide_textures(self._texture, vol._texture, tout=self._texture)
+
+    def divide_softzero(self, vol: Volume, eps: float) -> None:
+        """Divide the volume by another volume, using `eps` to soften division by zero."""
+        tops.divide_textures_softzero(
+            self._texture, vol._texture, tout=self._texture, eps=eps
+        )
 
     def as_numpy(self, out: np.ndarray | None = None) -> np.ndarray:
         """Copy this volume's data into a numpy array."""
