@@ -91,12 +91,24 @@ def convert_ph_file_to_shapes(  # ruff: ignore[undocumented-public-function]
     skip_preprocessing: bool = False,
     append_files: tuple[pathlib.Path, ...] | list[pathlib.Path] | None = None,
 ) -> np.ndarray[np.dtype[fv.Shape]]:  # ty:ignore[invalid-type-arguments]
-    with open(fn, mode="r", encoding="ISO-8859-1") as f:
-        s = f.read()
-    if append_files is not None:
-        for p in append_files:
-            with open(p, mode="r", encoding="ISO-8859-1") as f:
-                s += "\n" + f.read()
+    if skip_preprocessing:
+        with open(fn, mode="r", encoding="ISO-8859-1") as f:
+            s = f.read()
+        if append_files is not None:
+            for p in append_files:
+                with open(p, mode="r", encoding="ISO-8859-1") as f:
+                    s += "\n" + f.read()
+    else:
+        # Note: preproessing the string loses information, because we can no longer do
+        # #include directives in the file! So, preprocess as bona fide files,
+        # using the _preprocess_file method.
+        if append_files is None:
+            s = _preprocess_file(fn)
+        else:
+            s = _preprocess_file(fn)
+            for fp in append_files:
+                s += "\n"
+                s += _preprocess_file(fp)
     return convert_ph_str_to_shapes(s, skip_preprocessing=skip_preprocessing)
 
 
