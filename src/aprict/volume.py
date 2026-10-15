@@ -135,6 +135,25 @@ class Volume[
         )
         return xs, ys, zs
 
+    @property
+    def minxyz_maxxyz(
+        self,
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Boundary tuple: ((minx,miny,minz),(maxx,maxy,maxz))."""
+        xs, ys, zs = self.xs_ys_zs
+        return (
+            (
+                xs.min() - self._voxwid / 2,
+                ys.min() - self._voxwid / 2,
+                zs.min() - self._voxwid / 2,
+            ),
+            (
+                xs.max() + self._voxwid / 2,
+                ys.max() + self._voxwid / 2,
+                zs.max() + self._voxwid / 2,
+            ),
+        )
+
     def multiply(self, f: float) -> None:
         """Multiply the volume in-place by a value."""
         tops.multiply(self._texture, f)

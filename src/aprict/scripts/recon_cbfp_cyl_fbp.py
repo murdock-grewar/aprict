@@ -325,11 +325,17 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     filt_chunk_size: int = 3,
     logger: logging.Logger,
     two_sided: bool,
+    vol_minxyz_maxxyz: tuple[
+        tuple[float, float, float], tuple[float, float, float]
+    ],  # used to quickly skip projections out of range for this algorithm
+    cyl_mask_rad: float
+    | None,  # set to None to use the reconstruction support radius
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
     ],
+    float,
     float,
     float,
     float,
@@ -395,10 +401,50 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         msg = "Inconsistent source-to-detector length."
         raise NotImplementedError(msg)
     L = Ls[0]  # ruff: ignore[non-lowercase-variable-in-function]
+
+    # Compute vartheta_v and friends
+    _dethei = nv * pixhei  # ruff: ignore[used-dummy-variable]
+    _detwid = nu * pixwid  # ruff: ignore[used-dummy-variable]
+    vartheta_v = np.arctan2(
+        _dethei / 2 - pixhei / 2,
+        np.sqrt(np.square(L) + np.square(_detwid / 2 - pixwid / 2)),
+    )
+    vartheta_h = np.arctan2(  # ruff: ignore[unused-variable]
+        _detwid / 2 - pixwid / 2,
+        L,
+    )
+
+    zs_max = pg.source_pos[:, 2].max()
+    zs_min = pg.source_pos[:, 2].min()
     recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
+    recon_support_height: float = max(
+        0,
+        (zs_max - zs_min)
+        - 2 * (R + recon_support_radius) * np.tan(vartheta_v),
+    )
+    cyl_mask_rad = cyl_mask_rad or recon_support_radius
+    # This could be improved a little by checking the cyl_mask_rad
+    max_r_of_any_volpoint: float = min(
+        cyl_mask_rad,
+        np.sqrt(
+            np.square(
+                max(abs(vol_minxyz_maxxyz[0][0]), abs(vol_minxyz_maxxyz[1][0]))
+            )
+            + np.square(
+                max(abs(vol_minxyz_maxxyz[0][1]), abs(vol_minxyz_maxxyz[1][1]))
+            )
+        ),
+    )
+    vartheta_v_effective: float = (
+        min(limit_zeta, vartheta_v) if limit_zeta is not None else vartheta_v
+    )
+    # _hdiff will be used to quickly prune projections that don't intersect the volume
+    hdiff_: float = np.tan(vartheta_v_effective) * (R + max_r_of_any_volpoint)
+
     logger.info(f"R: {R!s:s}")
     logger.info(f"L: {L!s:s}")
     logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
+    logger.info(f"recon_support_height: {recon_support_height:.5g}")
 
     # Set up the filtering object
     filt = cb.FBPFilterer(
@@ -447,6 +493,19 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
             sl = slice(
                 sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk)
             )
+
+            # If projections are totally out of range of the volume, then skip
+            pg_sl = pg.sliced(sl)
+            sl_zs_max = pg_sl.source_pos[:, 2].max()
+            sl_zs_min = pg.source_pos[:, 2].min()
+            if (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_) or (
+                vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_
+            ):
+                # Projections are totally out of range of the volume. Skip loading these projections.
+                # Increment the slice
+                sl_start += num_projs_per_chunk
+                continue
+
             # Create ProjectionSet with filtered data in buffer
             if num_rot_angs is None:
                 with cp.cuda.Stream(non_blocking=False) as stream:
@@ -511,7 +570,15 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
             # Increment the slice
             sl_start += num_projs_per_chunk
 
-    return pg, _gen(), R, L, recon_support_radius, final_multiplier
+    return (
+        pg,
+        _gen(),
+        R,
+        L,
+        recon_support_radius,
+        cyl_mask_rad,
+        final_multiplier,
+    )
 
 
 def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure]
@@ -580,25 +647,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
-    two_sided = args.alg is ALG.NOOGREWAR
-    # Create the ProjectionSet objects corresponding to each ordered subset
-    pg, sl_filtps_gen, R, L, recon_support_radius, final_multiplier = (  # ruff: ignore[non-lowercase-variable-in-function, unused-unpacked-variable]
-        get_filtered_projectionset_generator(
-            projdata_path=args.projs,
-            pg=cbfp.ProjGeom.load(args.geom),
-            fan_beam_mode=args.fan_beam,
-            num_rot_angs=args.num_rot_angs,
-            limit_zeta=args.limit_zeta,
-            slice_projs=args.slice_projs,
-            autorange_z=args.autorange_z,
-            flip_x=args.flip_x,
-            flip_y=args.flip_y,
-            flip_z=args.flip_z,
-            rotate_xy=args.rotate_xy,
-            logger=logger,
-            two_sided=two_sided,
-        )
-    )
 
     # Create the working volume
     volshape = (
@@ -613,10 +661,34 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         pos_c=args.volpos,
     )
 
-    # This works fine when --volpos '(0,0,0)' and the volume is square, but not very good otherwise
-    # cyl_mask_rad = vol.shape[0] / 2 * vol.voxwid
-    # Set to reconstruction support radius instead
-    cyl_mask_rad = args.cyl_mask_rad or recon_support_radius
+    two_sided = args.alg is ALG.NOOGREWAR
+    # Create the ProjectionSet objects corresponding to each ordered subset
+    (
+        pg,
+        sl_filtps_gen,
+        R,  # ruff: ignore[non-lowercase-variable-in-function]
+        _L,  # ruff: ignore[non-lowercase-variable-in-function]
+        _recon_support_radius,
+        cyl_mask_rad,
+        final_multiplier,
+    ) = get_filtered_projectionset_generator(
+        projdata_path=args.projs,
+        pg=cbfp.ProjGeom.load(args.geom),
+        fan_beam_mode=args.fan_beam,
+        num_rot_angs=args.num_rot_angs,
+        limit_zeta=args.limit_zeta,
+        slice_projs=args.slice_projs,
+        autorange_z=args.autorange_z,
+        flip_x=args.flip_x,
+        flip_y=args.flip_y,
+        flip_z=args.flip_z,
+        rotate_xy=args.rotate_xy,
+        logger=logger,
+        two_sided=two_sided,
+        # These two are supplied to
+        vol_minxyz_maxxyz=vol.minxyz_maxxyz,
+        cyl_mask_rad=args.cyl_mask_rad,  #
+    )
 
     # Initialise the configuration used for backprojection
     config_bp_ramp_onesided = cbfp.ConfigBackproject(
@@ -736,7 +808,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         maxval=pg.num_projs,
         valunit="proj",
         logger=logger,
-        persist=False,
+        persist=True,
     ) as pbar:
         if args.fan_beam:
             sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
