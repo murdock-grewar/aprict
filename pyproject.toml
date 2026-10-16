@@ -10,7 +10,7 @@ authors = [
 description = 'Tools to simulate and reconstruct XCT transmission data.'
 readme = 'README.md'
 requires-python = '>=3.14'
-license = {file = 'LICENSE.txt'}
+license = 'GPL-3.0-or-later'
 classifiers = [
     'Natural Language :: English',
     'Operating System :: OS Independent',
