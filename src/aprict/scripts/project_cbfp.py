@@ -50,6 +50,11 @@ class OUTPUT_DTYPE(enum.Enum):  # ruff: ignore[invalid-class-name, undocumented-
     FP64 = 3
 
 
+class PLOTMODE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+    NONE = 1
+    PYQTGRAPH = 2
+
+
 def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
     match preset:
         case PHANTOM_PRESET.HEAD:
@@ -220,10 +225,10 @@ def _outdtype_to_dtype(
         help="The dtype of the output.",
     ),
     ce.option(
-        "--plot-afterwards",
-        type=click_tools.BoolArgType(),
-        default=False,
-        help="Attempt to display a plot of the data after it has been generated.",
+        "--plot-mode",
+        type=click.Choice(PLOTMODE),
+        default=PLOTMODE.NONE,
+        help="How to plot.",
     ),
 )
 @ce.option_group(
@@ -453,20 +458,23 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             # Perform logging updates
             pbar.update_to(sls[-1].stop * projs_per_unit * bytes_per_proj)
     logger.info("Done.")
-    if args.plot_afterwards:
-        msg = "Displaying plot..."
-        logger.info(msg)
-        with rich_console.status(msg, spinner="dots10"):
-            # Be clever: if the data has the shape of fan-beam data, then plot the sinogram instead.
-            if len(output_projs.shape) == 3 and output_projs.shape[2] == 1:
-                imview.plot_projections(
-                    output_projs.copy()[np.newaxis, :, :, 0].transpose(
-                        (0, 2, 1)
-                    ),
-                    title="Sinogram",
-                )
-            else:
-                imview.plot_projections(output_projs.copy())
+    match args.plot_mode:
+        case PLOTMODE.NONE:
+            pass
+        case PLOTMODE.PYQTGRAPH:
+            msg = "Displaying plot..."
+            logger.info(msg)
+            with rich_console.status(msg, spinner="dots10"):
+                # Be clever: if the data has the shape of fan-beam data, then plot the sinogram instead.
+                if len(output_projs.shape) == 3 and output_projs.shape[2] == 1:
+                    imview.plot_projections(
+                        output_projs.copy()[np.newaxis, :, :, 0].transpose(
+                            (0, 2, 1)
+                        ),
+                        title="Sinogram",
+                    )
+                else:
+                    imview.plot_projections(output_projs.copy())
 
 
 def _preprocess_phantom(v: FBVolume, args: types.SimpleNamespace) -> FBVolume:

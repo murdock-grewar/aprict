@@ -392,15 +392,18 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
         """Return a geometry corresponding to a binned-down detector."""
         # Check that nu and nv are divisible by n
         msg = "'n' should be a positive integer that divides all detector dimensions."
-        if not n>0 or not (np.all(self.nu/n == self.nu//n) and np.all(self.nv/n == self.nv//n)):
+        if not n > 0 or not (
+            np.all(self.nu / n == self.nu // n)
+            and np.all(self.nv / n == self.nv // n)
+        ):
             raise ValueError(msg)
         return ProjGeom(
             source_pos=self.source_pos,
             det_pos=self.det_pos,
-            det_uvec=self.det_uvec*n,
-            det_vvec=self.det_vvec*n,
-            nu=self.nu//n,
-            nv=self.nv//n,
+            det_uvec=self.det_uvec * n,
+            det_vvec=self.det_vvec * n,
+            nu=self.nu // n,
+            nv=self.nv // n,
         )
 
     def __eq__(self, other) -> bool:  # ruff: ignore[missing-type-function-argument, complex-structure, undocumented-magic-method]
