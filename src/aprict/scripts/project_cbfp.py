@@ -408,7 +408,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         valunit="proj",
         unit_is_bytes=True,
         logger=logger,
-        persist=False,
+        persist=True,
     ) as pbar:
         bytes_per_proj: int = (
             output_projs.itemsize
