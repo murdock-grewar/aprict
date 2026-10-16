@@ -342,6 +342,9 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     rotate_xy: float,
     num_projs_per_chunk: int = 9,
     logger: logging.Logger,
+    vol_minxyz_maxxyz: tuple[
+        tuple[float, float, float], tuple[float, float, float]
+    ],  # used to quickly skip projections out of range for this algorithm
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
@@ -434,6 +437,16 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
         (zs_max - zs_min)
         - 2 * (R + recon_support_radius) * np.tan(vartheta_v),
     )
+    max_r_of_any_volpoint: float = np.sqrt(
+        np.square(
+            max(abs(vol_minxyz_maxxyz[0][0]), abs(vol_minxyz_maxxyz[1][0]))
+        )
+        + np.square(
+            max(abs(vol_minxyz_maxxyz[0][1]), abs(vol_minxyz_maxxyz[1][1]))
+        )
+    )
+    # _hdiff will be used to quickly prune projections that don't intersect the volume
+    hdiff_: float = np.tan(vartheta_v) * (R + max_r_of_any_volpoint)
 
     logger.info(f"R: {R!s:s}")
     logger.info(f"L: {L!s:s}")
@@ -459,6 +472,19 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
             sl = slice(
                 sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk)
             )
+
+            # If projections are totally out of range of the volume, then skip
+            pg_sl = pg.sliced(sl)
+            sl_zs_max = pg_sl.source_pos[:, 2].max()
+            sl_zs_min = pg.source_pos[:, 2].min()
+            if (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_) or (
+                vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_
+            ):
+                # Projections are totally out of range of the volume. Skip loading these projections.
+                # Increment the slice
+                sl_start += num_projs_per_chunk
+                continue
+
             # Create ProjectionSet with filtered data in buffer
             filt_arrs = [cp.array(data_mm[sl])]
             pss = [
@@ -549,28 +575,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:
     ##########################################################
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
-    # Create the ProjectionSet objects corresponding to each ordered subset
-    (
-        pg,
-        sl_filtps_gen,
-        R,  # ruff: ignore[non-lowercase-variable-in-function]
-        _L,  # ruff: ignore[non-lowercase-variable-in-function]
-        _recon_support_radius,
-        _recon_support_height,
-        mu,
-        vartheta_v,
-        vartheta_h,
-    ) = get_projectionset_generator(
-        projdata_path=args.projs,
-        pg=cbfp.ProjGeom.load(args.geom),
-        slice_projs=args.slice_projs,
-        autorange_z=args.autorange_z,
-        flip_x=args.flip_x,
-        flip_y=args.flip_y,
-        flip_z=args.flip_z,
-        rotate_xy=args.rotate_xy,
-        logger=logger,
-    )
 
     # Create the working volumes
     # We need to pad the volume to a multiple of args.n in every axis, so that we can apply the low-pad correction. We will then crop the output. However, to crop the output, we need to be able to crop symmetrically, i.e. remove an even number of voxels from each axis. Therefore, we need the padded shape to be odd if and only if the input shape is odd.
@@ -631,6 +635,31 @@ def main_from_args(args: types.SimpleNamespace) -> None:
         pos_c=args.volpos,
     )
 
+    # Create the ProjectionSet objects corresponding to each ordered subset
+    (
+        pg,
+        sl_filtps_gen,
+        R,  # ruff: ignore[non-lowercase-variable-in-function]
+        _L,  # ruff: ignore[non-lowercase-variable-in-function]
+        _recon_support_radius,
+        _recon_support_height,
+        mu,
+        vartheta_v,
+        vartheta_h,
+    ) = get_projectionset_generator(
+        projdata_path=args.projs,
+        pg=cbfp.ProjGeom.load(args.geom),
+        slice_projs=args.slice_projs,
+        autorange_z=args.autorange_z,
+        flip_x=args.flip_x,
+        flip_y=args.flip_y,
+        flip_z=args.flip_z,
+        rotate_xy=args.rotate_xy,
+        logger=logger,
+        # These two are supplied to prune irrelevant projections
+        vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
+    )
+
     # Initialise the configuration used for backprojection
     config_bp = cbfp.ConfigBackproject(
         fast_approx=True,
@@ -668,7 +697,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:
         maxval=pg.num_projs,
         valunit="proj",
         logger=logger,
-        persist=False,
+        persist=True,
     ) as pbar:
         for sl, pss in sl_filtps_gen:
             (ps_ramp,) = pss
