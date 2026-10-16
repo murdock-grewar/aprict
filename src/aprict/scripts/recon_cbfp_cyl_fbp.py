@@ -423,7 +423,6 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         - 2 * (R + recon_support_radius) * np.tan(vartheta_v),
     )
     cyl_mask_rad = cyl_mask_rad or recon_support_radius
-    # This could be improved a little by checking the cyl_mask_rad
     max_r_of_any_volpoint: float = min(
         cyl_mask_rad,
         np.sqrt(
@@ -685,7 +684,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         rotate_xy=args.rotate_xy,
         logger=logger,
         two_sided=two_sided,
-        # These two are supplied to
+        # These two are supplied to prune irrelevant projections
         vol_minxyz_maxxyz=vol.minxyz_maxxyz,
         cyl_mask_rad=args.cyl_mask_rad,  #
     )
