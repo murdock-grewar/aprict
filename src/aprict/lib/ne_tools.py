@@ -90,6 +90,7 @@ def set_array_to_constant_pbar(
         unit_is_bytes=True,
         logger=pbar_logger,
         persist=pbar_persist,
+        show_gpu_usage=False,  # GPU is not used for this
     ) as pbar:
         while sl.start <= numlayers:
             arr_view = arr[..., sl] if step_last_axis else arr[sl, ...]

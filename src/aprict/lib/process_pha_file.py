@@ -211,6 +211,7 @@ def _convert_preprocessed_ph_str_to_shapes(
                 desc="Processing shapes",
                 valunit="shape",
                 maxval=numobjs,
+                show_gpu_usage=False,  # GPU is not used for this
             ) as pbar,
         ):
             shapes_lists = []
