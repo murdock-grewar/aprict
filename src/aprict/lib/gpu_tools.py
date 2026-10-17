@@ -15,6 +15,9 @@
 
 """Tools to probe GPU status and set some related CuPy settings."""
 
+import queue
+import random
+import threading
 import time
 import typing
 
@@ -46,13 +49,62 @@ def utilisation_average_perc(gpu_indices: typing.Iterable[int]) -> float:
     return sum(percs) / len(percs)
 
 
+def _gpu_perc_monitor_thread(
+    q_in: queue.SimpleQueue,
+    q_out: queue.SimpleQueue,
+    gpu_indices: typing.Iterable[int],
+    interval_seconds: float,
+) -> None:
+    if interval_seconds <= 0:
+        msg = "interval_seconds must be a positive float"
+        raise ValueError(msg)
+    gpu_perc: float = utilisation_average_perc(gpu_indices)
+    last_time = float(time.time())
+
+    # Will loop, reading the queue. If True is received, then quit this thread.
+    # If False is received, then send back the latest gpu_perc
+    quit_: bool = False
+    while not quit_:
+        # Get the new timeout interval based on how long it's been since the last check.
+        # Set a timeout with a small noise on the interval time.
+        # This is to prevent spurious correlations with the samples being produced at exact regular intervals
+        tim = float(time.time())
+        interval_seconds_ = max(
+            0,
+            min(
+                interval_seconds * 1.01,
+                interval_seconds * (1 + 0.01 * (0.5 - random.random()))  # nosec
+                - (tim - last_time),
+            ),
+        )
+        if interval_seconds_ == 0:
+            # Refresh right away, before checking the queue
+            gpu_perc = utilisation_average_perc(gpu_indices)
+            last_time = float(time.time())
+            continue
+
+        try:
+            # Get the message
+            quit_ = q_in.get(timeout=interval_seconds_)
+            # A message was received, but it wasn't to quit.
+            if not quit_:
+                # Note: DO NOT recalculate the gpu usage here, because that would cause the GPU usage sampling times to correlate with when the GPU usage reading was requested.
+                q_out.put((last_time, gpu_perc), block=False)
+        except queue.Empty:
+            # No message received. Fetch the latest usage and repeat.
+            gpu_perc = utilisation_average_perc(gpu_indices)
+            last_time = float(time.time())
+
+
 class UtilisationAveragePercMon:
     """Class to track GPU usage percentage over time."""
 
     gpu_indices: list[int]
-    last_time: float | None
     interval_seconds: float
     cached_perc: float | None
+    _monitor_thread: threading.Thread
+    _monitor_thread_msg_queue_in: queue.SimpleQueue
+    _monitor_thread_msg_queue_out: queue.SimpleQueue
 
     def __init__(
         self, gpu_indices: typing.Iterable[int], interval_seconds: float
@@ -61,17 +113,38 @@ class UtilisationAveragePercMon:
         self.last_time = None
         self.cached_perc = None
         self.interval_seconds = interval_seconds
+        self._monitor_thread_msg_queue_in = (
+            queue.SimpleQueue()
+        )  # SimpleQueue is FIFO, which is what we need
+        self._monitor_thread_msg_queue_out = (
+            queue.SimpleQueue()
+        )  # SimpleQueue is FIFO, which is what we need
+        self._monitor_thread = threading.Thread(
+            target=_gpu_perc_monitor_thread,
+            args=(
+                self._monitor_thread_msg_queue_in,
+                self._monitor_thread_msg_queue_out,
+                tuple(self.gpu_indices),
+                self.interval_seconds,
+            ),
+        )
+        self._monitor_thread.start()
 
     @property
     def gpu_perc(self) -> float | None:
         """Average percentage utilisation of the configured GPUs."""
-        tim = float(time.time())
-        if self.last_time is None or (
-            self.last_time <= (tim - self.interval_seconds)
-        ):
-            self.last_time = tim
-            self.cached_perc = utilisation_average_perc(self.gpu_indices)
-        return self.cached_perc
+        # Send a message telling the object that we want it to send back the GPU usage
+        self._monitor_thread_msg_queue_in.put(False)
+        _measurement_time, gpu_perc = self._monitor_thread_msg_queue_out.get(
+            block=True
+        )
+        return gpu_perc
+
+    def close(self) -> None:
+        """Gracefully close the background thread associated with this object."""
+        if self._monitor_thread.is_alive():
+            self._monitor_thread_msg_queue_in.put(True)
+            self._monitor_thread.join()
 
 
 def all_gpu_indices() -> set[int]:

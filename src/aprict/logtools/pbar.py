@@ -47,7 +47,7 @@ class ProgressBar:
     """A progress bar which will print to stderr."""
 
     _cm: rich.progress.Progress
-    _gpu_mon: gpu_tools.UtilisationAveragePercMon
+    _gpu_mon: gpu_tools.UtilisationAveragePercMon | None
 
     _maxval: float | int
     _desc: str
@@ -76,11 +76,16 @@ class ProgressBar:
         self._enable = enable
         self._desc = desc
         self._maxval = maxval
+        self._gpu_mon = None
         if self._enable:
             self._logger = logging.getLogger() if logger is None else logger
-            self._gpu_mon = gpu_tools.UtilisationAveragePercMon(
-                gpu_indices=gpu_tools.all_gpu_indices(),
-                interval_seconds=gpu_mon_interval_seconds,
+            self._gpu_mon = (
+                None
+                if not show_gpu_usage
+                else gpu_tools.UtilisationAveragePercMon(
+                    gpu_indices=gpu_tools.all_gpu_indices(),
+                    interval_seconds=gpu_mon_interval_seconds,
+                )
             )
             refresh_per_second = (
                 max(2 / gpu_mon_interval_seconds, 10) if show_gpu_usage else 10
@@ -130,6 +135,7 @@ class ProgressBar:
                 transient=not persist,
                 expand=expand,
                 refresh_per_second=refresh_per_second,
+                speed_estimate_period=86400,  # period in seconds
             )
 
     def __enter__(self) -> ProgressBar:  # ruff: ignore[undocumented-magic-method]
@@ -143,6 +149,9 @@ class ProgressBar:
 
     def _refresh_gpu_perc(self) -> None:
         progress = self._cm
+        assert (
+            self._gpu_mon is not None
+        )  # if we use this function, then the GPU mon obj should have been defined
         gpu_perc = self._gpu_mon.gpu_perc
         gpu_perc_str = (
             "---%" if gpu_perc is None else f"{round(gpu_perc): >3d}%"
@@ -153,7 +162,10 @@ class ProgressBar:
         """Update the progress bar value."""
         if self._enable:
             progress: rich.progress.Progress = self._cm
-            gpu_perc = self._gpu_mon.gpu_perc
+            if self._gpu_mon is not None:
+                gpu_perc = self._gpu_mon.gpu_perc
+            else:
+                gpu_perc = None
             gpu_perc_str = (
                 "---%" if gpu_perc is None else f"{round(gpu_perc): >3d}%"
             )
@@ -164,3 +176,6 @@ class ProgressBar:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
         if self._enable:
             self._cm.__exit__(exc_type, exc_val, exc_tb)
+        if self._gpu_mon is not None:
+            self._gpu_mon.close()
+            self._gpu_mon = None
