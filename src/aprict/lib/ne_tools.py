@@ -18,11 +18,14 @@
 import enum
 import itertools
 import logging  # ruff: ignore[typing-only-standard-library-import]
+import math
 import os
 import pathlib  # ruff: ignore[typing-only-standard-library-import]
 
 import numexpr as ne
 import numpy as np
+
+from .. import logtools
 
 
 def fastcopy(
@@ -52,6 +55,52 @@ def set_array_to_constant(
     """Fill an array with a constant value."""
     const_arr = const * np.ones(((1,) * arr.ndim), dtype=arr.dtype)
     ne.evaluate("const_arr", out=arr, local_dict={"const_arr": const_arr})
+
+
+def set_array_to_constant_pbar(
+    arr: np.ndarray | np.memmap,
+    *,
+    const: int | float,
+    pbar_desc: str,
+    pbar_valunit: str | None,
+    pbar_logger: logging.Logger | None,
+    pbar_persist: bool,
+    GiB_per_step: float = 1,  # ruff: ignore[invalid-argument-name]
+) -> None:
+    """Fill an array with a constant value, with a progress bar."""
+    const_arr = const * np.ones(((1,) * arr.ndim), dtype=arr.dtype)
+
+    # Depending on whether the array is F-ordered or C-ordered, slice it differently
+    step_last_axis: bool = arr.strides[-1] >= arr.strides[0]
+    if step_last_axis:
+        bytes_per_layer = math.prod(arr.shape[:-1]) * arr.itemsize
+        numlayers: int = arr.shape[-1]
+    else:
+        bytes_per_layer = math.prod(arr.shape[1:]) * arr.itemsize
+        numlayers: int = arr.shape[0]
+
+    layers_per_step = max(
+        1, math.floor(GiB_per_step * 1024**3 / bytes_per_layer)
+    )
+    sl = slice(0, layers_per_step)
+    with logtools.ProgressBar(
+        desc=pbar_desc,
+        maxval=numlayers * bytes_per_layer,
+        valunit=pbar_valunit,
+        unit_is_bytes=True,
+        logger=pbar_logger,
+        persist=pbar_persist,
+    ) as pbar:
+        while sl.start <= numlayers:
+            arr_view = arr[..., sl] if step_last_axis else arr[sl, ...]
+            ne.evaluate(
+                "const_arr", out=arr_view, local_dict={"const_arr": const_arr}
+            )
+            pbar.update_to(sl.stop * bytes_per_layer)
+            sl = slice(
+                sl.start + layers_per_step,
+                min(sl.stop + layers_per_step, numlayers),
+            )
 
 
 def downbin(  # ruff: ignore[complex-structure]

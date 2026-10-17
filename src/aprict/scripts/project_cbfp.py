@@ -29,7 +29,7 @@ import numexpr as ne
 import numpy as np
 import rich.console
 
-from aprict.lib import click_tools
+from aprict.lib import click_tools, ne_tools
 
 from .. import FBVolume, imview, logtools, phantoms
 from ..cb import flatpanel as cbfp
@@ -383,18 +383,25 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     #################### Begin projection ####################
     ##########################################################
     logger.info("")
+
     msg = "Allocating and zeroing the output array..."
     logger.info(msg)
-    with rich_console.status(msg, spinner="dots"):
-        output_projs = np.lib.format.open_memmap(
-            args.output.joinpath("projs.npy"),
-            "w+",
-            dtype=proj_dtype,
-            shape=tuple(map(int, (*pg.projs_list_shape, nu, nv))),
-        )
-        output_projs[...] = 0
-        # ne_tools.set_array_to_constant(output_projs, const=0)
+    output_projs = np.lib.format.open_memmap(
+        args.output.joinpath("projs.npy"),
+        "w+",
+        dtype=proj_dtype,
+        shape=tuple(map(int, (*pg.projs_list_shape, nu, nv))),
+    )
+    ne_tools.set_array_to_constant_pbar(
+        output_projs,
+        const=0,
+        pbar_desc="Allocating output array",
+        pbar_valunit=None,
+        pbar_logger=logger,
+        pbar_persist=False,
+    )
     logger.info("Done with allocating projection array.")
+
     msg = "Compiling/fetching CUDA kernels..."
     logger.info(msg)
     with rich_console.status(msg, spinner="dots"):
