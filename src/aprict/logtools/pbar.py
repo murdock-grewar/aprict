@@ -119,6 +119,7 @@ class ProgressBar:
                 )
             )
             self._cm = rich.progress.Progress(
+                rich.progress.SpinnerColumn("dots"),
                 rich.progress.TextColumn(
                     "[progress.description]{task.description}"
                 ),
