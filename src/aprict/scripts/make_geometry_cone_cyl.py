@@ -16,6 +16,7 @@
 """Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."""
 
 import enum
+import itertools
 import pathlib
 import sys
 import types
@@ -25,7 +26,7 @@ import click_extra as ce
 import cloup
 import numpy as np
 
-from aprict.lib import click_tools
+from aprict.lib import click_tools, lds
 
 from ..cb import flatpanel as cbfp
 
@@ -34,6 +35,7 @@ _progdesc = "Produce a ProjGeom object for a cylindrical cone-beam scan, and sav
 
 class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
     GOLDEN_THETA = 1
+    LDS_SIMPLE = 2
 
 
 @ce.command(
@@ -168,7 +170,12 @@ class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
     ce.option(
         "--seed-starting-theta",
         type=click_tools.MaybeType(click.INT),
-        help="Seed to use for choosing the starting theta.",
+        help="Seed to use for choosing the starting theta, if applicable.",
+    ),
+    ce.option(
+        "--seed-starting-z",
+        type=click_tools.MaybeType(click.INT),
+        help="Seed to use for choosing the starting z, if applicable.",
     ),
     help="Seeds to use for random number generation. Leave an option as None to use a pseudorandom seed.",
 )
@@ -207,6 +214,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
     )
     nu: int = args.nu or max(1, round(args.detwid / pixwid))
     nv: int = args.nv or max(1, round(args.dethei / pixhei))
+
     rng_starting_theta: np.random.Generator = np.random.default_rng(
         args.seed_starting_theta
     )
@@ -215,17 +223,22 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
         if args.theta_start is not None
         else rng_starting_theta.random() * 2 * np.pi
     )
+    rng_starting_z: np.random.Generator = np.random.default_rng(
+        args.seed_starting_z
+    )
+    # z_start may or may not be used, depending on the trajectory choice
+    z_start: float = -args.h / 2 + rng_starting_z.random() * args.h
 
     # Make geometry
-    zs = np.linspace(
-        -args.h / 2,
-        args.h / 2,
-        num=args.num + 2,
-        endpoint=True,
-        dtype=np.float64,
-    )[1:-1]
     match args.type:
         case TYPE.GOLDEN_THETA:
+            zs = np.linspace(
+                -args.h / 2,
+                args.h / 2,
+                num=args.num + 2,
+                endpoint=True,
+                dtype=np.float64,
+            )[1:-1]
             ts = (
                 theta_start
                 + (-1 if args.clockwise else 1)
@@ -233,6 +246,25 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
                 * (np.sqrt(5) - 1)
                 * np.pi
             )
+        case TYPE.LDS_SIMPLE:
+            zs, ts = zip(
+                *list(
+                    itertools.islice(
+                        lds.lds_cyl(
+                            zmin=-args.h / 2, zmax=args.h / 2, rad=args.R
+                        ),
+                        0,
+                        args.num,
+                    )
+                )
+            )
+            zs = np.array(zs, dtype=np.float64)
+            ts = (-1 if args.clockwise else 1) * np.array(ts, dtype=np.float64)
+            # Match to starting z and theta
+            zs = -args.h / 2 + np.mod(
+                zs - zs[0] + z_start + args.h / 2, args.h
+            )
+            ts = ts - ts[0] + theta_start
         case _:
             raise NotImplementedError()
     source_pos_arr = np.array(
