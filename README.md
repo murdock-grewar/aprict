@@ -28,9 +28,24 @@ It is strongly recommended to use high-speed mass storage, such as an NVMe drive
 Known limitations
 ---
 
-* The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
+* Implementation-related issues which could be alleviated in the future:
+  * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
+  * Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
+  * Not fully optimised: among other issues, this library currently requires that the whole volume (or more) can fit in the GPU VRAM.
+  * CPU and GPU work not completely asynchronous: due to unresolved bugs, various asynchronous GPU operations have been disabled. This may not have much impact on large reconstructions, but could result in poor GPU utilisation for smaller reconstructions.
+  * No smart batching of (back)projections: smarter code would analyse the geometry of projections, and batch together (back)projections that involve similar regions of the volume. Currently, the code does not do any kind of clever batching like this, and so the (back)projection code is not as performant as it could be.
 
-* Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
+Features
+---
+
+* Works efficiently with projection datasets of any size. (Requires high-speed mass storage for rapid reading/writing, e.g. an NVMe drive.)
+* High-accuracy simulation of projection data for almost any flat-panel geometry, with almost any FORBILD phantom. The projection code computes exact line integrals, and can accept arbtirary phantoms defined in `*.pha` files using the FORBILD format. The accuracy can be further increased by averaging multiple line integrals for each pixel. The source and detector can even be placed _inside_ the object, and projection will still be accurately computed from the source point to the detector pixels.
+
+* Several built-in phantoms included for the user's convenience.
+
+* Analytic reconstruction from:
+  * Fan-beam data with circular scan
+  * Cone-beam data with cylindrical scan
 
 </details>
 
