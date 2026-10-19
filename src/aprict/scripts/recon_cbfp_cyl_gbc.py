@@ -888,9 +888,37 @@ def main_from_args(args: types.SimpleNamespace) -> None:
         msg = "Saving volume to disk..."
         logger.info(msg)
         with rich_console.status(msg, spinner="dots"):
+            x = vol_filtered
             # Save the volume as a .npy file
             tomo_path = path_output.joinpath("recon.npy")
-            lib.ne_tools.save(tomo_path, vol_filtered)
+            lib.ne_tools.save(tomo_path, x)
+            # Save slices
+            for axis, axis_str in enumerate("xyz"):
+                save_path_sl = path_output
+                imview.save_volslice(
+                    save_path_sl.joinpath(
+                        "midslice_" + axis_str + "_" + "recon" + ".png"
+                    ),
+                    x,
+                    axis=axis,
+                    index_of_slice=x.shape[axis] // 2,
+                    pmin=args.plotmin,
+                    pmax=args.plotmax,
+                )
+                imview.save_volslice(
+                    save_path_sl.joinpath(
+                        "midslice_"
+                        + axis_str
+                        + "_fullrange_"
+                        + "recon"
+                        + ".png"
+                    ),
+                    x,
+                    axis=axis,
+                    index_of_slice=x.shape[axis] // 2,
+                    pmin=x.min(),
+                    pmax=x.max(),
+                )
 
     # Perform logging updates
     logger.info("Done.")
