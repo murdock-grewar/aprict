@@ -30,20 +30,23 @@ import rich.console
 
 # Try to load some modules
 try:
-    from .. import image_view as imview
-
-    _mod_avail_imview = True
-except ModuleNotFoundError:
-    _mod_avail_imview = False
-try:
     from .. import liveplot  # ruff: ignore[unused-import]
 
     _mod_avail_liveplot = True
 except ModuleNotFoundError:
     _mod_avail_liveplot = False
 
-from .. import Volume, gbc, lib, logtools
+try:
+    from ..lib import ng_tools
+
+    _mod_avail_neuroglancer = True
+except ModuleNotFoundError:
+    _mod_avail_neuroglancer = False
+
+from .. import Volume, gbc, imview, lib, logtools
 from ..cb import flatpanel as cbfp
+
+_mod_avail_imview = imview._pyqtgraph_installed  # ruff: ignore[private-member-access]
 
 
 class ALG(enum.Enum):  # ruff: ignore[undocumented-public-class]
@@ -327,6 +330,14 @@ def validate_args(args: types.SimpleNamespace) -> None:
 
     if args.n < 1 or args.n % 2 == 0:
         msg = "--n must be a positive odd integer."
+        raise ValueError(msg)
+
+    if args.plot_mode is PLOTMODE.PYQTGRAPH and not _mod_avail_imview:
+        msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
+        raise ValueError(msg)
+
+    if args.plot_mode is PLOTMODE.NEUROGLANCER and not _mod_avail_neuroglancer:
+        msg = "Cannot use --plot-mode NEUROGLANCER because the relevant modules are not installed."
         raise ValueError(msg)
 
 
@@ -938,7 +949,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:
         case PLOTMODE.NEUROGLANCER:
             msg = "Displaying plot..."
             logger.info(msg)
-            with lib.ng_tools.ArrayViewer3D(
+            with ng_tools.ArrayViewer3D(
                 vol_filtered,
                 plotmin=args.plotmin,
                 plotmax=args.plotmax,

@@ -34,6 +34,8 @@ from aprict.lib import click_tools, ne_tools
 from .. import FBVolume, imview, logtools, phantoms
 from ..cb import flatpanel as cbfp
 
+_mod_avail_imview = imview._pyqtgraph_installed  # ruff: ignore[private-member-access]
+
 _progdesc = "Compute flat-panel projection data."
 
 
@@ -247,6 +249,13 @@ def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
     main_from_args(args)
 
 
+def validate_args(args: types.SimpleNamespace) -> None:
+    """Validate a set of args."""
+    if args.plot_mode is PLOTMODE.PYQTGRAPH and not _mod_avail_imview:
+        msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
+        raise ValueError(msg)
+
+
 def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure, undocumented-public-function]
 
     artefact_path = args.output
@@ -277,7 +286,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
 
     # Validate args
-    # validate_args(args)
+    validate_args(args)
     if args.ssu < 1 or args.ssv < 1:
         msg = "--ssu and --ssv must be positive integers."
         raise ValueError(msg)

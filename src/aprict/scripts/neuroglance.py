@@ -23,6 +23,13 @@ import numpy as np
 
 from aprict import lib
 
+try:
+    from aprict.lib import ng_tools
+
+    _mod_avail_neuroglancer = True
+except ModuleNotFoundError:
+    _mod_avail_neuroglancer = False
+
 
 def main() -> None:  # ruff: ignore[undocumented-public-function]
     ap = argparse.ArgumentParser()
@@ -55,12 +62,17 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ap.add_argument("--port", type=int, default=8080)
     # -----------
     args = ap.parse_args()
+
+    if not _mod_avail_neuroglancer:
+        msg = "This script cannot be used because neuroglancer could not be imported."
+        raise ModuleNotFoundError(msg)
+
     if args.memmap:
         input_array = np.lib.format.open_memmap(args.input, mode="r")
     else:
         input_array = np.load(args.input)
 
-    with lib.ng_tools.ArrayViewer3D(
+    with ng_tools.ArrayViewer3D(
         input_array,
         port=args.port,
         voxwid_mm=args.voxel_size_mm,
