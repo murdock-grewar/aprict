@@ -221,7 +221,7 @@ def _outdtype_to_dtype(
     ce.option(
         "--out-dtype",
         type=click.Choice(OUTPUT_DTYPE),
-        default=OUTPUT_DTYPE.FP64,
+        default=OUTPUT_DTYPE.FP32,
         help="The dtype of the output.",
     ),
     ce.option(
