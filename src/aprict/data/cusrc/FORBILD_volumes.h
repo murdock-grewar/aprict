@@ -214,7 +214,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cylinder cylinder
@@ -321,7 +321,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cylinder_z cylinder_z
@@ -374,7 +374,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cone_z cone_z
@@ -505,15 +505,6 @@ __device__ fvec2 FORBILD_clip_line_segment(
             //const float disc = b*b - 4*a*c;// + 0.0001f;
             const float b_on_2a = b/a/2.;
 
-            // Numerical stability issue:
-            // Try projecting and reconstructing the following phantom to test this. Without helping the stability along for small discriminants, reconstructing this object will give black dots where three cone vertices meet.
-            /*
-            { [Cone: x=0.28867512941360474 y=-3.5352508240434326e-17 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-1.0,1.2246468525851679e-16,0.0)] rho=1.0 }
-{ [Cone: x=0.14433756470680237 y=-0.25 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(-0.5,0.8660253882408142,0.0)] rho=1.0 }
-{ [Cone: x=-0.14433756470680237 y=-0.25 z=0.0 l=0.5773502588272095 r1=0.3333333432674408 r2=0.0 axis(0.5,0.8660253882408142,0.0)] rho=1.0 }
-            */
-            // Test that phantom by doing a fan-beam simulation with z=0.
-            // In the original code, there is a dark spot at the intersection of the three cone vertices.
             // Original code:
             //const float disc_on_4asq = b_on_2a*b_on_2a - (c/a);
 
@@ -633,7 +624,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cone cone
@@ -703,7 +694,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cylinder_x cylinder_x
@@ -760,7 +751,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cone_x cone_x
@@ -815,7 +806,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cylinder_y cylinder_y
@@ -872,7 +863,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Cone_y cone_y
@@ -925,7 +916,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Sphere sphere
@@ -1018,7 +1009,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Ellipsoid ellipsoid
@@ -1093,7 +1084,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Ellipsoid_free ef
@@ -1180,7 +1171,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Ellipt_Cyl ecyl
@@ -1254,7 +1245,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Ellipt_Cyl_x ecylx
@@ -1317,8 +1308,8 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
     fvec3 v1,
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v2,
     FORBILD_Ellipt_Cyl_y ecyly
 )
@@ -1380,7 +1371,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Ellipt_Cyl_z ecylz
@@ -1730,7 +1721,7 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v1,
     fvec3 v2,
     FORBILD_Shape shape

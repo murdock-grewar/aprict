@@ -427,7 +427,7 @@ __global__ void project_CB_texture_chunked(
 }
 
 
-#define MAX_INTERSECTIONS_PER_LINE 1000  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then a memory access violation will occur...
+#define MAX_INTERSECTIONS_PER_LINE 1000  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then the 'out_of_mem_count' will be incremented to indicate that memory was exhausted. Wouldn't it be funny if it was incremented back to exactly 0...
 // NOTE:
 // The blockDim.x must be AT LEAST 4, since 4 worker threads are used.
 // So the tiles must be at least 4 detector pixels wide.

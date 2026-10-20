@@ -28,6 +28,11 @@ It is strongly recommended to use high-speed mass storage, such as an NVMe drive
 Known limitations
 ---
 
+* Lack of documentation:
+  * The Python API is not yet documented.
+  * The way that geometry is encoded in `*.json` files is not yet documented.
+  * The encoding of projection data and volume data is not yet documented. (Numpy arrays; memory-mapped in the case of projections.)
+
 * Implementation-related issues which could be alleviated in the future:
   * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
   * Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
@@ -39,7 +44,7 @@ Features
 ---
 
 * Works efficiently with projection datasets of any size. (Requires high-speed mass storage for rapid reading/writing, e.g. an NVMe drive.)
-* High-accuracy simulation of projection data for almost any flat-panel geometry, with almost any FORBILD phantom. The projection code computes exact line integrals, and can accept arbtirary phantoms defined in `*.pha` files using the FORBILD format. The accuracy can be further increased by averaging multiple line integrals for each pixel. The source and detector can even be placed _inside_ the object, and projection will still be accurately computed from the source point to the detector pixels.
+* High-accuracy simulation of projection data for almost any flat-panel geometry, with almost any FORBILD phantom. Also supports voxelised volumes. The projection code computes exact line integrals (including through voxelised volumes composed of voxels of uniform attenuation coefficient), and can accept arbtirary phantoms defined in `*.pha` files using the FORBILD format. The accuracy can be further increased by averaging multiple line integrals for each pixel. The source and detector can even be placed _inside_ the object, and projection will still be accurately computed from the source point to the detector pixels.
 
 * Several built-in phantoms included for the user's convenience.
 
@@ -67,6 +72,7 @@ Example installation using `uv`:
 ```bash
 $ uv venv -p 3.14
 $ uv pip install ~/downloads/aprict-0.0.9.tar.gz[gui]
+$ source .venv/bin/activate
 ```
 You should now have several executables available on `$PATH`. Try `aprict-cli --help` to see the polished commandline interface. 
 

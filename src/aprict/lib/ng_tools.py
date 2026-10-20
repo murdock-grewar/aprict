@@ -80,7 +80,7 @@ void main() {
         # voxel_offset=(0, 20, 30, 15),
         downsampling=None,  # disables downsampling
     )
-    # Flip the y axis for a correct display
+    # Can flip axes etc here if desired. Fourth column is translation
     coord_transform = neuroglancer.CoordinateSpaceTransform(
         output_dimensions=dimensions,
         matrix=[

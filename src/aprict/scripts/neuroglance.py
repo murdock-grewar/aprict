@@ -31,10 +31,28 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ap.add_argument(
         "input", metavar="path/to/numpy/array.npy", type=pathlib.Path
     )
-    ap.add_argument("--memmap", action="store_true")
-    ap.add_argument("--voxel-size-mm", type=float, default=None)
-    ap.add_argument("--plotmin", type=float, default=None)
-    ap.add_argument("--plotmax", type=float, default=None)
+    ap.add_argument(
+        "--memmap", type=lib.argparse_tools.BoolArgType, default=False
+    )
+    ap.add_argument(
+        "--voxel-size-mm",
+        "--voxwid-mm",
+        type=lib.argparse_tools.MaybeType(float),
+        default=None,
+    )
+    ap.add_argument(
+        "--plotmin",
+        "--pmin",
+        type=lib.argparse_tools.MaybeType(float),
+        default=None,
+    )
+    ap.add_argument(
+        "--plotmax",
+        "--pmax",
+        type=lib.argparse_tools.MaybeType(float),
+        default=None,
+    )
+    ap.add_argument("--port", type=int, default=8080)
     # -----------
     args = ap.parse_args()
     if args.memmap:
@@ -44,7 +62,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     with lib.ng_tools.ArrayViewer3D(
         input_array,
-        port=8080,
+        port=args.port,
         voxwid_mm=args.voxel_size_mm,
         plotmin=args.plotmin,
         plotmax=args.plotmax,

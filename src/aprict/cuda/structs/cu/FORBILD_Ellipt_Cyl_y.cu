@@ -32,8 +32,8 @@ __device__ bbox get_bbox(
 }
 
 __device__ fvec2 FORBILD_clip_line_segment(
-    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the plane.
     fvec3 v1,
+    // Will output a subinterval of [0,1] specifying the portion of the line from v1 to v2 that is contained within the shape.
     fvec3 v2,
     FORBILD_Ellipt_Cyl_y ecyly
 )
