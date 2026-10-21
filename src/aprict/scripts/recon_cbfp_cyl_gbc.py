@@ -1062,7 +1062,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
 
             # Free some memory
-            del vol, minivol, vol_weightsum, minivol_weightsum
+            del vol, minivol
             lib.gpu_tools.clear_cache()
 
         pbar.update_to(int(bytes_cumsum[-1]))
