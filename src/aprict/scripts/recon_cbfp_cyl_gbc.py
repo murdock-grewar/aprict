@@ -643,7 +643,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         ):
             return bytes_mini
         return bytes_mini + (
-            padded_volshape[0]
+            args.n
+            * padded_volshape[0]
             * padded_volshape[1]
             * (2 * np.dtype(vol_dtype).itemsize)
         )
@@ -656,7 +657,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Cumulative sum of the above
     bytes_cumsum = np.cumsum(bytes_by_zindex_mini)
     _, gpu_VRAM_capacity_MiB = lib.gpu_tools.get_gpu_mb_used_and_total()  # ruff: ignore[non-lowercase-variable-in-function]
-    GiB_per_chunk: float = (1 / 3) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
+    GiB_per_chunk: float = (3 / 4) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
 
     def next_slice_zindex_mini(last_slice: slice | None) -> slice | None:
         last_slice = slice(0, 0) if last_slice is None else last_slice
