@@ -25,6 +25,7 @@ import typing
 import click
 import click_extra as ce
 import cupy as cp
+import numexpr as ne
 import numpy as np
 import rich.console
 
@@ -352,7 +353,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     flip_z: bool,
     rotate_xy: float,
     num_projs_per_chunk: int = 9,
-    logger: logging.Logger,
+    logger: logging.Logger,  # ruff: ignore[unused-function-argument]
     vol_minxyz_maxxyz: tuple[
         tuple[float, float, float], tuple[float, float, float]
     ],  # used to quickly skip projections out of range for this algorithm
@@ -361,6 +362,8 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     typing.Iterable[
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
     ],
+    float,
+    float,
     float,
     float,
     float,
@@ -459,11 +462,6 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     # _hdiff will be used to quickly prune projections that don't intersect the volume
     hdiff_: float = np.tan(vartheta_v) * (R + max_r_of_any_volpoint)
 
-    logger.info(f"R: {R!s:s}")
-    logger.info(f"L: {L!s:s}")
-    logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
-    logger.info(f"recon_support_height: {recon_support_height:.5g}")
-
     # Do not apply this here!
     # The soft-zeroing of the weights needs to apply to the weights with
     # this factor included. So, just set this to 1 here and do that soft-zeroing
@@ -473,7 +471,6 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     #     (zs_max - zs_min) * 2*np.square(np.pi) / (R * pg.num_projs)
     # )
     mu = pg.num_projs / (2 * np.pi * R * (zs_max - zs_min))
-    logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
@@ -517,10 +514,12 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
         mu,
         vartheta_v,
         vartheta_h,
+        zs_min,
+        zs_max,
     )
 
 
-def main_from_args(args: types.SimpleNamespace) -> None:
+def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure]
     """Run the script."""
     # Validate the input arguments
     validate_args(args)
@@ -621,182 +620,460 @@ def main_from_args(args: types.SimpleNamespace) -> None:
     logger.debug(f"padded_volshape:      {padded_volshape}")
     logger.debug(f"padded_volshape_mini: {padded_volshape_mini}")
     logger.debug(f"minivol padx, pady, padz: {(mvc_padx, mvc_pady, mvc_padz)}")
-    vol = Volume.zeros(
-        padded_volshape,
-        voxwid=args.voxwid,
-        dtype=np.float32,  # ty:ignore[invalid-argument-type]
-        pos_c=args.volpos,
-    )
-    minivol = Volume.zeros(
-        padded_volshape_mini,
-        voxwid=args.voxwid * args.n,
-        dtype=np.float32,  # ty: ignore[invalid-argument-type]
-        pos_c=args.volpos,
-    )
-    vol_weightsum = Volume.zeros(
-        padded_volshape,
-        voxwid=args.voxwid,
-        dtype=np.float32,  # ty:ignore[invalid-argument-type]
-        pos_c=args.volpos,
-    )
-    minivol_weightsum = Volume.zeros(
-        padded_volshape_mini,
-        voxwid=args.voxwid * args.n,
-        dtype=np.float32,  # ty: ignore[invalid-argument-type]
-        pos_c=args.volpos,
-    )
-
-    # Create the ProjectionSet objects corresponding to each ordered subset
-    (
-        pg,
-        sl_filtps_gen,
-        R,  # ruff: ignore[non-lowercase-variable-in-function]
-        _L,  # ruff: ignore[non-lowercase-variable-in-function]
-        _recon_support_radius,
-        _recon_support_height,
-        mu,
-        vartheta_v,
-        vartheta_h,
-    ) = get_projectionset_generator(
-        projdata_path=args.projs,
-        pg=cbfp.ProjGeom.load(args.geom),
-        slice_projs=args.slice_projs,
-        autorange_z=args.autorange_z,
-        flip_x=args.flip_x,
-        flip_y=args.flip_y,
-        flip_z=args.flip_z,
-        rotate_xy=args.rotate_xy,
-        logger=logger,
-        # These two are supplied to prune irrelevant projections
-        vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
-    )
-
-    # Initialise the configuration used for backprojection
-    config_bp = cbfp.ConfigBackproject(
-        fast_approx=True,
-        cyl_mask_rad=None,
-        Z_on_val_factor_power=0,
-        Z_on_val_factor_val=R,  # This must be equal to R for the kernel to operate correctly.
-        backproj_weighting_preset=7,
-        approx_mode_direct_raycast=True,
-        approx_mode_bilinear_interpolate=args.interpolate_measurements,
-        ssx=args.ssx,
-        ssy=args.ssy,
-        ssz=args.ssz,
-        soft_vartheta_v=vartheta_v,
-        soft_vartheta_v_softspan=args.softspan_v,
-        soft_vartheta_h=vartheta_h,
-        soft_vartheta_h_softspan=args.softspan_h,
-    )
-
-    ##########################################################
-    ########## Initialisation of FBP reconstruction ##########
-    ##########################################################
-    logger.info("Initializing FBP reconstruction...")
 
     ##########################################################
     ################# Define helper methods ##################
     ##########################################################
-    pass  # ruff: ignore[unnecessary-placeholder]
+    vol_dtype = np.float32
+
+    def bytes_at_zindex_mini(zindex_mini: int) -> int:
+        """Return the number of volume bytes that need to be stored in memory to handle the zindex_mini value."""
+        bytes_mini = (
+            0
+            if zindex_mini >= padded_volshape_mini[2]
+            else (
+                padded_volshape_mini[0]
+                * padded_volshape_mini[1]
+                * (2 * np.dtype(vol_dtype).itemsize)
+            )
+        )
+        if (
+            zindex_mini < mvc_padz
+            or zindex_mini > padded_volshape_mini[2] - 1 - mvc_padz
+        ):
+            return bytes_mini
+        return bytes_mini + (
+            padded_volshape[0]
+            * padded_volshape[1]
+            * (2 * np.dtype(vol_dtype).itemsize)
+        )
+
+    # List the number of bytes corresponding to each z index of the minivol, from bottom to top.
+    bytes_by_zindex_mini: list[int] = [
+        bytes_at_zindex_mini(zind_mini)
+        for zind_mini in range(padded_volshape_mini[2])
+    ]
+    # Cumulative sum of the above
+    bytes_cumsum = np.cumsum(bytes_by_zindex_mini)
+    _, gpu_VRAM_capacity_MiB = lib.gpu_tools.get_gpu_mb_used_and_total()  # ruff: ignore[non-lowercase-variable-in-function]
+    GiB_per_chunk: float = (1 / 3) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
+
+    def next_slice_zindex_mini(last_slice: slice | None) -> slice | None:
+        last_slice = slice(0, 0) if last_slice is None else last_slice
+        if last_slice.stop >= padded_volshape_mini[2]:
+            return None
+        idxs = np.argwhere(
+            (
+                (
+                    bytes_cumsum.astype(np.float32)
+                    - bytes_cumsum[max(0, last_slice.stop)].astype(np.float32)
+                )
+                / (1024**3 * GiB_per_chunk)
+            )
+            < 1
+        )
+        if idxs.size == 0:
+            sl = slice(last_slice.stop, last_slice.stop + 1)
+        else:
+            sl = slice(last_slice.stop, int(idxs[-1][0]) + 1)
+        sl = slice(
+            last_slice.stop,
+            min(padded_volshape_mini[2], max(last_slice.stop + 1, sl.stop)),
+        )
+        if sl.stop == sl.start:
+            return None
+        return sl
+
+    def make_vols(
+        slz_mini_: slice,
+    ) -> tuple[
+        tuple[slice, Volume | None],  # volume and corresponding slice
+        tuple[slice, Volume | None],  # minivol and corresponding slice
+        tuple[
+            slice, Volume | None
+        ],  # volume weightsum and corresponding slice
+        tuple[slice, Volume | None],  # minivol and corresponding slice
+    ]:
+        """Produce volumes corresponding to a volume chunk."""
+        # The 'zindex_mini' gives the index beginning from the bottom (0) of the padded minivol.
+
+        zindex_mini: int = slz_mini_.start
+        znumlayers_mini: int = slz_mini_.stop - slz_mini_.start
+
+        slz_mini = slice(
+            min(padded_volshape_mini[2], zindex_mini),
+            min(padded_volshape_mini[2], zindex_mini + znumlayers_mini),
+        )
+        zindex_notmini = args.n * (zindex_mini - mvc_padz)
+        slz_notmini = slice(
+            max(0, min(padded_volshape[2], zindex_notmini)),
+            max(
+                0,
+                min(
+                    padded_volshape[2],
+                    zindex_notmini + znumlayers_mini * args.n,
+                ),
+            ),
+        )
+
+        volpos_mini = (
+            args.volpos[0],
+            args.volpos[1],
+            # offset from centre is (slz_mini.stop - slz_mini.start)
+            args.volpos[2]
+            - args.voxwid
+            * args.n
+            * (
+                (padded_volshape_mini[2] - (slz_mini.stop - slz_mini.start))
+                / 2
+                - slz_mini.start
+            ),
+        )
+        volpos = (
+            args.volpos[0],
+            args.volpos[1],
+            args.volpos[2]
+            - args.voxwid
+            * (
+                (padded_volshape[2] - (slz_notmini.stop - slz_notmini.start))
+                / 2
+                - slz_notmini.start
+            ),
+        )
+        vol = (
+            None
+            if ((slz_notmini.stop - slz_notmini.start) <= 0)
+            else Volume.zeros(
+                (*padded_volshape[:2], slz_notmini.stop - slz_notmini.start),
+                voxwid=args.voxwid,
+                dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
+                pos_c=volpos,
+            )
+        )
+        minivol = (
+            None
+            if ((slz_mini.stop - slz_mini.start) <= 0)
+            else Volume.zeros(
+                (*padded_volshape_mini[:2], slz_mini.stop - slz_mini.start),
+                voxwid=args.voxwid * args.n,
+                dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
+                pos_c=volpos_mini,
+            )
+        )
+        vol_weightsum = (
+            None
+            if ((slz_notmini.stop - slz_notmini.start) <= 0)
+            else Volume.zeros(
+                (*padded_volshape[:2], slz_notmini.stop - slz_notmini.start),
+                voxwid=args.voxwid,
+                dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
+                pos_c=volpos,
+            )
+        )
+        minivol_weightsum = (
+            None
+            if ((slz_mini.stop - slz_mini.start) <= 0)
+            else Volume.zeros(
+                (*padded_volshape_mini[:2], slz_mini.stop - slz_mini.start),
+                voxwid=args.voxwid * args.n,
+                dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
+                pos_c=volpos_mini,
+            )
+        )
+        return (
+            (slz_notmini, vol),
+            (slz_mini, minivol),
+            (slz_notmini, vol_weightsum),
+            (slz_mini, minivol_weightsum),
+        )
+
+    ##########################################################
+    ########## Initialisation of GBC reconstruction ##########
+    ##########################################################
+    logger.info("Initializing GBC reconstruction...")
+
+    # Precomputations
+    # Initialise the volumes with a z height of 1, just so that we can generate the xygrid of the
+    # weightsum divisors.
+    (_, vol), (_, minivol), (_, vol_weightsum), (_, minivol_weightsum) = (
+        make_vols(
+            slice(
+                padded_volshape_mini[2] // 2, padded_volshape_mini[2] // 2 + 1
+            )
+        )
+    )
+    if (
+        minivol is None
+        or vol_weightsum is None
+        or vol is None
+        or minivol_weightsum is None
+    ):
+        # Nothing to do! Something's not right...
+        msg = "Nothing to do... does the volshape have a height of zero?"
+        logger.error(msg)
+        return
+    msg = "Performing precomputations..."
+    logger.info(msg)
+    with rich_console.status(msg, spinner="dots"):
+        # Create the ProjectionSet objects corresponding to each ordered subset
+        # We only run this to get the vartheta_v and vartheta_h
+        (
+            pg,
+            _sl_filtps_gen,
+            R,  # ruff: ignore[non-lowercase-variable-in-function]
+            L,  # ruff: ignore[non-lowercase-variable-in-function]
+            recon_support_radius,
+            recon_support_height,
+            mu,
+            vartheta_v,
+            vartheta_h,
+            zs_min,
+            zs_max,
+        ) = get_projectionset_generator(
+            projdata_path=args.projs,
+            pg=cbfp.ProjGeom.load(args.geom),
+            slice_projs=args.slice_projs,
+            autorange_z=args.autorange_z,
+            flip_x=args.flip_x,
+            flip_y=args.flip_y,
+            flip_z=args.flip_z,
+            rotate_xy=args.rotate_xy,
+            logger=logger,
+            # These two are supplied to prune irrelevant projections
+            # This value shouldn't matter here, since we're only using the values like vartheta_v and vartheta_h...
+            vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
+        )
+        xs, ys, _ = vol_weightsum.xs_ys_zs
+        weightsum_divisor_xygrid = np.power(
+            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
+                xs,
+                ys,
+                R,
+                soft_vartheta_v=vartheta_v,
+                soft_vartheta_v_softspan=args.softspan_v,
+                soft_vartheta_h=vartheta_h,
+                soft_vartheta_h_softspan=args.softspan_h,
+            ),
+            -1,
+        ).astype(np.float32)
+        xs, ys, _ = minivol_weightsum.xs_ys_zs
+        weightsum_divisor_mini_xygrid = np.power(
+            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
+                xs,
+                ys,
+                R,
+                soft_vartheta_v=vartheta_v,
+                soft_vartheta_v_softspan=args.softspan_v,
+                soft_vartheta_h=vartheta_h,
+                soft_vartheta_h_softspan=args.softspan_h,
+            ),
+            -1,
+        ).astype(np.float32)
 
     ##########################################################
     ################# Begin reconstruction ###################
     ##########################################################
+    logger.info(f"R: {R!s:s}")
+    logger.info(f"L: {L!s:s}")
+    logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
+    logger.info(f"recon_support_height: {recon_support_height:.5g}")
+    logger.info(f"Height of source cylinder: {zs_max - zs_min!s:s}")
+
+    msg = "Allocating and zeroing the backprojection arrays..."
+    logger.info(msg)
+    # Put the z axis first, so that we can slice it in Z and have a C-contiguous array. This is necessary to copy directly from a cupy array to a numpy array.
+    vol_np = np.empty(padded_volshape, dtype=vol_dtype)
+    volmini_np = np.empty(padded_volshape_mini, dtype=vol_dtype)
+    lib.ne_tools.set_array_to_constant_pbar(
+        vol_np,
+        const=0,
+        pbar_desc="Allocating room for big backprojection...",
+        pbar_valunit=None,
+        pbar_logger=logger,
+        pbar_persist=False,
+    )
+    lib.ne_tools.set_array_to_constant_pbar(
+        volmini_np,
+        const=0,
+        pbar_desc="Allocating room for mini backprojection...",
+        pbar_valunit=None,
+        pbar_logger=logger,
+        pbar_persist=False,
+    )
+
+    curr_slice: slice | None = None
     logger.info("Beginning reconstruction...")
     with logtools.ProgressBar(
         desc="Backproj.:",
-        maxval=pg.num_projs,
-        valunit="proj",
+        maxval=int(bytes_cumsum[-1]),
         logger=logger,
         persist=True,
+        unit_is_bytes=True,
     ) as pbar:
-        for sl, pss in sl_filtps_gen:
-            (ps_ramp,) = pss
-            cbfp.backproject(
-                config_bp,
-                vol,
-                ps_ramp,
-                secondary_volume=vol_weightsum,
-                block=True,
-            )
-            cbfp.backproject(
-                config_bp,
-                minivol,
-                ps_ramp,
-                secondary_volume=minivol_weightsum,
-                block=True,
-            )
-            assert (
-                ps_ramp.data is not None
-            )  # useful assertion for type-checking
-            # Perform logging updates
-            pbar.update_to(sl.stop)
+        while (curr_slice := next_slice_zindex_mini(curr_slice)) is not None:
+            # Log information about which volume chunk is being worked on
+            msg = f"Computing chunk with slice: {curr_slice}; maximum index {padded_volshape_mini[2]:d}"
+            logger.debug(msg)
 
-    # Normalise to the correct weighting.
-    # This will multiply both a numerator and a divisor by the same amount.
-    # Howevever, it will affect how the denominator is soft-zeroed.
-    msg = "Applying constant factor to volume and weights..."
-    logger.info(msg)
-    with rich_console.status(msg, spinner="dots"):
-        factor = 1 / (mu * R**2)
-        vol.multiply(factor)
-        minivol.multiply(factor)
-        vol_weightsum.multiply(factor)
-        minivol_weightsum.multiply(factor)
+            # Loop through each volume chunk.
+            (
+                (sl_vol, vol),
+                (sl_minivol, minivol),
+                (_, vol_weightsum),
+                (_, minivol_weightsum),
+            ) = make_vols(curr_slice)
+            if minivol is None or minivol_weightsum is None:
+                msg = "Something has gone wrong. The script has a bug."
+                logger.error(msg)
+                return
 
-    # Normalize weights by the expected weightsums
-    msg = "Normalizing the weightsums by the expected sum of backprojection weights..."
-    logger.info(msg)
-    with rich_console.status(msg, spinner="dots"):
-        # Full-scale volume
-        xs, ys, _ = vol_weightsum.xs_ys_zs
-        xygrid = np.power(
-            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
-                xs,
-                ys,
-                R,
+            # Create the ProjectionSet objects corresponding to each ordered subset
+            (
+                pg,
+                sl_filtps_gen,
+                R,  # ruff: ignore[non-lowercase-variable-in-function]
+                _L,  # ruff: ignore[non-lowercase-variable-in-function]
+                _recon_support_radius,
+                _recon_support_height,
+                mu,
+                vartheta_v,
+                vartheta_h,
+                _zs_min,
+                _zs_max,
+            ) = get_projectionset_generator(
+                projdata_path=args.projs,
+                pg=cbfp.ProjGeom.load(args.geom),
+                slice_projs=args.slice_projs,
+                autorange_z=args.autorange_z,
+                flip_x=args.flip_x,
+                flip_y=args.flip_y,
+                flip_z=args.flip_z,
+                rotate_xy=args.rotate_xy,
+                logger=logger,
+                # These two are supplied to prune irrelevant projections
+                vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
+            )
+
+            # Initialise the configuration used for backprojection
+            config_bp = cbfp.ConfigBackproject(
+                fast_approx=True,
+                cyl_mask_rad=None,
+                Z_on_val_factor_power=0,
+                Z_on_val_factor_val=R,  # This must be equal to R for the kernel to operate correctly.
+                backproj_weighting_preset=7,
+                approx_mode_direct_raycast=True,
+                approx_mode_bilinear_interpolate=args.interpolate_measurements,
+                ssx=args.ssx,
+                ssy=args.ssy,
+                ssz=args.ssz,
                 soft_vartheta_v=vartheta_v,
                 soft_vartheta_v_softspan=args.softspan_v,
                 soft_vartheta_h=vartheta_h,
                 soft_vartheta_h_softspan=args.softspan_h,
-            ),
-            -1,
-        ).astype(np.float32)
-        vol_weightsum.multiply_by_xygrid(xygrid)
-        # Mini volume
-        xs, ys, _ = minivol_weightsum.xs_ys_zs
-        xygrid = np.power(
-            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
-                xs,
-                ys,
-                R,
-                soft_vartheta_v=vartheta_v,
-                soft_vartheta_v_softspan=args.softspan_v,
-                soft_vartheta_h=vartheta_h,
-                soft_vartheta_h_softspan=args.softspan_h,
-            ),
-            -1,
-        ).astype(np.float32)
-        minivol_weightsum.multiply_by_xygrid(xygrid)
+            )
 
-    # Divide by the weightsums
-    msg = "Normalizing volumes by the sum of backprojection weights..."
-    logger.info(msg)
-    with rich_console.status(msg, spinner="dots"):
-        vol.divide_softzero(vol_weightsum, eps=args.eps)
-        minivol.divide_softzero(minivol_weightsum, eps=args.eps)
-        del vol_weightsum
-        del minivol_weightsum
+            accum_num_projs: int = 0
+
+            for sl, pss in sl_filtps_gen:
+                (ps_ramp,) = pss
+                if (
+                    vol is not None
+                ):  # vol may be None, in which case we're in the range of the minivol but not the vol
+                    cbfp.backproject(
+                        config_bp,
+                        vol,
+                        ps_ramp,
+                        secondary_volume=vol_weightsum,
+                        block=True,
+                    )
+                cbfp.backproject(
+                    config_bp,
+                    minivol,
+                    ps_ramp,
+                    secondary_volume=minivol_weightsum,
+                    block=True,
+                )
+                assert (
+                    ps_ramp.data is not None
+                )  # useful assertion for type-checking
+
+                # Perform logging updates
+                accum_num_projs += sl.stop - sl.start
+                pbar.update_to(
+                    int(([0, *bytes_cumsum])[curr_slice.start])
+                    + (accum_num_projs / pg.num_projs)
+                    * (
+                        int(bytes_cumsum[curr_slice.stop - 1])
+                        - int(([0, *bytes_cumsum])[curr_slice.start])
+                    )
+                )
+
+            # Normalise to the correct weighting.
+            # This will multiply both a numerator and a divisor by the same amount.
+            # Howevever, it will affect how the denominator is soft-zeroed.
+            msg = "Applying constant factor to volume and weights..."
+            logger.debug(msg)
+            # with rich_console.status(msg, spinner="dots"):
+            with lib.empty_context_manager.EmptyContextManager():
+                factor = 1 / (mu * R**2)
+                if vol is not None:
+                    assert vol_weightsum is not None
+                    vol.multiply(factor)
+                    vol_weightsum.multiply(factor)
+                minivol.multiply(factor)
+                minivol_weightsum.multiply(factor)
+
+            # Normalize weights by the expected weightsums
+            msg = "Normalizing the weightsums by the expected sum of backprojection weights..."
+            logger.debug(msg)
+            # with rich_console.status(msg, spinner="dots"):
+            with lib.empty_context_manager.EmptyContextManager():
+                # Full-scale volume
+                if vol is not None:
+                    assert vol_weightsum is not None
+                    vol_weightsum.multiply_by_xygrid(weightsum_divisor_xygrid)
+                # Mini volume
+                minivol_weightsum.multiply_by_xygrid(
+                    weightsum_divisor_mini_xygrid
+                )
+
+            # Divide by the weightsums
+            msg = "Normalizing volumes by the sum of backprojection weights..."
+            logger.debug(msg)
+            # with rich_console.status(msg, spinner="dots"):
+            with lib.empty_context_manager.EmptyContextManager():
+                if vol is not None:
+                    assert vol_weightsum is not None
+                    vol.divide_softzero(vol_weightsum, eps=args.eps)
+                minivol.divide_softzero(minivol_weightsum, eps=args.eps)
+                del vol_weightsum
+                del minivol_weightsum
+
+            # Save the backprojections into the arrays
+            msg = "Transferring backprojected volume chunk from GPU..."
+            logger.debug(msg)
+            if vol is not None:
+                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+                ans = vol.as_numpy()
+                lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
+            # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+            ans = minivol.as_numpy()
+            lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
+
+            # Free some memory
+            del vol, minivol, vol_weightsum, minivol_weightsum
+            lib.gpu_tools.clear_cache()
+
+        pbar.update_to(int(bytes_cumsum[-1]))
 
     msg = "Filtering volumes..."
     logger.info(msg)
     with rich_console.status(msg, spinner="dots"):
         # Filter the mini recon first.
-        minivol_cp = minivol.as_cupy()
-        minivol_voxwid = minivol.voxwid
-        ndarray_container = lib.np_tools.NDArrayContainer(array=minivol_cp)
+        minivol_voxwid = args.voxwid * args.n
+        ndarray_container = lib.np_tools.NDArrayContainer(array=volmini_np)
         del minivol  # allows memory to be freed, because the gbc.filters.ramp_filter_conebeam may be free to overwrite the ndarray_container.array
-        minivol_padded_filtered_cp = gbc.filters.ramp_filter_conebeam(
+        minivol_padded_filtered_np = gbc.filters.ramp_filter_conebeam(
             ndarray_container,
             minivol_voxwid,
             2 * vartheta_v,
@@ -807,14 +1084,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:
             copy_to_array=None,
         )
         ndarray_container = lib.np_tools.NDArrayContainer(
-            array=minivol_cp[
+            array=volmini_np[
                 mvc_padx : (-mvc_padx) or None,
                 mvc_pady : (-mvc_pady) or None,
                 mvc_padz : (-mvc_padz) or None,
             ]
         )
-        del minivol_cp  # not going to reuse this, so delete this reference so the filtration can free some memory.
-        minivol_unpadded_filtered_cp = gbc.filters.ramp_filter_conebeam(
+        del volmini_np  # not going to reuse this, so delete this reference so the filtration can free some memory.
+        minivol_unpadded_filtered_np = gbc.filters.ramp_filter_conebeam(
             ndarray_container,
             minivol_voxwid,
             2 * vartheta_v,
@@ -824,25 +1101,25 @@ def main_from_args(args: types.SimpleNamespace) -> None:
             logger=logger,
             copy_to_array=None,
         )
-        minivol_correction_cp = (
-            minivol_padded_filtered_cp[
+        minivol_correction_np = (
+            minivol_padded_filtered_np[
                 mvc_padx : (-mvc_padx) or None,
                 mvc_pady : (-mvc_pady) or None,
                 mvc_padz : (-mvc_padz) or None,
             ]
-            - minivol_unpadded_filtered_cp
+            - minivol_unpadded_filtered_np
         )
         # Delete some references to free up memory, if possible
         del (
-            minivol_padded_filtered_cp,
-            minivol_unpadded_filtered_cp,
+            minivol_padded_filtered_np,
+            minivol_unpadded_filtered_np,
             ndarray_container,
         )
         # Filter the full recon now
-        ndarray_container = lib.np_tools.NDArrayContainer(array=vol.as_cupy())
-        vol_voxwid = vol.voxwid
-        del vol  # allows memory to be freed, because the gbc.filters.ramp_filter_conebeam is free to overwrite the ndarray_container.array
-        vol_filtered_cp = gbc.filters.ramp_filter_conebeam(
+        ndarray_container = lib.np_tools.NDArrayContainer(array=vol_np)
+        vol_voxwid = args.voxwid
+        del vol_np  # allows memory to be freed, because the gbc.filters.ramp_filter_conebeam is free to overwrite the ndarray_container.array
+        vol_filtered_np = gbc.filters.ramp_filter_conebeam(
             ndarray_container,
             vol_voxwid,
             2 * vartheta_v,
@@ -851,14 +1128,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:
             allow_overwrite_arr=True,
             logger=logger,
             copy_to_array=None,  # Should be a contiguous array. E.g., not an arbitrary view.
-            lowres_correction_array=minivol_correction_cp,
+            lowres_correction_array=minivol_correction_np,
         )
-        del minivol_correction_cp, ndarray_container
+        del minivol_correction_np, ndarray_container
 
         # Now estimate the DC component by looking at the voxels on the boundary.
         # Due to the lowres correction interpolating on the edges, we want to move in
         # by 2*args.n (empirically determined) before we get an accurate result.
-        cropped_view_cp = vol_filtered_cp[
+        cropped_view_np = vol_filtered_np[
             2 * args.n : -2 * args.n,
             2 * args.n : -2 * args.n,
             2 * args.n : -2 * args.n,
@@ -868,31 +1145,34 @@ def main_from_args(args: types.SimpleNamespace) -> None:
             1
             / 4
             * (
-                cp.mean(cropped_view_cp[:, 0, :])
-                + cp.mean(cropped_view_cp[:, -1, :])
-                + cp.mean(cropped_view_cp[0, :, :])
-                + cp.mean(cropped_view_cp[-1, :, :])
+                np.mean(cropped_view_np[:, 0, :])
+                + np.mean(cropped_view_np[:, -1, :])
+                + np.mean(cropped_view_np[0, :, :])
+                + np.mean(cropped_view_np[-1, :, :])
             )
         )
         logger.debug(
             f"Estimated DC component to be subtracted: {dc_component:.5g}"
         )
         # Correct the DC component
-        cp.subtract(vol_filtered_cp, dc_component, out=vol_filtered_cp)
+        ne.evaluate(
+            "v - dcc",
+            out=vol_filtered_np,
+            local_dict={"v": vol_filtered_np, "dcc": dc_component},
+        )
 
         # Now crop back to the original shape
-        vol_filtered_cp = vol_filtered_cp[
+        vol_filtered_np = vol_filtered_np[
             padx : (-padx) or None,
             pady : (-pady) or None,
             padz : (-padz) or None,
         ]
-        logger.debug(f"Output volume shape: {vol_filtered_cp.shape}")
+        logger.debug(f"Output volume shape: {vol_filtered_np.shape}")
 
         # Fetch it now as a numpy array
-        vol_filtered = vol_filtered_cp.get()  # ty: ignore[unresolved-attribute]
+        vol_filtered = vol_filtered_np
 
         # Clean up
-        del vol_filtered_cp
         lib.gpu_tools.clear_cache()
 
     if path_output is not None:
