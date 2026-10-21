@@ -1073,7 +1073,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         # Filter the mini recon first.
         minivol_voxwid = args.voxwid * args.n
         ndarray_container = lib.np_tools.NDArrayContainer(array=volmini_np)
-        del minivol  # allows memory to be freed, because the gbc.filters.ramp_filter_conebeam may be free to overwrite the ndarray_container.array
         minivol_padded_filtered_np = gbc.filters.ramp_filter_conebeam(
             ndarray_container,
             minivol_voxwid,
