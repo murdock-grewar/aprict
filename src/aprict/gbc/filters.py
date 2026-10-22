@@ -82,8 +82,8 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         if cone_angle/2 - theta_soft <= 0:
             alpha = 0
         else:
-            alpha = cp.divide(cp.sin(cone_angle/2 - theta_soft), sintkm)
-        beta  = cp.where(cp.sin(cone_angle/2) >= sintkm, 1, cp.divide(cp.sin(cone_angle/2), sintkm))
+            alpha = cp.maximum(0, cp.minimum(1, cp.divide(cp.sin(cone_angle/2 - theta_soft), sintkm)))
+        beta  = cp.maximum(0, cp.minimum(1, cp.where(cp.sin(cone_angle/2) >= sintkm, 1, cp.divide(cp.sin(cone_angle/2), sintkm))))
         term1 = cp.arcsin(beta) - cp.arcsin(alpha)
         term2 = cp.sqrt(1 - cp.square(beta))
         term3 = cp.sqrt(1 - cp.square(alpha))
@@ -124,8 +124,8 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         if cone_angle/2 - theta_soft <= 0:
             alpha = 0
         else:
-            alpha = ne.evaluate('sin(cone_angle/2 - theta_soft) / sintkm')
-        beta  = ne.evaluate('where(sin(cone_angle/2) >= sintkm, 1, sin(cone_angle/2) / sintkm)')
+            alpha = ne.evaluate('maximum(0, minimum(1, sin(cone_angle/2 - theta_soft) / sintkm))')
+        beta  = ne.evaluate('maximum(0, minimum(1, where(sin(cone_angle/2) >= sintkm, 1, sin(cone_angle/2) / sintkm)))')
         term1 = ne.evaluate('arcsin(beta) - arcsin(alpha)')
         term2 = ne.evaluate('sqrt(1 - beta**2)')
         term3 = ne.evaluate('sqrt(1 - alpha**2)')
