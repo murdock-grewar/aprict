@@ -975,41 +975,43 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
             accum_num_projs: int = 0
 
-            for sl, pss in sl_filtps_gen:
-                (ps_ramp,) = pss
-                if (
-                    vol is not None
-                ):  # vol may be None, in which case we're in the range of the minivol but not the vol
+            with cp.cuda.Stream(non_blocking=True) as stream:
+                for sl, pss in sl_filtps_gen:
+                    (ps_ramp,) = pss
+                    if (
+                        vol is not None
+                    ):  # vol may be None, in which case we're in the range of the minivol but not the vol
+                        cbfp.backproject(
+                            config_bp,
+                            vol,
+                            ps_ramp,
+                            secondary_volume=vol_weightsum,
+                            block=False,
+                            logger=logger,
+                        )
                     cbfp.backproject(
                         config_bp,
-                        vol,
+                        minivol,
                         ps_ramp,
-                        secondary_volume=vol_weightsum,
-                        block=True,
+                        secondary_volume=minivol_weightsum,
+                        block=False,
                         logger=logger,
                     )
-                cbfp.backproject(
-                    config_bp,
-                    minivol,
-                    ps_ramp,
-                    secondary_volume=minivol_weightsum,
-                    block=True,
-                    logger=logger,
-                )
-                assert (
-                    ps_ramp.data is not None
-                )  # useful assertion for type-checking
+                    assert (
+                        ps_ramp.data is not None
+                    )  # useful assertion for type-checking
 
-                # Perform logging updates
-                accum_num_projs += sl.stop - sl.start
-                pbar.update_to(
-                    int(([0, *bytes_cumsum])[curr_slice.start])
-                    + (accum_num_projs / pg.num_projs)
-                    * (
-                        int(bytes_cumsum[curr_slice.stop - 1])
-                        - int(([0, *bytes_cumsum])[curr_slice.start])
+                    # Perform logging updates
+                    accum_num_projs += sl.stop - sl.start
+                    pbar.update_to(
+                        int(([0, *bytes_cumsum])[curr_slice.start])
+                        + (accum_num_projs / pg.num_projs)
+                        * (
+                            int(bytes_cumsum[curr_slice.stop - 1])
+                            - int(([0, *bytes_cumsum])[curr_slice.start])
+                        )
                     )
-                )
+                stream.synchronize()
 
             # Normalise to the correct weighting.
             # This will multiply both a numerator and a divisor by the same amount.
