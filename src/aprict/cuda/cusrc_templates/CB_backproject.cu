@@ -282,7 +282,7 @@ __device__ float cossq_soft(
     // In the remaining cases, we need to apply a softening.
     // The formula is 3x^2 - 2x^3, where
     // x = gamma * sin(|c|) - chi
-    const float gamma = 1./(
+    const float gamma = 1.f/(
         sin(a - b) - sin(a)
     );
     const float chi = gamma * sin(a);
@@ -591,11 +591,11 @@ __device__ double2 _backproject_CB_getval(
 
                                         // c_on_R = |cos(\theta_h)|
                                         float cos_theta_el = max(0.f, min(1.f, 1. / sqrt(
-                                            1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2)
+                                            1 + powint(r_minus_s.z/R/max(0.000000001f, ell_on_R), 2)
                                         )));
                                         float weight = (
                                             powint(cos_theta_el, 3) * c_on_R / (
-                                                max(1e-9, powint(c_on_R, 2) + powint(dsigned_on_R, 2))
+                                                max(0.000000001f, powint(c_on_R, 2) + powint(dsigned_on_R, 2))
                                             )
                                         );
                                         float softfactor = (
@@ -714,7 +714,7 @@ __device__ double2 _backproject_CB_getval(
 
 
 template <typename Tp>
-__device__ Tp _GBC_weightfun(
+__device__ const Tp _GBC_weightfun(
     const float R,
     const fvec3 vox_pos,
     const fvec3 source_pos,
@@ -739,16 +739,27 @@ __device__ Tp _GBC_weightfun(
         // The weighting is eq. (23) from the GBC paper.
         // preset 7 applies the weighting to the backprojected detector value
         // c_on_R = |cos(\theta_h)|
-        const float cos_theta_el = max(0.f, min(1.f, 1. / sqrt(
-            1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2)
-        )));
+
+        // DO NOT USE e NOTATION!! It creates doubles and slows things down A LOT.
+        // I really don't know why the below two versions are so slow.
+        //const float cos_theta_el = max(0.f, min(1.f, 1.f / sqrt(
+        //    1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2)
+        //)));
+        //const float cos_theta_el = max(0.f, min(1.f, rsqrtf(1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2))));
+        const float theta_el = atan2(r_minus_s.z/R, ell_on_R);
+        const float cos_theta_el = cos(theta_el);
+
+        const float csq_on_R = c_on_R*c_on_R;
+        const float dsq_on_R = dsigned_on_R*dsigned_on_R;
+        // DO NOT USE e NOTATION!! It creates doubles and slows things down A LOT.
         const float weight = (
             powint(cos_theta_el, 3) * c_on_R / (
-                max(1e-9, powint(c_on_R, 2) + powint(dsigned_on_R, 2))
+                max(0.000000001f, csq_on_R + dsq_on_R)
             )
         );
+
         const float softfactor = (
-            cossq_soft(soft_vartheta_v, soft_vartheta_v_softspan, acos(cos_theta_el)) *
+            cossq_soft(soft_vartheta_v, soft_vartheta_v_softspan, theta_el) *
             cossq_soft(soft_vartheta_h, soft_vartheta_h_softspan, acos(c_on_R))
         );
         const Tp multiplier = fcast<Tp>(weight * softfactor);
@@ -782,6 +793,8 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
 
     // Get the center position of this voxel
     const fvec3 vox_pos_c = pos_000_c + (vol_idx * voxwid);
+    // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
+    const float R = config.Z_on_val_factor_val;
 
     // Unpack projection metadata
     const ulvec3    input_projs_strides = proj_chunk_spec.projmemstrides;
@@ -789,11 +802,6 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
     const unsigned short num_projs      = proj_chunk_spec.numprojs;
 
     // Reused structures
-    unsigned long det_idx;
-
-    const bool exact = config.exact_line_integ_backproj;
-    const Tv voxwid_Tv = fcast<Tv>(voxwid);
-
     const unsigned int ssx = config.ssx;
     const unsigned int ssy = config.ssy;
     const unsigned int ssz = config.ssz;
@@ -811,23 +819,20 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
             Tv ssz_accumulator_secondary = 0;
             for (unsigned int ssk = 0; ssk < ssz; ssk++) {
 
+                const fvec3 vox_pos = vox_pos_c + fvec3(
+                    -1./2. + offx*(0.5f + ssi),
+                    -1./2. + offy*(0.5f + ssj),
+                    -1./2. + offz*(0.5f + ssk)
+                ) * voxwid;
+
                 Tv accumulator = 0.;
-                Tv sub_accumulator = 0.;
                 Tv accumulator_secondary = 0.;
-                Tv sub_accumulator_secondary = 0.;
                 for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
 
-                    const fvec3 vox_pos = vox_pos_c + fvec3(
-                        -1./2. + offx*(0.5f + ssi),
-                        -1./2. + offy*(0.5f + ssj),
-                        -1./2. + offz*(0.5f + ssk)
-                    ) * voxwid;
-
                     // Get the start point of the projection line
+                    //const proj_spec projspec = proj_chunk_spec.projspecs[0];
                     const proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
                     const fvec3 source_pos = projspec.sourcepos;
-                    // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
-                    const float R = config.Z_on_val_factor_val;
 
                     const Tp multiplier = _GBC_weightfun<Tp>(
                         R,
@@ -840,12 +845,10 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
                     );
 
                     // Store the weight only. Don't care about the detector avlue.
-                    sub_accumulator_secondary = fcast<Tv>(multiplier);
+                    accumulator_secondary += fcast<Tv>(multiplier);
 
-                    if (multiplier == (Tp)0) {
+                    if (!(multiplier == (Tp)0)) {
                         // Don't bother reading from the memory etc if the multiplier is 0 anyway.
-                        sub_accumulator = 0;
-                    } else {
                         const fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
                         const float2 det_idx_f = float2({
                             det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
@@ -860,10 +863,8 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
                                 get_zero_interp(det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)])
                             )
                         );
-                        sub_accumulator = fcast<Tv>(det_value * multiplier);
+                        accumulator += fcast<Tv>(det_value * multiplier);
                     }
-                    accumulator += sub_accumulator;
-                    accumulator_secondary += sub_accumulator_secondary;
                 }
                 ssz_accumulator += accumulator;
                 ssz_accumulator_secondary += accumulator_secondary;
