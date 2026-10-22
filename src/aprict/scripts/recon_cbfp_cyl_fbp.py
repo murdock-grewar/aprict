@@ -827,10 +827,18 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             if two_sided:
                 ps_ramp, ps_hilb = pss
                 cbfp.backproject(
-                    config_bp_ramp_twosided, vol, ps_ramp, block=True
+                    config_bp_ramp_twosided,
+                    vol,
+                    ps_ramp,
+                    block=True,
+                    logger=logger,
                 )
                 cbfp.backproject(
-                    config_bp_hilb_twosided, vol, ps_hilb, block=True
+                    config_bp_hilb_twosided,
+                    vol,
+                    ps_hilb,
+                    block=True,
+                    logger=logger,
                 )
                 assert (
                     ps_ramp.data is not None

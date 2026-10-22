@@ -986,6 +986,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                         ps_ramp,
                         secondary_volume=vol_weightsum,
                         block=True,
+                        logger=logger,
                     )
                 cbfp.backproject(
                     config_bp,
@@ -993,6 +994,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     ps_ramp,
                     secondary_volume=minivol_weightsum,
                     block=True,
+                    logger=logger,
                 )
                 assert (
                     ps_ramp.data is not None

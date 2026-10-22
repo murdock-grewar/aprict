@@ -54,6 +54,8 @@ def load_injected_module(
     options: tuple[str, ...] = (
         "-std=c++17",
         "-use_fast_math",
+        "--ptxas-options",
+        "-v",
     ),  # "-lineinfo"),  # "-maxrregcount", "128"),
     extraoptions: tuple[str, ...] | None = None,
     name_expressions: list[str] | None = None,
@@ -68,4 +70,5 @@ def load_injected_module(
         code=inject_headers(cusrc_path.joinpath(rel_path_to_uninjected_cu)),
         options=options,
         name_expressions=name_expressions,
+        backend="nvrtc",
     )

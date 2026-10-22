@@ -40,10 +40,10 @@ _delay_compile: bool = (
 )
 
 
-def force_compile() -> None:
+def force_compile(*, log_stream: object | None = None) -> None:
     """Force the relevant CUDA kernels to compile."""
-    _projection_module.compile()
-    _backprojection_module.compile()
+    _projection_module.compile(log_stream=log_stream)
+    _backprojection_module.compile(log_stream=log_stream)
 
 
 def _injected_module_project_texture_chunked() -> cp.RawModule:
