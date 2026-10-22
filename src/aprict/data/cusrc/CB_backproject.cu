@@ -377,8 +377,7 @@ __device__ double2 _backproject_CB_getval(
                     ) * voxwid;
 
                     // Get the start point of the projection line
-                    //proj_spec projspec = proj_tex_chunk_spec.projspecs[proj_idx];
-                    proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
+                    const proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
                     source_pos = projspec.sourcepos;
 
                     // Find the intersection with the detector of the ray passing through
@@ -714,6 +713,177 @@ __device__ double2 _backproject_CB_getval(
 }
 
 
+template <typename Tp>
+__device__ Tp _GBC_weightfun(
+    const float R,
+    const fvec3 vox_pos,
+    const fvec3 source_pos,
+    const float soft_vartheta_v,
+    const float soft_vartheta_h,
+    const float soft_vartheta_v_softspan,
+    const float soft_vartheta_h_softspan
+)
+{
+
+        // NOTE: ASSUMES that the source cylinder axis passes through x,y = 0
+        const fvec3 Lvec = fvec3(-source_pos.x, -source_pos.y, 0);
+        const float Z = dot_prod((vox_pos - source_pos), Lvec) / norm_fvec3(Lvec);
+
+        const fvec3 r_minus_s = vox_pos - source_pos;
+        const float ell_on_R = norm_fvec3(fvec3(r_minus_s.x, r_minus_s.y, 0.f))/R;
+        // Note: "Z" here is the distance from s to r, projected onto the source-to-detector axis
+        const float Z_on_R = Z / R;
+        const float c_on_R = max(0.f, min(1.f, abs(Z_on_R / ell_on_R)));
+        const float dsigned_on_R = c_on_R - ell_on_R;  // positive if the source point is further away
+        // Backprojection weighting for GBC formula with cylindral source locus
+        // The weighting is eq. (23) from the GBC paper.
+        // preset 7 applies the weighting to the backprojected detector value
+        // c_on_R = |cos(\theta_h)|
+        const float cos_theta_el = max(0.f, min(1.f, 1. / sqrt(
+            1 + powint(r_minus_s.z/R/max(1e-9, ell_on_R), 2)
+        )));
+        const float weight = (
+            powint(cos_theta_el, 3) * c_on_R / (
+                max(1e-9, powint(c_on_R, 2) + powint(dsigned_on_R, 2))
+            )
+        );
+        const float softfactor = (
+            cossq_soft(soft_vartheta_v, soft_vartheta_v_softspan, acos(cos_theta_el)) *
+            cossq_soft(soft_vartheta_h, soft_vartheta_h_softspan, acos(c_on_R))
+        );
+        const Tp multiplier = fcast<Tp>(weight * softfactor);
+
+        return multiplier;
+}
+
+
+
+template<
+    typename Tv,  // type of volume data. e.g. float or double.
+    typename Tp>  // type of projection data. e.g. float or double
+__device__ double2 _backproject_CB_getval_GBC_cyl(
+        const config_CB_backproject     config,          // any miscellaneous config for the CB projection
+        const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
+        const uivec3                    vol_chunk_shape,
+        const proj_chunk_spec_maxlen10  proj_chunk_spec,
+        const uivec3                    vol_idx,          // index of the voxel within the chunk, beginning from 0,0,0
+        const float                     voxwid
+)
+{
+    // Returns two values. Usually, we just want the first value, and to cast it to type Tv.
+    // However, we might also compute a secondary value at the same time, since this is more efficient.
+
+    // Return 0 if block is out of range
+    if ((vol_idx.x >= vol_chunk_shape.x) ||
+        (vol_idx.y >= vol_chunk_shape.y) ||
+        (vol_idx.z >= vol_chunk_shape.z)) {
+        return double2({0., 0.});
+    }
+
+    // Get the center position of this voxel
+    const fvec3 vox_pos_c = pos_000_c + (vol_idx * voxwid);
+
+    // Unpack projection metadata
+    const ulvec3    input_projs_strides = proj_chunk_spec.projmemstrides;
+    const Tp*       input_projs         = (Tp*)proj_chunk_spec.projmemaddr;
+    const unsigned short num_projs      = proj_chunk_spec.numprojs;
+
+    // Reused structures
+    unsigned long det_idx;
+
+    const bool exact = config.exact_line_integ_backproj;
+    const Tv voxwid_Tv = fcast<Tv>(voxwid);
+
+    const unsigned int ssx = config.ssx;
+    const unsigned int ssy = config.ssy;
+    const unsigned int ssz = config.ssz;
+    const float offx = 1./((float)ssx);
+    const float offy = 1./((float)ssy);
+    const float offz = 1./((float)ssz);
+
+    Tv ssx_accumulator = 0;
+    Tv ssx_accumulator_secondary = 0;
+    for (unsigned int ssi = 0; ssi < ssx; ssi++) {
+        Tv ssy_accumulator = 0;
+        Tv ssy_accumulator_secondary = 0;
+        for (unsigned int ssj = 0; ssj < ssy; ssj++) {
+            Tv ssz_accumulator = 0;
+            Tv ssz_accumulator_secondary = 0;
+            for (unsigned int ssk = 0; ssk < ssz; ssk++) {
+
+                Tv accumulator = 0.;
+                Tv sub_accumulator = 0.;
+                Tv accumulator_secondary = 0.;
+                Tv sub_accumulator_secondary = 0.;
+                for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
+
+                    const fvec3 vox_pos = vox_pos_c + fvec3(
+                        -1./2. + offx*(0.5f + ssi),
+                        -1./2. + offy*(0.5f + ssj),
+                        -1./2. + offz*(0.5f + ssk)
+                    ) * voxwid;
+
+                    // Get the start point of the projection line
+                    const proj_spec projspec = proj_chunk_spec.projspecs[proj_idx];
+                    const fvec3 source_pos = projspec.sourcepos;
+                    // Assume that 'R' is contained in 'config.Z_on_val_factor_val'
+                    const float R = config.Z_on_val_factor_val;
+
+                    const Tp multiplier = _GBC_weightfun<Tp>(
+                        R,
+                        vox_pos,
+                        source_pos,
+                        config.soft_vartheta_v,
+                        config.soft_vartheta_h,
+                        config.soft_vartheta_v_softspan,
+                        config.soft_vartheta_h_softspan
+                    );
+
+                    // Store the weight only. Don't care about the detector avlue.
+                    sub_accumulator_secondary = fcast<Tv>(multiplier);
+
+                    if (multiplier == (Tp)0) {
+                        // Don't bother reading from the memory etc if the multiplier is 0 anyway.
+                        sub_accumulator = 0;
+                    } else {
+                        const fvec2 det_coords_c = get_projected_detector_coords(vox_pos, projspec);
+                        const float2 det_idx_f = float2({
+                            det_coords_c.x + ((projspec.dspec.nu-1)/2.f),
+                            det_coords_c.y + ((projspec.dspec.nv-1)/2.f)
+                        });
+                        const uint2 shape   = uint2({projspec.dspec.nu, projspec.dspec.nv});
+                        const ulong2 strides = ulong2({input_projs_strides.y, input_projs_strides.z});
+                        const Tp det_value = (
+                            config.approx_mode_linear_interpolate ? (
+                                get_bilinear_interp(det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)])
+                            ) : (
+                                get_zero_interp(det_idx_f, shape, strides, &input_projs[input_projs_strides.x * proj_idx / sizeof(Tp)])
+                            )
+                        );
+                        sub_accumulator = fcast<Tv>(det_value * multiplier);
+                    }
+                    accumulator += sub_accumulator;
+                    accumulator_secondary += sub_accumulator_secondary;
+                }
+                ssz_accumulator += accumulator;
+                ssz_accumulator_secondary += accumulator_secondary;
+            }
+            ssz_accumulator /= ssz;
+            ssy_accumulator += ssz_accumulator;
+            ssz_accumulator_secondary /= ssz;
+            ssy_accumulator_secondary += ssz_accumulator_secondary;
+        }
+        ssy_accumulator /= ssy;
+        ssx_accumulator += ssy_accumulator;
+        ssy_accumulator_secondary /= ssy;
+        ssx_accumulator_secondary += ssy_accumulator_secondary;
+    }
+    ssx_accumulator /= ssx;
+    ssx_accumulator_secondary /= ssx;
+    return double2({(double)ssx_accumulator, (double)ssx_accumulator_secondary});
+}
+
+
 // DEPRECATED!! May ignore some options, or behave in unexpected ways!
 template<
     typename Tv,  // type of volume data. e.g. float or double.
@@ -831,3 +1001,79 @@ __global__ void backproject_CB_voltex(
         }
     }
 }
+
+
+template<
+    typename Tv,  // type of volume data. e.g. float or double. It is assumed that the summand_multiplier_surface is the same type!
+    typename Tp>  // type of projection data. e.g. float or double
+__global__ void backproject_CB_voltex_GBC_cyl(
+        const config_CB_backproject     config,          // any miscellaneous config for the CB projection
+        const vol_tex_chunk_spec        voltexchunkspec,
+        const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
+        const cudaSurfaceObject_t       summand_multiplier_surface,  // if configured to do so, then the backprojection will be multiplied by the corresponding value in this multiplier before being added to the volume
+        const proj_chunk_spec_maxlen10  proj_chunk_spec,
+        const cudaSurfaceObject_t       volume_surface_secondary
+)
+{
+    // Get the position within the chunk
+    const uivec3 vol_idx = uivec3(
+        threadIdx.x + blockIdx.x * blockDim.x,
+        threadIdx.y + blockIdx.y * blockDim.y,
+        threadIdx.z + blockIdx.z * blockDim.z
+    );
+    const uivec3 vol_chunk_shape = voltexchunkspec.shape;
+    const float voxwid = voltexchunkspec.voxwid;
+    const fvec3  pos_000_c       = voltexchunkspec.texpos + (
+            fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets)*voxwid;
+
+    const double2 values = _backproject_CB_getval_GBC_cyl<Tv,Tp>(
+        config,
+        pos_000_c,
+        vol_chunk_shape,
+        proj_chunk_spec,
+        vol_idx,
+        voxwid
+    );
+
+    const bool secondary_volume_expected = true;
+
+    // Return early without reading surfaces, if there's nothing to do.
+    if (
+        (values.x == 0.) &&
+        (
+            (!secondary_volume_expected) ||
+            (values.y == 0.)
+        )
+    ) { return; }
+
+    // Read the summand multiplier once, to save on reading for both output volumes.
+    Tv summand_multiplier;
+    if (config.apply_summand_multiplier) {
+        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+    } else {
+        summand_multiplier = fcast<Tv>(1.);
+    }
+
+
+    Tv value;
+    value = fcast<Tv>(values.x);
+    // Write the value to the surface memory and leave
+    if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
+        // Multiply by the multiplier, if applicable
+        value *= summand_multiplier;
+        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
+        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
+    }
+
+    if (secondary_volume_expected) {
+        value = fcast<Tv>(values.y);
+        // Write the value to the surface memory and leave
+        if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
+            // Multiply by the multiplier, if applicable
+            value *= summand_multiplier;
+            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+        }
+    }
+}
+

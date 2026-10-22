@@ -91,12 +91,20 @@ def _injected_module_backproject() -> cp.RawModule:
     # Inject and compile module
     module: cp.RawModule = header_injection.load_injected_module(
         "./CB_backproject.cu",
-        name_expressions=[
-            f"backproject_CB_voltex<{t1:s},{t2:s}>"
-            for t1, t2 in itertools.product(
-                ["half", "float"], ["half", "float", "double"]
-            )
-        ],
+        name_expressions=(
+            [
+                f"backproject_CB_voltex<{t1:s},{t2:s}>"
+                for t1, t2 in itertools.product(
+                    ["half", "float"], ["half", "float", "double"]
+                )
+            ]
+            + [
+                f"backproject_CB_voltex_GBC_cyl<{t1:s},{t2:s}>"
+                for t1, t2 in itertools.product(
+                    ["half", "float"], ["half", "float", "double"]
+                )
+            ]
+        ),
     )
     if not _delay_compile:
         module.compile()
@@ -132,7 +140,7 @@ def _select_projection_kernel(  # ruff: ignore[missing-return-type-private-funct
 
 
 def _select_backprojection_kernel(  # ruff: ignore[missing-return-type-private-function]
-    config: ConfigBackproject,  # ruff: ignore[unused-function-argument]
+    config: ConfigBackproject,
     volume: Volume,
     projs: ProjectionSet,
 ):
@@ -141,6 +149,10 @@ def _select_backprojection_kernel(  # ruff: ignore[missing-return-type-private-f
         raise RuntimeError(msg)
     t1 = _np_dtype_to_c_type[volume.dtype]
     t2 = _np_dtype_to_c_type[projs.data.dtype]
+    if config.contents["backproj_weighting_preset"] == 7:
+        return _backprojection_module.get_function(
+            f"backproject_CB_voltex_GBC_cyl<{t1:s},{t2:s}>"
+        )
     return _backprojection_module.get_function(
         f"backproject_CB_voltex<{t1:s},{t2:s}>"
     )
@@ -1100,7 +1112,8 @@ def backproject(
     index_tuple_list = list(
         itertools.product(*map(range, projs.proj_specs.shape[:-1]))
     )
-    istop: int = int(np.ceil(projs.proj_specs.shape[-1] / 10))
+    num_projs_per_chunk: int = 10  # can't be changed without also changing the struct from ...maxlen10
+    istop: int = int(np.ceil(projs.proj_specs.shape[-1] / num_projs_per_chunk))
     with logtools.ProgressBar(
         desc="backprojection:",
         maxval=len(index_tuple_list) * projs.proj_specs.shape[-1],
@@ -1113,7 +1126,11 @@ def backproject(
             for i in range(istop):
                 # Prepare a chunk of 10 projections
                 proj_spec_sl = slice(
-                    i * 10, min((i + 1) * 10, projs.proj_specs.shape[-1])
+                    i * num_projs_per_chunk,
+                    min(
+                        (i + 1) * num_projs_per_chunk,
+                        projs.proj_specs.shape[-1],
+                    ),
                 )
                 proj_specs_10chunk = list(
                     projs.proj_specs[index_tuple][
@@ -1122,7 +1139,8 @@ def backproject(
                 )
                 num_projs_in_chunk = len(proj_specs_10chunk)
                 proj_specs_10chunk.extend(
-                    [proj_specs_10chunk[-1]] * (10 - num_projs_in_chunk)
+                    [proj_specs_10chunk[-1]]
+                    * (num_projs_per_chunk - num_projs_in_chunk)
                 )  # repeat the last projspec to fill up a whole chunk of 10.
                 #
                 input_proj_chunk_spec = np.array(
@@ -1139,7 +1157,9 @@ def backproject(
                                     index_tuple,
                                     projs.data.strides[:-3],
                                 ),
-                                i * 10 * projs.data.strides[-3],
+                                i
+                                * num_projs_per_chunk
+                                * projs.data.strides[-3],
                             )
                         ),  # projmemaddr
                         projs_3d_strides_bytes,  # projmemstrides
