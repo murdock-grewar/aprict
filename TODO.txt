@@ -1,4 +1,5 @@
 TODO for 0.1.0:
+ - [ ] Document status of non-square pixel support
  - [ ] Allow block=False in the projection script
  - [x] Chunk the FBP script
  - [x] Add --memmap-vols option to FBP script
@@ -8,7 +9,7 @@ TODO for 0.1.0:
    - [ ] GBC 
    - [ ] FBP
  - [ ] Check that all methods are performant on my home PC.
-   - [ ] GBC, rock
+   - [-] GBC, rock  -- can't do full-size recon. Requires more memory/disk space than I have.
    - [x] FBP, rock
    - [ ] GBC, LDS
    - [ ] FBP, LDS

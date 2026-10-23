@@ -1125,9 +1125,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
                     ans = vol.as_numpy()
                     lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
+                    del ans  # allow the memory to be freed
                 # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
                 ans = minivol.as_numpy()
                 lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
+                del ans  # allow the memory to be freed
 
             # Free some memory
             del vol, minivol
