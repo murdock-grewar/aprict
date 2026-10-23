@@ -1,0 +1,6 @@
+TODO for 0.1.0:
+ - [ ] Allow block=False in the projection script
+ - [ ] Chunk the FBP script
+ - [ ] Add --memmap options. Or, switch to memmap only for the final volumes, since this may incur little speed penalty.
+ - [ ] Optimise case of 1 chunk for GBC and FBP methods.
+ - [ ] Check that all methods are performant on the rock dataset, on my home PC.
