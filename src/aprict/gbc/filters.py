@@ -56,9 +56,9 @@ lib.gpu_tools.cupy_set_fft_plan_cache_size(0)  # cupy is extremely wasteful of V
 #   ) / abs(sin(theta))
 # )
 # Needed to put abs(...) on sin(theta).
-def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
+def _conebeam_kfactor_unchunked(theta_k_polar, cone_angle, theta_soft):
 
-    tp = cp if type(theta_k_el) is cp.ndarray else np
+    tp = cp if type(theta_k_polar) is cp.ndarray else np
 
     if cone_angle == np.pi:
         if theta_soft != 0:
@@ -66,18 +66,18 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         return 2 * np.pi
 
     if tp is cp:
-        cp.abs(theta_k_el, out=theta_k_el)
+        cp.abs(theta_k_polar, out=theta_k_polar)
         mask = tp.logical_and(
-            (cone_angle/2 - theta_soft) < theta_k_el,
-            theta_k_el < tp.pi - (cone_angle/2 - theta_soft),
+            (cone_angle/2 - theta_soft) < theta_k_polar,
+            theta_k_polar < tp.pi - (cone_angle/2 - theta_soft),
         )
-        out = tp.empty_like(theta_k_el)
+        out = tp.empty_like(theta_k_polar)
         out[~mask] = 2*tp.pi
-        tkm = theta_k_el[mask]
+        tkm = theta_k_polar[mask]
         # Scalars
         gamma = cp.divide(1, cp.sin(cone_angle/2-theta_soft) - cp.sin(cone_angle/2))
         chi   = cp.multiply(gamma, cp.sin(cone_angle/2))
-        # theta_k_el dependent
+        # theta_k_polar dependent
         sintkm = cp.sin(tkm)
         if cone_angle/2 - theta_soft <= 0:
             alpha = 0
@@ -87,7 +87,7 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         term1 = cp.arcsin(beta) - cp.arcsin(alpha)
         term2 = cp.sqrt(1 - cp.square(beta))
         term3 = cp.sqrt(1 - cp.square(alpha))
-        # Cubic equation in sin(theta_k_el). Add terms one-by-one.
+        # Cubic equation in sin(theta_k_polar). Add terms one-by-one.
         # out_masked = a + bx + cx^2 + dx^3
         # Add term 'a'
         out[mask] = (
@@ -107,19 +107,19 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         )
         return out
     else:
-        theta_k_el = ne.evaluate('abs(theta_k_el)', out=theta_k_el)
+        theta_k_polar = ne.evaluate('abs(theta_k_polar)', out=theta_k_polar)
         mask = tp.logical_and(
-            (cone_angle/2 - theta_soft) < theta_k_el,
-            theta_k_el < tp.pi - (cone_angle/2 - theta_soft),
+            (cone_angle/2 - theta_soft) < theta_k_polar,
+            theta_k_polar < tp.pi - (cone_angle/2 - theta_soft),
         )
-        out = tp.empty_like(theta_k_el)
+        out = tp.empty_like(theta_k_polar)
         out[~mask] = 2*tp.pi
-        tkm = theta_k_el[mask]
+        tkm = theta_k_polar[mask]
         out_masked = out[mask]
         # Scalars
         gamma = ne.evaluate('1/(sin(cone_angle/2-theta_soft) - sin(cone_angle/2))')
         chi   = ne.evaluate('sin(cone_angle/2) * gamma')
-        # theta_k_el dependent
+        # theta_k_polar dependent
         sintkm = ne.evaluate('sin(tkm)')
         if cone_angle/2 - theta_soft <= 0:
             alpha = 0
@@ -129,7 +129,7 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         term1 = ne.evaluate('arcsin(beta) - arcsin(alpha)')
         term2 = ne.evaluate('sqrt(1 - beta**2)')
         term3 = ne.evaluate('sqrt(1 - alpha**2)')
-        # Cubic equation in sin(theta_k_el). Add terms one-by-one.
+        # Cubic equation in sin(theta_k_polar). Add terms one-by-one.
         # out_masked = a + bx + cx^2 + dx^3
         # Add term 'a'
         ne.evaluate('term1 * 4 * (chi*chi) * (3 + 2*chi) + 4 * arcsin(alpha)', out=out_masked)
@@ -146,19 +146,19 @@ def _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft):
         ne.evaluate('out', out=out)
         return out
 
-def _conebeam_kfactor(theta_k_el, cone_angle, theta_soft, mb_per_chunk: typing.Optional[int] = 128, allow_overwrite_theta_k_el: bool = False):
+def _conebeam_kfactor(theta_k_polar, cone_angle, theta_soft, mb_per_chunk: typing.Optional[int] = 128, allow_overwrite_theta_k_polar: bool = False):
 
     # NOTE: the mb_per_chunk option is only applied if the array is 3-dimensional.
-    # This method is only designed for input arrays `theta_k_el` of dimension 1 or 2.
+    # This method is only designed for input arrays `theta_k_polar` of dimension 1 or 2.
 
-    tp = cp if type(theta_k_el) is cp.ndarray else np
-    if allow_overwrite_theta_k_el:
-        out = theta_k_el
+    tp = cp if type(theta_k_polar) is cp.ndarray else np
+    if allow_overwrite_theta_k_polar:
+        out = theta_k_polar
     else:
-        out = tp.empty_like(theta_k_el)
+        out = tp.empty_like(theta_k_polar)
 
-    if mb_per_chunk is None or theta_k_el.ndim == 2:
-        out[...] = _conebeam_kfactor_unchunked(theta_k_el, cone_angle, theta_soft)
+    if mb_per_chunk is None or theta_k_polar.ndim == 2:
+        out[...] = _conebeam_kfactor_unchunked(theta_k_polar, cone_angle, theta_soft)
         return out
 
     def slice_gen(slicelen: int):
@@ -177,19 +177,19 @@ def _conebeam_kfactor(theta_k_el, cone_angle, theta_soft, mb_per_chunk: typing.O
     )
     for sl in slice_gen(numzperpart):
         Z_sub_arr = out[... , sl]
-        Z_sub_arr[...] = _conebeam_kfactor_unchunked(theta_k_el[... , sl], cone_angle, theta_soft)
+        Z_sub_arr[...] = _conebeam_kfactor_unchunked(theta_k_polar[... , sl], cone_angle, theta_soft)
     return out
 
 
-def _conebeam_kfactor_unchunked_unweighted_approx(theta_k_el, cone_angle, theta_soft):
+def _conebeam_kfactor_unchunked_unweighted_approx(theta_k_polar, cone_angle, theta_soft):
     """theta_soft currently assumed to be 0."""
-    tp = cp if type(theta_k_el) is cp.ndarray else np
+    tp = cp if type(theta_k_polar) is cp.ndarray else np
     if tp is cp:
         raise NotImplementedError("This method has not been implemented for cupy arrays.")
     else:
         pi = np.pi
-        theta_k = ne.evaluate('abs(pi/2 - abs(theta_k_el))', out=theta_k_el, casting='same_kind')
-        del theta_k_el
+        theta_k = ne.evaluate('abs(pi/2 - abs(theta_k_polar))', out=theta_k_polar, casting='same_kind')
+        del theta_k_polar
         out = tp.empty_like(theta_k)
         # Scalars
         sintkm = ne.evaluate('sin(theta_k)')
@@ -216,19 +216,19 @@ def _conebeam_kfactor_unchunked_unweighted_approx(theta_k_el, cone_angle, theta_
         return out
 
 
-def _conebeam_kfactor_unweighted_approx(theta_k_el, cone_angle, theta_soft, mb_per_chunk: typing.Optional[int] = 128,
-                      allow_overwrite_theta_k_el: bool = False):
+def _conebeam_kfactor_unweighted_approx(theta_k_polar, cone_angle, theta_soft, mb_per_chunk: typing.Optional[int] = 128,
+                      allow_overwrite_theta_k_polar: bool = False):
 
-    tp = cp if type(theta_k_el) is cp.ndarray else np
+    tp = cp if type(theta_k_polar) is cp.ndarray else np
 
-    if allow_overwrite_theta_k_el:
-        out = theta_k_el
+    if allow_overwrite_theta_k_polar:
+        out = theta_k_polar
     else:
-        out = tp.empty_like(theta_k_el)
+        out = tp.empty_like(theta_k_polar)
 
 
     if mb_per_chunk is None:
-        out[...] = _conebeam_kfactor_unchunked_unweighted_approx(theta_k_el, cone_angle, theta_soft)
+        out[...] = _conebeam_kfactor_unchunked_unweighted_approx(theta_k_polar, cone_angle, theta_soft)
         return out
 
     def slice_gen(slicelen: int):
@@ -249,7 +249,7 @@ def _conebeam_kfactor_unweighted_approx(theta_k_el, cone_angle, theta_soft, mb_p
     )
     for sl in slice_gen(numzperpart):
         Z_sub_arr = out[... , sl]
-        Z_sub_arr[...] = _conebeam_kfactor_unchunked_unweighted_approx(theta_k_el[... , sl], cone_angle, theta_soft)
+        Z_sub_arr[...] = _conebeam_kfactor_unchunked_unweighted_approx(theta_k_polar[... , sl], cone_angle, theta_soft)
     return out
 
 
@@ -377,15 +377,15 @@ def ramp_filter_conebeam(
         else:
             if input_array_is_cupy:
                 f_tparr[..., sl] *= tp.sqrt(lateral_k_mag_sq + tp.square(freqs_2_slice)) * multiplier # Multiply by ramp filter
-                theta_el = tp.abs(tp.pi/2 - tp.arctan2(freqs_2_slice, tp.sqrt(lateral_k_mag_sq)))
+                theta_polar = tp.abs(tp.pi/2 - tp.arctan2(freqs_2_slice, tp.sqrt(lateral_k_mag_sq)))
             else:
                 ne.evaluate('f_tparr_slice * sqrt(lateral_k_mag_sq + freqs_2_slice**2) * multiplier', out=f_tparr_slice, casting='same_kind')
-                theta_el = ne.evaluate('abs(pi/2 - arctan2(freqs_2_slice, sqrt(lateral_k_mag_sq)))')
-            # extra_factor = _conebeam_kfactor(theta_el, cone_angle, theta_soft, mb_per_chunk=1024, allow_overwrite_theta_k_el=True)
+                theta_polar = ne.evaluate('abs(pi/2 - arctan2(freqs_2_slice, sqrt(lateral_k_mag_sq)))')
+            # extra_factor = _conebeam_kfactor(theta_polar, cone_angle, theta_soft, mb_per_chunk=1024, allow_overwrite_theta_k_polar=True)
             if cone_angle == np.pi:
                 extra_factor = 2 * np.pi
             else:
-                extra_factor = _conebeam_kfactor(theta_el, cone_angle, theta_soft, mb_per_chunk=None, allow_overwrite_theta_k_el=True)
+                extra_factor = _conebeam_kfactor(theta_polar, cone_angle, theta_soft, mb_per_chunk=None, allow_overwrite_theta_k_polar=True)
             if input_array_is_cupy:
                 f_tparr[..., sl] /= extra_factor
             else:
