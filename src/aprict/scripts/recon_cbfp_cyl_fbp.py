@@ -780,7 +780,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Cumulative sum of the above
     bytes_cumsum = np.cumsum(bytes_by_index)
     _, gpu_VRAM_capacity_MiB = lib.gpu_tools.get_gpu_mb_used_and_total()  # ruff: ignore[non-lowercase-variable-in-function]
-    GiB_per_chunk: float = (3 / 4) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
+    GiB_per_chunk: float = (2 / 4) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
 
     def next_slice_zindex(last_slice: slice | None) -> slice | None:
         last_slice = slice(0, 0) if last_slice is None else last_slice
