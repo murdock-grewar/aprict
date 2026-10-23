@@ -37,8 +37,7 @@ Known limitations
   * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
   * Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
   * Not fully optimised: among other issues, 
-    * the FBP reconstruction script assumes that the whole volume (or more) can fit in the GPU VRAM. This limitation will be lifted in the future. The GBC reconstruction script does not have this limitation.
-    * the FBP and GBC reconstruction scripts assume that the whole volume (or more) can fit in RAM. This limitation will be lifted in the future. (Note: a present workaround is to create a large swapfile on disk, since swap space is treated as RAM when the physical RAM is exhausted.)
+    * the GBC reconstruction script assumes that the whole volume (or more) can fit in RAM. This limitation may be lifted in the future. (Note: a present workaround is to create a large swapfile on disk, since swap space is treated as RAM when the physical RAM is exhausted.)
   * CPU and GPU work not completely asynchronous: due to unresolved bugs, various asynchronous GPU operations have been disabled. This may not have much impact on large reconstructions, but could result in poor GPU utilisation for smaller reconstructions.
   * No smart batching of (back)projections: smarter code would analyse the geometry of projections, and batch together (back)projections that involve similar regions of the volume. Currently, the code does not do any kind of clever batching like this, and so the (back)projection code is not as performant as it could be.
 
