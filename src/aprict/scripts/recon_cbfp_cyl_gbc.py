@@ -262,7 +262,7 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     ),
     ce.option(
         "--output-intermediates",
-        type=bool,
+        type=lib.click_tools.BoolArgType(),
         default=False,
         help="Whether to output intermediate reconstructions from each iteration.",
     ),

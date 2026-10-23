@@ -245,7 +245,7 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     ),
     ce.option(
         "--output-intermediates",
-        type=bool,
+        type=lib.click_tools.BoolArgType(),
         default=False,
         help="Whether to output intermediate reconstructions from each iteration.",
     ),
@@ -277,6 +277,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         default=8080,
         help="Port to use for serving things via a web interface, if applicable.",
     ),
+    ce.option(
+        "--memmap-vols",
+        type=lib.click_tools.BoolArgType(),
+        default=True,
+        help="Memory-map volumes, rather than keeping them in RAM.",
+    ),
 )
 @ce.option_group(
     "resource options",
@@ -298,6 +304,10 @@ def validate_args(args: types.SimpleNamespace) -> None:
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
         msg = f"Output path '{args.output!s}' already exists."
+        raise ValueError(msg)
+
+    if args.output is None and args.memmap_vols:
+        msg = "Cannot use --memmap-vols True while --output is not specified."
         raise ValueError(msg)
 
     # If outputting intermediates, then the user must also specify the --output directory
@@ -832,7 +842,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         return (slz, vol)
 
     def save_volume(
-        vol: np.ndarray, id_str: str, is_intermediate: bool
+        vol: np.ndarray,
+        id_str: str,
+        is_intermediate: bool,
+        skip_if_exists: bool = False,
     ) -> None:
         # Do nothing if the output path is None.
         if path_output is None:
@@ -852,7 +865,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             save_path.joinpath("tomograms") if is_intermediate else save_path
         )
         tomo_path.mkdir(exist_ok=True)
-        lib.ne_tools.save(tomo_path.joinpath(id_str + ".npy"), x)
+        savepath = tomo_path.joinpath(id_str + ".npy")
+        if not savepath.is_file() or not skip_if_exists:
+            lib.ne_tools.save(savepath, x)
 
         # Save midslices from volume as .png files
         # The method used here can be a bit slow, because I get a full numpy array and process that.
@@ -897,7 +912,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     msg = "Allocating and zeroing the backprojection arrays..."
     logger.info(msg)
     # Put the z axis first, so that we can slice it in Z and have a C-contiguous array. This is necessary to copy directly from a cupy array to a numpy array.
-    vol_np = np.empty(volshape, dtype=vol_dtype)
+    if args.memmap_vols:
+        assert path_output is not None  # ensured by validate_args(...)
+        savepath = path_output.joinpath("recon" + ".npy")
+        vol_np = np.lib.format.open_memmap(
+            savepath, shape=volshape, dtype=vol_dtype, mode="w+"
+        )
+    else:
+        vol_np = np.empty(volshape, dtype=vol_dtype)
     lib.ne_tools.set_array_to_constant_pbar(
         vol_np,
         const=0,
@@ -1112,7 +1134,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Save final output artefacts
     if path_output:
-        save_volume(vol=vol_np, id_str="recon", is_intermediate=False)
+        save_volume(
+            vol=vol_np,
+            id_str="recon",
+            is_intermediate=False,
+            skip_if_exists=True,
+        )  # the skip_if_exists is there in case memory-mapping was enabled, in which case the volume will already be there on disk.
 
     # Perform logging updates
     logger.info("Done.")
