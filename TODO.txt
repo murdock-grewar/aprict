@@ -11,6 +11,6 @@ TODO for 0.1.0:
  - [ ] Check that all methods are performant on my home PC.
    - [-] GBC, rock  -- can't do full-size recon. Requires more memory/disk space than I have.
    - [x] FBP, rock
-   - [ ] GBC, LDS
-   - [ ] FBP, LDS
+   - [x] GBC, LDS
+   - [x] FBP, LDS
  - [ ] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections. 
