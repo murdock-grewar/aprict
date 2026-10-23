@@ -353,6 +353,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     float,
     float,
     float,
+    int,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if fan_beam_mode:
@@ -487,6 +488,26 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         )
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
+    def is_inrange(pg_sliced: cbfp.ProjGeom) -> bool:
+        pg_sl = pg_sliced
+        sl_zs_max = pg_sl.source_pos[:, 2].max()
+        sl_zs_min = pg_sl.source_pos[:, 2].min()
+        return not (
+            (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_)
+            or (vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_)
+        )
+
+    # Figure out ahead of time how many projections need to be considered.
+    # This is helpful progress bar / time estimates.
+    tot_num_nonskipped_projs: int = 0
+    sl_start: int = 0
+    while sl_start < pg.num_projs:
+        sl = slice(sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk))
+        pg_sl = pg.sliced(sl)
+        if is_inrange(pg_sl):
+            tot_num_nonskipped_projs += sl.stop - sl.start
+        sl_start += num_projs_per_chunk
+
     def _gen() -> typing.Generator[  # ruff: ignore[complex-structure]
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ]:
@@ -508,19 +529,10 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
 
             # If projections are totally out of range of the volume, then skip
             pg_sl = pg.sliced(sl)
-            sl_zs_max = pg_sl.source_pos[:, 2].max()
-            sl_zs_min = pg.source_pos[:, 2].min()
-            if (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_) or (
-                vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_
-            ):
+            if not is_inrange(pg_sl):
                 # Projections are totally out of range of the volume. Skip loading these projections.
                 # Increment the slice
                 sl_start += num_projs_per_chunk
-                # Yield
-                yield (
-                    sl,
-                    None,
-                )  # Make sure to yield here in order to indicate to the caller that these projections were not missed, but were explicitly considered and could be skipped.
                 continue
 
             # Create ProjectionSet with filtered data in buffer
@@ -595,6 +607,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         recon_support_radius,
         cyl_mask_rad,
         final_multiplier,
+        tot_num_nonskipped_projs,
     )
 
 
@@ -681,13 +694,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     two_sided = args.alg is ALG.NOOGREWAR
     # Create the ProjectionSet objects corresponding to each ordered subset
     (
-        pg,
+        _pg,
         sl_filtps_gen,
         R,  # ruff: ignore[non-lowercase-variable-in-function]
         _L,  # ruff: ignore[non-lowercase-variable-in-function]
         _recon_support_radius,
         cyl_mask_rad,
         final_multiplier,
+        tot_num_nonskipped_projs,
     ) = get_filtered_projectionset_generator(
         projdata_path=args.projs,
         pg=cbfp.ProjGeom.load(args.geom),
@@ -822,7 +836,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     logger.info("Beginning reconstruction...")
     with logtools.ProgressBar(
         desc="Filtered Backproj.:",
-        maxval=pg.num_projs,
+        maxval=tot_num_nonskipped_projs,
         valunit="proj",
         logger=logger,
         persist=True,
@@ -901,15 +915,15 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                                 )
                             )
 
-                # ProgressBar stuff
-                ev = cp.cuda.Event()
-                ev.record(stream=stream)
-                prog_evs_bytes.append(
-                    (
-                        ev,
-                        sl.stop - sl.start,
+                    # ProgressBar stuff
+                    ev = cp.cuda.Event()
+                    ev.record(stream=stream)
+                    prog_evs_bytes.append(
+                        (
+                            ev,
+                            sl.stop - sl.start,
+                        )
                     )
-                )
                 update_pbar(pbar)  # update from this and previous queued work
 
             # Don't synchronize the ordinary way, because then we get no progress updates

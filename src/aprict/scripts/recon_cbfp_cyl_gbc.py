@@ -372,6 +372,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     float,
     float,
     float,
+    int,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if autorange_z:
@@ -473,6 +474,26 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     # )
     mu = pg.num_projs / (2 * np.pi * R * (zs_max - zs_min))
 
+    def is_inrange(pg_sliced: cbfp.ProjGeom) -> bool:
+        pg_sl = pg_sliced
+        sl_zs_max = pg_sl.source_pos[:, 2].max()
+        sl_zs_min = pg_sl.source_pos[:, 2].min()
+        return not (
+            (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_)
+            or (vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_)
+        )
+
+    # Figure out ahead of time how many projections need to be considered.
+    # This is helpful progress bar / time estimates.
+    tot_num_nonskipped_projs: int = 0
+    sl_start: int = 0
+    while sl_start < pg.num_projs:
+        sl = slice(sl_start, min(pg.num_projs, sl_start + num_projs_per_chunk))
+        pg_sl = pg.sliced(sl)
+        if is_inrange(pg_sl):
+            tot_num_nonskipped_projs += sl.stop - sl.start
+        sl_start += num_projs_per_chunk
+
     def _gen() -> typing.Generator[
         tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ]:
@@ -484,19 +505,10 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
 
             # If projections are totally out of range of the volume, then skip
             pg_sl = pg.sliced(sl)
-            sl_zs_max = pg_sl.source_pos[:, 2].max()
-            sl_zs_min = pg.source_pos[:, 2].min()
-            if (vol_minxyz_maxxyz[1][2] < sl_zs_min - hdiff_) or (
-                vol_minxyz_maxxyz[0][2] > sl_zs_max + hdiff_
-            ):
+            if not is_inrange(pg_sl):
                 # Projections are totally out of range of the volume. Skip loading these projections.
                 # Increment the slice
                 sl_start += num_projs_per_chunk
-                # Yield
-                yield (
-                    sl,
-                    None,
-                )  # Make sure to yield here in order to indicate to the caller that these projections were not missed, but were explicitly considered and could be skipped.
                 continue
 
             # Create ProjectionSet with filtered data in buffer
@@ -522,6 +534,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
         vartheta_h,
         zs_min,
         zs_max,
+        tot_num_nonskipped_projs,
     )
 
 
@@ -825,7 +838,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         # Create the ProjectionSet objects corresponding to each ordered subset
         # We only run this to get the vartheta_v and vartheta_h
         (
-            pg,
+            _pg,
             _sl_filtps_gen,
             R,  # ruff: ignore[non-lowercase-variable-in-function]
             L,  # ruff: ignore[non-lowercase-variable-in-function]
@@ -836,6 +849,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             vartheta_h,
             zs_min,
             zs_max,
+            tot_num_nonskipped_projs,
         ) = get_projectionset_generator(
             projdata_path=args.projs,
             pg=cbfp.ProjGeom.load(args.geom),
@@ -949,7 +963,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
             # Create the ProjectionSet objects corresponding to each ordered subset
             (
-                pg,
+                _pg,
                 sl_filtps_gen,
                 R,  # ruff: ignore[non-lowercase-variable-in-function]
                 _L,  # ruff: ignore[non-lowercase-variable-in-function]
@@ -960,6 +974,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 vartheta_h,
                 _zs_min,
                 _zs_max,
+                tot_num_nonskipped_projs,
             ) = get_projectionset_generator(
                 projdata_path=args.projs,
                 pg=cbfp.ProjGeom.load(args.geom),
@@ -1020,23 +1035,28 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                             ps_ramp.data is not None
                         )  # useful assertion for type-checking
 
-                    # ProgressBar stuff
-                    ev = cp.cuda.Event()
-                    ev.record(stream=stream)
-                    prog_evs_bytes.append(
-                        (
-                            ev,
+                        # ProgressBar stuff
+                        ev = cp.cuda.Event()
+                        ev.record(stream=stream)
+                        prog_evs_bytes.append(
                             (
-                                ((sl.stop - sl.start) / pg.num_projs)
-                                * (
-                                    int(bytes_cumsum[curr_slice.stop - 1])
-                                    - int(
-                                        ([0, *bytes_cumsum])[curr_slice.start]
+                                ev,
+                                (
+                                    (
+                                        (sl.stop - sl.start)
+                                        / tot_num_nonskipped_projs
                                     )
-                                )
-                            ),
+                                    * (
+                                        int(bytes_cumsum[curr_slice.stop - 1])
+                                        - int(
+                                            ([0, *bytes_cumsum])[
+                                                curr_slice.start
+                                            ]
+                                        )
+                                    )
+                                ),
+                            )
                         )
-                    )
                     update_pbar(
                         pbar
                     )  # update from this and previous queued work
