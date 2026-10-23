@@ -32,21 +32,22 @@ Known limitations
   * The Python API is not yet documented.
   * The way that geometry is encoded in `*.json` files is not yet documented.
   * The encoding of projection data and volume data is not yet documented. (Numpy arrays; memory-mapped in the case of projections.)
-
 * Implementation-related issues which could be alleviated in the future:
+  * Volume size is limited by CUDA texture limit. For example, a `(2400,2400,4800)` volume can be reconstructed, but not a `(30000,30000,1)` volume, due to a volume of this size not fitting within a single CUDA texture
   * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape can is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
   * Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
-  * Not fully optimised: among other issues, this library currently requires that the whole volume (or more) can fit in the GPU VRAM.
+  * Not fully optimised: among other issues, 
+    * the FBP reconstruction script assumes that the whole volume (or more) can fit in the GPU VRAM. This limitation will be lifted in the future. The GBC reconstruction script does not have this limitation.
+    * the FBP and GBC reconstruction scripts assume that the whole volume (or more) can fit in RAM. This limitation will be lifted in the future. (Note: a present workaround is to create a large swapfile on disk, since swap space is treated as RAM when the physical RAM is exhausted.)
   * CPU and GPU work not completely asynchronous: due to unresolved bugs, various asynchronous GPU operations have been disabled. This may not have much impact on large reconstructions, but could result in poor GPU utilisation for smaller reconstructions.
   * No smart batching of (back)projections: smarter code would analyse the geometry of projections, and batch together (back)projections that involve similar regions of the volume. Currently, the code does not do any kind of clever batching like this, and so the (back)projection code is not as performant as it could be.
 
 Features
 ---
 
-* Works efficiently with projection datasets of any size. (Requires high-speed mass storage for rapid reading/writing, e.g. an NVMe drive.)
-* High-accuracy simulation of projection data for almost any flat-panel geometry, with almost any FORBILD phantom. Also supports voxelised volumes. The projection code computes exact line integrals (including through voxelised volumes composed of voxels of uniform attenuation coefficient), and can accept arbtirary phantoms defined in `*.pha` files using the FORBILD format. The accuracy can be further increased by averaging multiple line integrals for each pixel. The source and detector can even be placed _inside_ the object, and projection will still be accurately computed from the source point to the detector pixels.
-
+* Simulation of projection data for almost any flat-panel geometry, with almost any FORBILD phantom. Also supports voxelised volumes. The projection code computes exact line integrals (including through voxelised volumes composed of voxels of uniform attenuation coefficient), and can accept arbtirary phantoms defined in `*.pha` files using the FORBILD format. The accuracy can be further increased by averaging multiple line integrals for each pixel. The source and detector can even be placed _inside_ the object, and projection will still be accurately computed from the source point to the detector pixels.
 * Several built-in phantoms included for the user's convenience.
+* GBC and FBP reconstruction scripts supplied. These work efficiently with projection datasets of any size, e.g. a 200 GiB+ set is OK. (Requires high-speed mass storage for rapid reading/writing, e.g. an NVMe drive.) 
 
 * Analytic reconstruction from:
   * Fan-beam data with circular scan
@@ -71,7 +72,7 @@ You can install `aprict` like you would any python package, using `pip install`.
 Example installation using `uv`: 
 ```bash
 $ uv venv -p 3.14
-$ uv pip install ~/downloads/aprict-0.0.9.tar.gz[gui]
+$ uv pip install aprict[gui]==0.0.19
 $ source .venv/bin/activate
 ```
 You should now have several executables available on `$PATH`. Try `aprict-cli --help` to see the polished commandline interface. 
@@ -97,7 +98,7 @@ Activate the environment:
 ```bash
 source .venv/bin/activate
 ```
-Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.9`:
+Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.19`:
 ```
 Usage: aprict-cli [OPTIONS] COMMAND [ARGS]...
 
@@ -156,6 +157,7 @@ aprict-cli project cbfp \
     --output projs \
     --plot-mode PYQTGRAPH
 ````
+(Time on my machine: ~2 minutes, 55 seconds) 
 The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
 
 Now, let's reconstruct with three different algorithms:
@@ -174,7 +176,7 @@ aprict-cli recon gbc-cone-cyl \
     --output recon_gbc \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~03m10s)
+(Time on my machine: ~37 seconds)
 
 To perform an FBP reconstruction, we do:
 ```bash
@@ -187,7 +189,7 @@ aprict-cli recon fbp-cone-cyl \
     --output recon_fbp \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~00m33s)
+(Time on my machine: ~12 seconds)
 
 To perform an FBP-VM reconstruction, we change `--alg` to `NOOGREWAR`:
 ```bash
@@ -200,7 +202,7 @@ aprict-cli recon fbp-cone-cyl \
     --output recon_fbp-vw \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~01m03s)
+(Time on my machine: ~22 seconds)
 
 
 </details>
@@ -245,6 +247,7 @@ aprict-cli project cbfp \
     --output projs \
     --plot-mode PYQTGRAPH
 ````
+(Time on my machine: ~1 minute, 46 seconds) 
 The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data (a sinogram) after it is created. (This will not be available if the module was not installed with the `[gui]` option.) 
 
 You will find a copy of the `ROCK_CAN` phantom in the output directory `projs`, beside the projection data. The phantom is always copied to the output directory, to ensure a good record of the inputs to the simulation.
@@ -262,6 +265,7 @@ aprict-cli recon fbp-fan-circ \
     --plotmax 2.25 \
     --plot-mode PYQTGRAPH
 ```
+(Time on my machine: ~2 seconds) 
 Once again, the option `--plot-mode PYQTGRAPH` ensures that a plot window will pop up once the reconstruction is done. Note the `--plotmin -0.25` and `--plotmax 2.25` options here, which control the plotting range of the saved `*.png` files in the output directory. The whole volume is stored as a numpy array (`*.npy`), but it's useful to have some preview PNGs generated as well.
 
 
@@ -278,6 +282,7 @@ aprict-cli recon fbp-fan-circ \
     --plotmax 2.25 \
     --plot-mode PYQTGRAPH
 ```
+(Time on my machine: ~2 seconds)
 
 </details>
 
