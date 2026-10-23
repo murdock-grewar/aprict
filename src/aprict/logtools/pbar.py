@@ -38,7 +38,7 @@ class TextColumnWithCallable(rich.progress.TextColumn):
         self._call_on_refresh = call_on_refresh
         super().__init__(*args, **kwargs)
 
-    def reader(self, *args, **kwargs):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-args, missing-type-kwargs, undocumented-public-method]
+    def render(self, *args, **kwargs):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-args, missing-type-kwargs, undocumented-public-method]
         self._call_on_refresh()
         return super().render(*args, **kwargs)
 
@@ -56,7 +56,7 @@ class ProgressBar:
 
     _logger: logging.Logger
     _enable: bool
-    _task: rich.progress.TaskID
+    _task: rich.progress.TaskID | None
 
     def __init__(
         self,
@@ -73,6 +73,7 @@ class ProgressBar:
         show_gpu_usage: bool = True,
         gpu_mon_interval_seconds: float = 0.2,
     ) -> None:
+        self._task = None  # set this to None initially, so that the dynamically updated fields can see that the task is not yet present
         self._enable = enable
         self._desc = desc
         self._maxval = maxval
@@ -157,17 +158,18 @@ class ProgressBar:
         gpu_perc_str = (
             "---%" if gpu_perc is None else f"{round(gpu_perc): >3d}%"
         )
-        progress.update(self._task, gpu_perc_str=gpu_perc_str)
+        if self._task is not None:
+            progress.update(self._task, gpu_perc_str=gpu_perc_str)
 
     def advance(self, advance: float | int) -> None:
         """Advance the progress bar by a number of steps."""
-        if self._enable:
+        if self._enable and self._task is not None:
             return self._cm.advance(task_id=self._task, advance=advance)
         return None
 
     def update_to(self, val: float | int) -> None:
         """Update the progress bar value."""
-        if self._enable:
+        if self._enable and self._task is not None:
             progress: rich.progress.Progress = self._cm
             if self._gpu_mon is not None:
                 gpu_perc = self._gpu_mon.gpu_perc
