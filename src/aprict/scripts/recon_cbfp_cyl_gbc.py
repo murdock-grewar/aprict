@@ -19,6 +19,7 @@ import enum
 import logging
 import math
 import pathlib
+import time
 import types
 import typing
 
@@ -360,7 +361,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
-        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ],
     float,
     float,
@@ -473,7 +474,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     mu = pg.num_projs / (2 * np.pi * R * (zs_max - zs_min))
 
     def _gen() -> typing.Generator[
-        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ]:
         sl_start: int = 0
         while sl_start < pg.num_projs:
@@ -491,6 +492,11 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
                 # Projections are totally out of range of the volume. Skip loading these projections.
                 # Increment the slice
                 sl_start += num_projs_per_chunk
+                # Yield
+                yield (
+                    sl,
+                    None,
+                )  # Make sure to yield here in order to indicate to the caller that these projections were not missed, but were explicitly considered and could be skipped.
                 continue
 
             # Create ProjectionSet with filtered data in buffer
@@ -911,6 +917,19 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         persist=True,
         unit_is_bytes=True,
     ) as pbar:
+        # I don't want the progress bar to increment until a piece of work is actually finished by the GPU,
+        # not merely queued on the GPU. For this reason, I will add Events to the CUDA stream and this function
+        # will check which events have completed, and how many bytes to add to the progress bar.
+        prog_evs_bytes: list[tuple[cp.cuda.Event, float]] = []
+
+        def update_pbar(pbar: logtools.ProgressBar) -> None:
+            # Loop backwards through list so we can safely delete things as we go
+            for i in reversed(range(len(prog_evs_bytes))):
+                ev, advance = prog_evs_bytes[i]
+                if ev.done:
+                    pbar.advance(advance)
+                    del prog_evs_bytes[i]
+
         while (curr_slice := next_slice_zindex_mini(curr_slice)) is not None:
             # Log information about which volume chunk is being worked on
             msg = f"Computing chunk with slice: {curr_slice}; maximum index {padded_volshape_mini[2]:d}"
@@ -973,45 +992,63 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 soft_vartheta_h_softspan=args.softspan_h,
             )
 
-            accum_num_projs: int = 0
-
             with cp.cuda.Stream(non_blocking=True) as stream:
                 for sl, pss in sl_filtps_gen:
-                    (ps_ramp,) = pss
-                    if (
-                        vol is not None
-                    ):  # vol may be None, in which case we're in the range of the minivol but not the vol
+                    # pss can be None to indicate that there was no work to do for this slice
+                    if pss is not None:
+                        (ps_ramp,) = pss
+                        if (
+                            vol is not None
+                        ):  # vol may be None, in which case we're in the range of the minivol but not the vol
+                            cbfp.backproject(
+                                config_bp,
+                                vol,
+                                ps_ramp,
+                                secondary_volume=vol_weightsum,
+                                block=False,
+                                logger=logger,
+                            )
                         cbfp.backproject(
                             config_bp,
-                            vol,
+                            minivol,
                             ps_ramp,
-                            secondary_volume=vol_weightsum,
+                            secondary_volume=minivol_weightsum,
                             block=False,
                             logger=logger,
                         )
-                    cbfp.backproject(
-                        config_bp,
-                        minivol,
-                        ps_ramp,
-                        secondary_volume=minivol_weightsum,
-                        block=False,
-                        logger=logger,
-                    )
-                    assert (
-                        ps_ramp.data is not None
-                    )  # useful assertion for type-checking
+                        assert (
+                            ps_ramp.data is not None
+                        )  # useful assertion for type-checking
 
-                    # Perform logging updates
-                    accum_num_projs += sl.stop - sl.start
-                    pbar.update_to(
-                        int(([0, *bytes_cumsum])[curr_slice.start])
-                        + (accum_num_projs / pg.num_projs)
-                        * (
-                            int(bytes_cumsum[curr_slice.stop - 1])
-                            - int(([0, *bytes_cumsum])[curr_slice.start])
+                    # ProgressBar stuff
+                    ev = cp.cuda.Event()
+                    ev.record(stream=stream)
+                    prog_evs_bytes.append(
+                        (
+                            ev,
+                            (
+                                ((sl.stop - sl.start) / pg.num_projs)
+                                * (
+                                    int(bytes_cumsum[curr_slice.stop - 1])
+                                    - int(
+                                        ([0, *bytes_cumsum])[curr_slice.start]
+                                    )
+                                )
+                            ),
                         )
                     )
-                stream.synchronize()
+                    update_pbar(
+                        pbar
+                    )  # update from this and previous queued work
+
+                # Don't synchronize the ordinary way, because then we get no progress updates
+                # stream.synchronize()
+                while not stream.done:
+                    update_pbar(
+                        pbar
+                    )  # update from this and previous queued work
+                    time.sleep(0.05)
+                update_pbar(pbar)
 
             # Normalise to the correct weighting.
             # This will multiply both a numerator and a divisor by the same amount.

@@ -159,6 +159,12 @@ class ProgressBar:
         )
         progress.update(self._task, gpu_perc_str=gpu_perc_str)
 
+    def advance(self, advance: float | int) -> None:
+        """Advance the progress bar by a number of steps."""
+        if self._enable:
+            return self._cm.advance(task_id=self._task, advance=advance)
+        return None
+
     def update_to(self, val: float | int) -> None:
         """Update the progress bar value."""
         if self._enable:

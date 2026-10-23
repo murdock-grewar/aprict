@@ -18,6 +18,7 @@
 import enum
 import logging
 import pathlib
+import time
 import types
 import typing
 
@@ -345,7 +346,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
-        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ],
     float,
     float,
@@ -487,7 +488,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
     def _gen() -> typing.Generator[  # ruff: ignore[complex-structure]
-        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...]]
+        tuple[slice[int, int, None], tuple[cbfp.ProjectionSet, ...] | None]
     ]:
         if num_rot_angs is not None:  # None means a single random angle.
             if num_rot_angs == 1:
@@ -515,6 +516,11 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                 # Projections are totally out of range of the volume. Skip loading these projections.
                 # Increment the slice
                 sl_start += num_projs_per_chunk
+                # Yield
+                yield (
+                    sl,
+                    None,
+                )  # Make sure to yield here in order to indicate to the caller that these projections were not missed, but were explicitly considered and could be skipped.
                 continue
 
             # Create ProjectionSet with filtered data in buffer
@@ -823,58 +829,99 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ) as pbar:
         if args.fan_beam:
             sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
+
+        # I don't want the progress bar to increment until a piece of work is actually finished by the GPU,
+        # not merely queued on the GPU. For this reason, I will add Events to the CUDA stream and this function
+        # will check which events have completed, and how many bytes to add to the progress bar.
+        prog_evs_bytes: list[tuple[cp.cuda.Event, float]] = []
+
+        def update_pbar(pbar: logtools.ProgressBar) -> None:
+            # Loop backwards through list so we can safely delete things as we go
+            for i in reversed(range(len(prog_evs_bytes))):
+                ev, advance = prog_evs_bytes[i]
+                if ev.done:
+                    pbar.advance(advance)
+                    del prog_evs_bytes[i]
+
         with cp.cuda.Stream(non_blocking=True) as stream:
             for sl, pss in sl_filtps_gen:
-                if two_sided:
-                    ps_ramp, ps_hilb = pss
-                    cbfp.backproject(
-                        config_bp_ramp_twosided,
-                        vol,
-                        ps_ramp,
-                        block=False,
-                        logger=logger,
-                    )
-                    cbfp.backproject(
-                        config_bp_hilb_twosided,
-                        vol,
-                        ps_hilb,
-                        block=False,
-                        logger=logger,
-                    )
-                    assert (
-                        ps_ramp.data is not None
-                    )  # useful assertion for type-checking
-                    assert (
-                        ps_hilb.data is not None
-                    )  # useful assertion for type-checking
-                    if args.fan_beam:
-                        sum_of_c += float(
-                            cp.sum(
-                                ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :]
-                            )
+                # pss is None if there was nothing to do for this slice
+                if pss is not None:
+                    if two_sided:
+                        ps_ramp, ps_hilb = pss
+                        cbfp.backproject(
+                            config_bp_ramp_twosided,
+                            vol,
+                            ps_ramp,
+                            block=False,
+                            logger=logger,
                         )
-                        sum_of_c += float(
-                            cp.sum(
-                                ps_hilb.data[:, ps_ramp.data.shape[1] // 2, :]
-                            )
+                        cbfp.backproject(
+                            config_bp_hilb_twosided,
+                            vol,
+                            ps_hilb,
+                            block=False,
+                            logger=logger,
                         )
-                else:
-                    (ps_ramp,) = pss
-                    cbfp.backproject(
-                        config_bp_ramp_onesided, vol, ps_ramp, block=False
+                        assert (
+                            ps_ramp.data is not None
+                        )  # useful assertion for type-checking
+                        assert (
+                            ps_hilb.data is not None
+                        )  # useful assertion for type-checking
+                        if args.fan_beam:
+                            sum_of_c += float(
+                                cp.sum(
+                                    ps_ramp.data[
+                                        :, ps_ramp.data.shape[1] // 2, :
+                                    ]
+                                )
+                            )
+                            sum_of_c += float(
+                                cp.sum(
+                                    ps_hilb.data[
+                                        :, ps_ramp.data.shape[1] // 2, :
+                                    ]
+                                )
+                            )
+                    else:
+                        (ps_ramp,) = pss
+                        cbfp.backproject(
+                            config_bp_ramp_onesided, vol, ps_ramp, block=False
+                        )
+                        assert (
+                            ps_ramp.data is not None
+                        )  # useful assertion for type-checking
+                        if args.fan_beam:
+                            sum_of_c += float(
+                                cp.sum(
+                                    ps_ramp.data[
+                                        :, ps_ramp.data.shape[1] // 2, :
+                                    ]
+                                )
+                            )
+
+                # ProgressBar stuff
+                ev = cp.cuda.Event()
+                ev.record(stream=stream)
+                prog_evs_bytes.append(
+                    (
+                        ev,
+                        sl.stop - sl.start,
                     )
-                    assert (
-                        ps_ramp.data is not None
-                    )  # useful assertion for type-checking
-                    if args.fan_beam:
-                        sum_of_c += float(
-                            cp.sum(
-                                ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :]
-                            )
-                        )
-                # Perform logging updates
-                pbar.update_to(sl.stop)
-            stream.synchronize()
+                )
+                update_pbar(pbar)  # update from this and previous queued work
+
+            # Don't synchronize the ordinary way, because then we get no progress updates
+            # stream.synchronize()
+            while not stream.done:
+                update_pbar(pbar)  # update from this and previous queued work
+                time.sleep(0.05)
+            update_pbar(pbar)  # update from this and previous queued work
+            if len(prog_evs_bytes) != 0:
+                logger.error(
+                    f"It seems that not all work was completed... this is a bug in the program. Output of 'prog_evs_bytes': {prog_evs_bytes}"
+                )
 
     if args.fan_beam:
         logger.debug(
