@@ -23,6 +23,8 @@ import cupy as cp
 import imageio.v3
 import numpy as np
 
+from .lib import ne_tools
+
 if TYPE_CHECKING:
     from pyqtgraph.Qt.QtWidgets import QApplication, QMainWindow
 
@@ -130,13 +132,16 @@ def save_volslice(
     index_of_slice: int | None = None,
     pmin: float | None = None,
     pmax: float | None = None,
-) -> None:
-    """Save a 2D slice of a volume as a .png."""
+) -> np.ndarray[tuple[int, int, int]]:
+    """Save a 2D slice of a volume as a .png. Returns the 3D array consisting of the slice."""
     index_of_slice = (
         imarr.shape[axis] // 2 if index_of_slice is None else index_of_slice
     )
+    # Slicing in this manner preserves a memmap as a memmap
     volslice = imarr[(slice(None),) * axis + (index_of_slice,)]
-    save_2d_arr(path, volslice, pmin=pmin, pmax=pmax)
+    return save_2d_arr(path, volslice, pmin=pmin, pmax=pmax)[
+        (slice(None),) * axis + (np.newaxis,)
+    ]
 
 
 def save_2d_arr(
@@ -144,15 +149,23 @@ def save_2d_arr(
     imarr: np.ndarray | cp.ndarray | pathlib.Path | str,
     pmin: float | None = None,
     pmax: float | None = None,
-) -> None:
-    """Save a 2D array as a .png."""
+) -> np.ndarray[tuple[int, int]]:
+    """Save a 2D array as a .png. Returns a copy of the 2D array."""
     if type(imarr) in (str,) or issubclass(type(imarr), pathlib.PurePath):
         imarr = np.load(imarr)  # ty:ignore[invalid-argument-type]
     if type(imarr) not in (np.ndarray, cp.ndarray, np.memmap):
         msg = "Unsupported type for 'imarr'."
         raise ValueError(msg)
-    imarr_np = imarr.get() if type(imarr) is cp.ndarray else imarr  # ty:ignore[unresolved-attribute]
-    volslice: np.ndarray = np.flip(imarr_np.transpose(), axis=0).copy()  # ty:ignore[unresolved-attribute]
+
+    if type(imarr) is cp.ndarray:
+        imarr_np = imarr.get()  # ty: ignore[unresolved-attribute]
+    else:
+        # This could be a non-contiguous 2D view into a big (memory-mapped) array, so use numexpr to copy the contents quickly.
+        assert type(imarr) is np.ndarray or type(imarr) is np.memmap
+        imarr_np = np.empty_like(imarr)
+        ne_tools.fastcopy(src=imarr, dst=imarr_np)
+
+    volslice: np.ndarray = np.flip(imarr_np.transpose(), axis=0).copy()
     if pmin is None:
         pmin = volslice.min()
     if pmax is None:
@@ -163,3 +176,4 @@ def save_2d_arr(
     imageio.v3.imwrite(
         path, volslice, mode="L"
     )  # , cmin=pmin, cmax=pmax, mode='L')
+    return imarr_np  # ty: ignore[invalid-return-type]

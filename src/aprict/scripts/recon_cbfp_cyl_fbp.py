@@ -846,6 +846,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         id_str: str,
         is_intermediate: bool,
         skip_if_exists: bool = False,
+        logger: logging.Logger | None = None,
     ) -> None:
         # Do nothing if the output path is None.
         if path_output is None:
@@ -867,19 +868,32 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         tomo_path.mkdir(exist_ok=True)
         savepath = tomo_path.joinpath(id_str + ".npy")
         if not savepath.is_file() or not skip_if_exists:
+            if logger is not None:
+                msg = f"Saving full volume to '{savepath}'..."
+                logger.debug(msg)
             lib.ne_tools.save(savepath, x)
+            if logger is not None:
+                msg = "Full volume now saved to disk."
+                logger.debug(msg)
+        else:
+            if logger is not None:
+                msg = f"Volume already present at '{savepath}'. Skipping save."
+                logger.debug(msg)
 
         # Save midslices from volume as .png files
         # The method used here can be a bit slow, because I get a full numpy array and process that.
         # I've decided that I prefer the simplicity and robustness of this approach, instead of trying
         # to squeeze optimal performance by directly extracting slices from cupy arrays.
         for axis, axis_str in enumerate("xyz"):
+            if logger is not None:
+                msg = f"Saving '{axis_str}' slice..."
+                logger.debug(msg)
             if is_intermediate:
                 save_path_sl = save_path.joinpath("slices_" + axis_str)
                 save_path_sl.mkdir(exist_ok=True)
             else:
                 save_path_sl = save_path
-            imview.save_volslice(
+            arr_slice = imview.save_volslice(
                 save_path_sl.joinpath(
                     "midslice_" + axis_str + "_" + id_str + ".png"
                 ),
@@ -893,9 +907,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 save_path_sl.joinpath(
                     "midslice_" + axis_str + "_fullrange_" + id_str + ".png"
                 ),
-                x,
+                arr_slice,
                 axis=axis,
-                index_of_slice=x.shape[axis] // 2,
+                index_of_slice=0,
                 pmin=x.min(),
                 pmax=x.max(),
             )
@@ -1134,11 +1148,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Save final output artefacts
     if path_output:
+        msg = "Saving volume to disk..."
+        logger.info(msg)
         save_volume(
             vol=vol_np,
             id_str="recon",
             is_intermediate=False,
             skip_if_exists=True,
+            logger=logger,
         )  # the skip_if_exists is there in case memory-mapping was enabled, in which case the volume will already be there on disk.
 
     # Perform logging updates

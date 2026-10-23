@@ -1244,10 +1244,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             # Save the volume as a .npy file
             tomo_path = path_output.joinpath("recon.npy")
             lib.ne_tools.save(tomo_path, x)
+            msg = "Full volume now saved to disk."
+            logger.debug(msg)
             # Save slices
             for axis, axis_str in enumerate("xyz"):
+                msg = f"Saving '{axis_str}' slice..."
+                logger.debug(msg)
                 save_path_sl = path_output
-                imview.save_volslice(
+                arr_slice = imview.save_volslice(
                     save_path_sl.joinpath(
                         "midslice_" + axis_str + "_" + "recon" + ".png"
                     ),
@@ -1265,9 +1269,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                         + "recon"
                         + ".png"
                     ),
-                    x,
+                    arr_slice,
                     axis=axis,
-                    index_of_slice=x.shape[axis] // 2,
+                    index_of_slice=0,
                     pmin=x.min(),
                     pmax=x.max(),
                 )
