@@ -823,50 +823,58 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ) as pbar:
         if args.fan_beam:
             sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
-        for sl, pss in sl_filtps_gen:
-            if two_sided:
-                ps_ramp, ps_hilb = pss
-                cbfp.backproject(
-                    config_bp_ramp_twosided,
-                    vol,
-                    ps_ramp,
-                    block=True,
-                    logger=logger,
-                )
-                cbfp.backproject(
-                    config_bp_hilb_twosided,
-                    vol,
-                    ps_hilb,
-                    block=True,
-                    logger=logger,
-                )
-                assert (
-                    ps_ramp.data is not None
-                )  # useful assertion for type-checking
-                assert (
-                    ps_hilb.data is not None
-                )  # useful assertion for type-checking
-                if args.fan_beam:
-                    sum_of_c += float(
-                        cp.sum(ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :])
+        with cp.cuda.Stream(non_blocking=True) as stream:
+            for sl, pss in sl_filtps_gen:
+                if two_sided:
+                    ps_ramp, ps_hilb = pss
+                    cbfp.backproject(
+                        config_bp_ramp_twosided,
+                        vol,
+                        ps_ramp,
+                        block=False,
+                        logger=logger,
                     )
-                    sum_of_c += float(
-                        cp.sum(ps_hilb.data[:, ps_ramp.data.shape[1] // 2, :])
+                    cbfp.backproject(
+                        config_bp_hilb_twosided,
+                        vol,
+                        ps_hilb,
+                        block=False,
+                        logger=logger,
                     )
-            else:
-                (ps_ramp,) = pss
-                cbfp.backproject(
-                    config_bp_ramp_onesided, vol, ps_ramp, block=True
-                )
-                assert (
-                    ps_ramp.data is not None
-                )  # useful assertion for type-checking
-                if args.fan_beam:
-                    sum_of_c += float(
-                        cp.sum(ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :])
+                    assert (
+                        ps_ramp.data is not None
+                    )  # useful assertion for type-checking
+                    assert (
+                        ps_hilb.data is not None
+                    )  # useful assertion for type-checking
+                    if args.fan_beam:
+                        sum_of_c += float(
+                            cp.sum(
+                                ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :]
+                            )
+                        )
+                        sum_of_c += float(
+                            cp.sum(
+                                ps_hilb.data[:, ps_ramp.data.shape[1] // 2, :]
+                            )
+                        )
+                else:
+                    (ps_ramp,) = pss
+                    cbfp.backproject(
+                        config_bp_ramp_onesided, vol, ps_ramp, block=False
                     )
-            # Perform logging updates
-            pbar.update_to(sl.stop)
+                    assert (
+                        ps_ramp.data is not None
+                    )  # useful assertion for type-checking
+                    if args.fan_beam:
+                        sum_of_c += float(
+                            cp.sum(
+                                ps_ramp.data[:, ps_ramp.data.shape[1] // 2, :]
+                            )
+                        )
+                # Perform logging updates
+                pbar.update_to(sl.stop)
+            stream.synchronize()
 
     if args.fan_beam:
         logger.debug(
