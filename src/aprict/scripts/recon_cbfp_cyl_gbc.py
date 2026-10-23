@@ -1070,10 +1070,13 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     )  # update from this and previous queued work
                     time.sleep(0.05)
                 update_pbar(pbar)
+                del pss  # free up some memory
 
             if tot_num_nonskipped_projs == 0:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
                 logger.debug(msg)
+                del vol_weightsum
+                del minivol_weightsum
             else:
                 # Normalise to the correct weighting.
                 # This will multiply both a numerator and a divisor by the same amount.
@@ -1126,13 +1129,16 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     ans = vol.as_numpy()
                     lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
                     del ans  # allow the memory to be freed
+                    lib.gpu_tools.clear_pinned_cache()
                 # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
                 ans = minivol.as_numpy()
                 lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
                 del ans  # allow the memory to be freed
+                lib.gpu_tools.clear_pinned_cache()
 
             # Free some memory
             del vol, minivol
+            lib.gpu_tools.clear_pinned_cache()
             lib.gpu_tools.clear_cache()
 
         pbar.update_to(int(bytes_cumsum[-1]))

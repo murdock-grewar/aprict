@@ -1142,6 +1142,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     ans = vol.as_numpy()
                     lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
                     del ans  # allow the memory to be freed
+                    lib.gpu_tools.clear_pinned_cache()
             else:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
                 logger.debug(msg)
@@ -1149,6 +1150,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             # Free some memory
             del vol
             lib.gpu_tools.clear_cache()
+            lib.gpu_tools.clear_pinned_cache()
 
         pbar.update_to(int(bytes_cumsum[-1]))
 
