@@ -25,7 +25,7 @@ from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import main as main_fbp
 from .recon_cbfp_cyl_gbc import main as main_gbc
 
-_progdesc: str = "Entry point for aprict CLI."
+_progdesc: str = f"Entry point for CLI interface to aprict version {version}"
 
 
 _cs = {
