@@ -698,6 +698,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
     vol_dtype = np.float32
+    pg_raw: cbfp.ProjGeom = cbfp.ProjGeom.load(args.geom)
 
     # Resolve the seed. We need to do this because a seed value of 'None' will cause
     # a different seed to be used each time we generate projections.
@@ -739,7 +740,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         zs_max,
     ) = get_filtered_projectionset_generator(
         projdata_path=args.projs,
-        pg=cbfp.ProjGeom.load(args.geom),
+        pg=pg_raw,
         fan_beam_mode=args.fan_beam,
         num_rot_angs=args.num_rot_angs,
         limit_zeta=args.limit_zeta,
@@ -993,7 +994,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 zs_max,
             ) = get_filtered_projectionset_generator(
                 projdata_path=args.projs,
-                pg=cbfp.ProjGeom.load(args.geom),
+                pg=pg_raw,
                 fan_beam_mode=args.fan_beam,
                 num_rot_angs=args.num_rot_angs,
                 limit_zeta=args.limit_zeta,
@@ -1129,16 +1130,20 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     time.sleep(0.05)
                 update_pbar(pbar)
 
-            # Scale the answer correctly
-            vol.multiply(final_multiplier)
+            if tot_num_nonskipped_projs > 0:
+                # Scale the answer correctly
+                vol.multiply(final_multiplier)
 
-            # Save the backprojections into the arrays
-            msg = "Transferring backprojected volume chunk from GPU..."
-            logger.debug(msg)
-            if vol is not None:
-                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                ans = vol.as_numpy()
-                lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
+                # Save the backprojections into the arrays
+                msg = "Transferring backprojected volume chunk from GPU..."
+                logger.debug(msg)
+                if vol is not None:
+                    # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+                    ans = vol.as_numpy()
+                    lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
+            else:
+                msg = "No need to transfer volume chunk from GPU. No work performed."
+                logger.debug(msg)
 
             # Free some memory
             del vol

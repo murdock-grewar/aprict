@@ -644,6 +644,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ################# Define helper methods ##################
     ##########################################################
     vol_dtype = np.float32
+    pg_raw: cbfp.ProjGeom = cbfp.ProjGeom.load(args.geom)
 
     def bytes_at_zindex_mini(zindex_mini: int) -> int:
         """Return the number of volume bytes that need to be stored in memory to handle the zindex_mini value."""
@@ -852,7 +853,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             tot_num_nonskipped_projs,
         ) = get_projectionset_generator(
             projdata_path=args.projs,
-            pg=cbfp.ProjGeom.load(args.geom),
+            pg=pg_raw,
             slice_projs=args.slice_projs,
             autorange_z=args.autorange_z,
             flip_x=args.flip_x,
@@ -977,7 +978,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 tot_num_nonskipped_projs,
             ) = get_projectionset_generator(
                 projdata_path=args.projs,
-                pg=cbfp.ProjGeom.load(args.geom),
+                pg=pg_raw,
                 slice_projs=args.slice_projs,
                 autorange_z=args.autorange_z,
                 flip_x=args.flip_x,
@@ -1070,57 +1071,63 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     time.sleep(0.05)
                 update_pbar(pbar)
 
-            # Normalise to the correct weighting.
-            # This will multiply both a numerator and a divisor by the same amount.
-            # Howevever, it will affect how the denominator is soft-zeroed.
-            msg = "Applying constant factor to volume and weights..."
-            logger.debug(msg)
-            # with rich_console.status(msg, spinner="dots"):
-            with lib.empty_context_manager.EmptyContextManager():
-                factor = 1 / (mu * R**2)
-                if vol is not None:
-                    assert vol_weightsum is not None
-                    vol.multiply(factor)
-                    vol_weightsum.multiply(factor)
-                minivol.multiply(factor)
-                minivol_weightsum.multiply(factor)
+            if tot_num_nonskipped_projs == 0:
+                msg = "No need to transfer volume chunk from GPU. No work performed."
+                logger.debug(msg)
+            else:
+                # Normalise to the correct weighting.
+                # This will multiply both a numerator and a divisor by the same amount.
+                # Howevever, it will affect how the denominator is soft-zeroed.
+                msg = "Applying constant factor to volume and weights..."
+                logger.debug(msg)
+                # with rich_console.status(msg, spinner="dots"):
+                with lib.empty_context_manager.EmptyContextManager():
+                    factor = 1 / (mu * R**2)
+                    if vol is not None:
+                        assert vol_weightsum is not None
+                        vol.multiply(factor)
+                        vol_weightsum.multiply(factor)
+                    minivol.multiply(factor)
+                    minivol_weightsum.multiply(factor)
 
-            # Normalize weights by the expected weightsums
-            msg = "Normalizing the weightsums by the expected sum of backprojection weights..."
-            logger.debug(msg)
-            # with rich_console.status(msg, spinner="dots"):
-            with lib.empty_context_manager.EmptyContextManager():
-                # Full-scale volume
-                if vol is not None:
-                    assert vol_weightsum is not None
-                    vol_weightsum.multiply_by_xygrid(weightsum_divisor_xygrid)
-                # Mini volume
-                minivol_weightsum.multiply_by_xygrid(
-                    weightsum_divisor_mini_xygrid
-                )
+                # Normalize weights by the expected weightsums
+                msg = "Normalizing the weightsums by the expected sum of backprojection weights..."
+                logger.debug(msg)
+                # with rich_console.status(msg, spinner="dots"):
+                with lib.empty_context_manager.EmptyContextManager():
+                    # Full-scale volume
+                    if vol is not None:
+                        assert vol_weightsum is not None
+                        vol_weightsum.multiply_by_xygrid(
+                            weightsum_divisor_xygrid
+                        )
+                    # Mini volume
+                    minivol_weightsum.multiply_by_xygrid(
+                        weightsum_divisor_mini_xygrid
+                    )
 
-            # Divide by the weightsums
-            msg = "Normalizing volumes by the sum of backprojection weights..."
-            logger.debug(msg)
-            # with rich_console.status(msg, spinner="dots"):
-            with lib.empty_context_manager.EmptyContextManager():
-                if vol is not None:
-                    assert vol_weightsum is not None
-                    vol.divide_softzero(vol_weightsum, eps=args.eps)
-                minivol.divide_softzero(minivol_weightsum, eps=args.eps)
-                del vol_weightsum
-                del minivol_weightsum
+                # Divide by the weightsums
+                msg = "Normalizing volumes by the sum of backprojection weights..."
+                logger.debug(msg)
+                # with rich_console.status(msg, spinner="dots"):
+                with lib.empty_context_manager.EmptyContextManager():
+                    if vol is not None:
+                        assert vol_weightsum is not None
+                        vol.divide_softzero(vol_weightsum, eps=args.eps)
+                    minivol.divide_softzero(minivol_weightsum, eps=args.eps)
+                    del vol_weightsum
+                    del minivol_weightsum
 
-            # Save the backprojections into the arrays
-            msg = "Transferring backprojected volume chunk from GPU..."
-            logger.debug(msg)
-            if vol is not None:
+                # Save the backprojections into the arrays
+                msg = "Transferring backprojected volume chunk from GPU..."
+                logger.debug(msg)
+                if vol is not None:
+                    # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+                    ans = vol.as_numpy()
+                    lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
                 # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                ans = vol.as_numpy()
-                lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
-            # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-            ans = minivol.as_numpy()
-            lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
+                ans = minivol.as_numpy()
+                lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
 
             # Free some memory
             del vol, minivol

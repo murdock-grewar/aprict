@@ -3,9 +3,13 @@ TODO for 0.1.0:
  - [x] Chunk the FBP script
  - [x] Add --memmap-vols option to FBP script
  - [ ] Add --memmap-vols option to GBC script (may not implement this...)
+ - [ ] Speed up GBC precomputations, maybe with GPU
  - [ ] Optimise case of 1 chunk for 
    - [ ] GBC 
    - [ ] FBP
- - [ ] Check that all methods are performant on the rock dataset, on my home PC.
-   - [ ] GBC
-   - [x] FBP
+ - [ ] Check that all methods are performant on my home PC.
+   - [ ] GBC, rock
+   - [x] FBP, rock
+   - [ ] GBC, LDS
+   - [ ] FBP, LDS
+ - [ ] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections. 
