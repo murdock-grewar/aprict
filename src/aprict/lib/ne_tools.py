@@ -92,7 +92,7 @@ def set_array_to_constant_pbar(
         persist=pbar_persist,
         show_gpu_usage=False,  # GPU is not used for this
     ) as pbar:
-        while sl.start <= numlayers:
+        while sl.start < numlayers:
             arr_view = arr[..., sl] if step_last_axis else arr[sl, ...]
             ne.evaluate(
                 "const_arr", out=arr_view, local_dict={"const_arr": const_arr}
