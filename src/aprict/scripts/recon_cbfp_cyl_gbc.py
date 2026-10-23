@@ -1283,9 +1283,17 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             msg = "Displaying plot..."
             logger.info(msg)
             with rich_console.status(msg, spinner="dots10"):
-                imview.plot_volume(vol_filtered, title="Filtered volume")
                 imview.plot_volume(
-                    vol_filtered.transpose((2, 1, 0)), title="Filtered volume"
+                    vol_filtered,
+                    title="Filtered volume",
+                    plotmin=args.plotmin,
+                    plotmax=args.plotmax,
+                )
+                imview.plot_volume(
+                    vol_filtered.transpose((2, 1, 0)),
+                    title="Filtered volume",
+                    plotmin=args.plotmin,
+                    plotmax=args.plotmax,
                 )
         case PLOTMODE.NEUROGLANCER:
             msg = "Displaying plot..."

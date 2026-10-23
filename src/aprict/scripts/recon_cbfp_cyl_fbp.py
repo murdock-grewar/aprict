@@ -964,6 +964,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 imview.plot_volume(
                     x, plotmin=args.plotmin, plotmax=args.plotmax
                 )
+                imview.plot_volume(
+                    x.transpose((2, 1, 0)),
+                    title="Filtered volume",
+                    plotmin=args.plotmin,
+                    plotmax=args.plotmax,
+                )
         case PLOTMODE.NEUROGLANCER:
             msg = "Displaying plot..."
             logger.info(msg)
