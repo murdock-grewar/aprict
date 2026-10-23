@@ -3,5 +3,9 @@ TODO for 0.1.0:
  - [x] Chunk the FBP script
  - [x] Add --memmap-vols option to FBP script
  - [ ] Add --memmap-vols option to GBC script (may not implement this...)
- - [ ] Optimise case of 1 chunk for GBC and FBP methods.
+ - [ ] Optimise case of 1 chunk for 
+   - [ ] GBC 
+   - [ ] FBP
  - [ ] Check that all methods are performant on the rock dataset, on my home PC.
+   - [ ] GBC
+   - [x] FBP

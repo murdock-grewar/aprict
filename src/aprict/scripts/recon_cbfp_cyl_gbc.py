@@ -1272,8 +1272,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     arr_slice,
                     axis=axis,
                     index_of_slice=0,
-                    pmin=x.min(),
-                    pmax=x.max(),
+                    pmin=arr_slice.min(),
+                    pmax=arr_slice.max(),
                 )
 
     # Perform logging updates
