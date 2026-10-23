@@ -304,36 +304,36 @@ def validate_args(args: types.SimpleNamespace) -> None:
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
         msg = f"Output path '{args.output!s}' already exists."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if args.output is None and args.memmap_vols:
         msg = "Cannot use --memmap-vols True while --output is not specified."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     # If outputting intermediates, then the user must also specify the --output directory
     if args.output_intermediates and not args.output:
         msg = "Cannot output intermediate tomograms when no output directory was specified. Specify an output directory with --output path/to/new/dir"
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if not args.output and args.plot_mode is PLOTMODE.NONE:
         msg = "No output directory specified and no plotting option chosen. There is no point running the recon."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if args.fan_beam and args.ssz != 1:
         msg = "--ssz must be set to 1 for fan-beam mode, as otherwise the backprojection would sample things toward the top/bottom of a voxel, instead of just the center."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if args.ssx <= 0 or args.ssy <= 0 or args.ssz <= 0:
         msg = "--ssx, --ssy, --ssz must all be positive integers."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if args.plot_mode is PLOTMODE.PYQTGRAPH and not _mod_avail_imview:
         msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
     if args.plot_mode is PLOTMODE.NEUROGLANCER and not _mod_avail_neuroglancer:
         msg = "Cannot use --plot-mode NEUROGLANCER because the relevant modules are not installed."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
 
 
 def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
