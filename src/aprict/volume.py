@@ -106,12 +106,16 @@ class Volume[
         voxwid: float,
         pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
         | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
+        initialize_texture: bool = True,
     ) -> None:
         # Essentially, we are storing the resolved types of the TypeVars
         self._dtype = arr.dtype
         self._shape = arr.shape
         # Create the texture and load the data
-        self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)
+        if initialize_texture:
+            self._texture = self._new_texture(
+                shape=self._shape, dtype=self._dtype
+            )
         self._voxwid = voxwid
         self._pos_c = np.array(pos_c)
         self.copy_from(arr)
@@ -258,8 +262,9 @@ class Volume[
         dtype: _DType | _DType_base = np.float32,  # ty:ignore[invalid-parameter-default]
         pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
         | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
+        initialize_texture: bool = True,  # provided as a way to create a dummy volume, so we may inspect things like its geometries properties, bounding box, etc, without allocating room on the GPU
     ) -> Volume:
-        """Initialise a new volume, filled with zeros."""
+        """Initialise a new volume, filled with zeros. (Supply initialize_texture=False for a dummy volume.)"""  # ruff: ignore[missing-trailing-period]
         if type(shape) is not tuple or len(shape) != 3:
             msg = "Invalid shape provided. It should be a tuple of three positive integers."
             raise ValueError(msg)
@@ -268,8 +273,12 @@ class Volume[
         self._dtype = np.dtype(dtype)
         self._shape = shape
         self._pos_c = np.array(pos_c)
-        self._texture = self._new_texture(shape=self._shape, dtype=self._dtype)  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.
-        self.fill(0)
+        if initialize_texture:
+            self._texture = self._new_texture(
+                shape=self._shape,  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.,
+                dtype=self._dtype,  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.
+            )
+            self.fill(0)
         return self
 
     def zeroed_copy(self) -> Volume:

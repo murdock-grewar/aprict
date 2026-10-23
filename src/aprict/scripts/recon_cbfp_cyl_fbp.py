@@ -191,6 +191,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         help="How many filtration directions to sample. Set to None to use a random single direction for each CB projection.",
     ),
     ce.option(
+        "--seed-proj-rots",
+        default=None,
+        type=lib.click_tools.MaybeType(click.INT),
+        help="Seed to use for generating the volume preset, if applicable.",
+    ),
+    ce.option(
         "--interpolate-measurements",
         type=bool,
         default=True,
@@ -336,13 +342,14 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     rotate_xy: float,
     num_projs_per_chunk: int = 9,
     filt_chunk_size: int = 3,
-    logger: logging.Logger,
+    logger: logging.Logger,  # ruff: ignore[unused-function-argument]
     two_sided: bool,
     vol_minxyz_maxxyz: tuple[
         tuple[float, float, float], tuple[float, float, float]
     ],  # used to quickly skip projections out of range for this algorithm
     cyl_mask_rad: float
     | None,  # set to None to use the reconstruction support radius
+    seed_proj_rots: int,
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
@@ -353,7 +360,10 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     float,
     float,
     float,
+    float,
     int,
+    float,
+    float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
     if fan_beam_mode:
@@ -431,11 +441,6 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     zs_max = pg.source_pos[:, 2].max()
     zs_min = pg.source_pos[:, 2].min()
     recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
-    recon_support_height: float = max(
-        0,
-        (zs_max - zs_min)
-        - 2 * (R + recon_support_radius) * np.tan(vartheta_v),
-    )
     cyl_mask_rad = cyl_mask_rad or recon_support_radius
     max_r_of_any_volpoint: float = min(
         cyl_mask_rad,
@@ -451,15 +456,18 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     vartheta_v_effective: float = (
         min(limit_zeta, vartheta_v) if limit_zeta is not None else vartheta_v
     )
+    recon_support_height: float = max(
+        0,
+        (zs_max - zs_min)
+        - 2 * (R + recon_support_radius) * np.tan(vartheta_v_effective),
+    )
     # _hdiff will be used to quickly prune projections that don't intersect the volume
     hdiff_: float = np.tan(vartheta_v_effective) * (R + max_r_of_any_volpoint)
 
-    logger.info(f"R: {R!s:s}")
-    logger.info(f"L: {L!s:s}")
-    logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
-    logger.info(f"recon_support_height: {recon_support_height:.5g}")
-
     # Set up the filtering object
+    rng_proj_rots: np.random.Generator = np.random.default_rng(
+        seed=seed_proj_rots
+    )
     filt = cb.FBPFilterer(
         proj_2d_shape=(nu, nv),
         projs_per_batch=filt_chunk_size,
@@ -468,10 +476,9 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         limit_zeta=limit_zeta,
         include_hilbert_transform_in_output=two_sided,
         _hacky_fan_beam_mode=fan_beam_mode,
+        rng=rng_proj_rots,
     )
 
-    zs_max = pg.source_pos[:, 2].max()
-    zs_min = pg.source_pos[:, 2].min()
     if fan_beam_mode:
         final_multiplier = (
             # 1
@@ -486,7 +493,6 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
             # * (R * 2 * np.pi * (zs_max - zs_min) / pg.num_projs)
             (zs_max - zs_min) / (16 * np.square(np.pi) * R**2 * pg.num_projs)
         )
-    logger.debug(f"Height of source cylinder: {zs_max - zs_min!s:s}")
 
     def is_inrange(pg_sliced: cbfp.ProjGeom) -> bool:
         pg_sl = pg_sliced
@@ -533,6 +539,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                 # Projections are totally out of range of the volume. Skip loading these projections.
                 # Increment the slice
                 sl_start += num_projs_per_chunk
+                filt.advance_rng(amount=sl.stop - sl.start)
                 continue
 
             # Create ProjectionSet with filtered data in buffer
@@ -605,9 +612,12 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         R,
         L,
         recon_support_radius,
+        recon_support_height,
         cyl_mask_rad,
         final_multiplier,
         tot_num_nonskipped_projs,
+        zs_min,
+        zs_max,
     )
 
 
@@ -677,31 +687,46 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ######## Prepare the input data for the FBP recon ########
     ##########################################################
+    vol_dtype = np.float32
 
-    # Create the working volume
-    volshape = (
+    # Resolve the seed. We need to do this because a seed value of 'None' will cause
+    # a different seed to be used each time we generate projections.
+    # We want to fix a definite seed value right now.
+    BIG_INT: int = int(1e10)  # ruff: ignore[non-lowercase-variable-in-function]
+    seed_proj_rots: int = int(
+        BIG_INT * np.random.default_rng(seed=args.seed_proj_rots).random()
+    )
+
+    # Create a working volume -- this will only be used to compute some geometry information.
+    # Then it will be discarded. This is not very efficient.
+    volshape: tuple[int, int, int] = (
         (*tuple(n for n in args.volshape[0:2]), 1)
         if args.fan_beam
         else tuple(n for n in args.volshape)
     )
-    vol = Volume.zeros(
-        volshape,
-        voxwid=args.voxwid,
-        dtype=np.float32,  # ty:ignore[invalid-argument-type]
-        pos_c=args.volpos,
-    )
 
     two_sided = args.alg is ALG.NOOGREWAR
-    # Create the ProjectionSet objects corresponding to each ordered subset
+
+    # Do some computations to figure out geometry attributes, and log them
+    dummy_vol: Volume = Volume.zeros(
+        volshape,
+        voxwid=args.voxwid,
+        dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
+        pos_c=args.volpos,
+        initialize_texture=False,  # just a dummy volume. Don't try to allocate room on the GPU for it.
+    )
     (
         _pg,
-        sl_filtps_gen,
+        _sl_filtps_gen,
         R,  # ruff: ignore[non-lowercase-variable-in-function]
-        _L,  # ruff: ignore[non-lowercase-variable-in-function]
-        _recon_support_radius,
-        cyl_mask_rad,
-        final_multiplier,
-        tot_num_nonskipped_projs,
+        L,  # ruff: ignore[non-lowercase-variable-in-function]
+        recon_support_radius,
+        recon_support_height,
+        _cyl_mask_rad,
+        _final_multiplier,
+        _tot_num_nonskipped_projs,
+        zs_min,
+        zs_max,
     ) = get_filtered_projectionset_generator(
         projdata_path=args.projs,
         pg=cbfp.ProjGeom.load(args.geom),
@@ -717,74 +742,104 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         logger=logger,
         two_sided=two_sided,
         # These two are supplied to prune irrelevant projections
-        vol_minxyz_maxxyz=vol.minxyz_maxxyz,
-        cyl_mask_rad=args.cyl_mask_rad,  #
-    )
-
-    # Initialise the configuration used for backprojection
-    config_bp_ramp_onesided = cbfp.ConfigBackproject(
-        fast_approx=True,
-        cyl_mask_rad=cyl_mask_rad,
-        Z_on_val_factor_power=(-2 if args.fan_beam else -3),
-        Z_on_val_factor_val=R,
-        backproj_weighting_preset=0,
-        approx_mode_direct_raycast=True,
-        approx_mode_bilinear_interpolate=args.interpolate_measurements,
-        ssx=args.ssx,
-        ssy=args.ssy,
-        ssz=args.ssz,
-    )
-    # Configurations to backproject the ramp- and Hilbert-filtered data
-    # Combine one of these preset pairs:
-    #  - (1, 2) for a formula derived from Kudo's result
-    #  - (3, 4) for a formula derived by F. Noo.
-    #  - (1, 6) for a formula derived from a result by F. Noo.
-    config_bp_ramp_twosided = cbfp.ConfigBackproject(
-        fast_approx=True,
-        cyl_mask_rad=cyl_mask_rad,
-        Z_on_val_factor_power=(0 if args.fan_beam else -1),
-        Z_on_val_factor_val=R,
-        backproj_weighting_preset=1,  # 1,#3,
-        approx_mode_direct_raycast=True,
-        approx_mode_bilinear_interpolate=args.interpolate_measurements,
-        ssx=args.ssx,
-        ssy=args.ssy,
-        ssz=args.ssz,
-    )
-    config_bp_hilb_twosided = cbfp.ConfigBackproject(
-        fast_approx=True,
-        cyl_mask_rad=cyl_mask_rad,
-        Z_on_val_factor_power=(0 if args.fan_beam else -1),
-        Z_on_val_factor_val=R,
-        backproj_weighting_preset=6,  # 2,#4,
-        approx_mode_direct_raycast=True,
-        approx_mode_bilinear_interpolate=args.interpolate_measurements,
-        # Note: it probably isn't necessary to supersample the Hilbert transform part, since it's low frequency.
-        # I'll do it anyway, for simplicity in describing this method.
-        ssx=args.ssx,
-        ssy=args.ssy,
-        ssz=args.ssz,
+        vol_minxyz_maxxyz=dummy_vol.minxyz_maxxyz,
+        cyl_mask_rad=args.cyl_mask_rad,
+        seed_proj_rots=seed_proj_rots,
     )
 
     ##########################################################
     ########## Initialisation of FBP reconstruction ##########
     ##########################################################
-    logger.info(f"cyl mask radius: {cyl_mask_rad:.5g}")
-    logger.debug(
-        f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}"
-    )
+    # logger.info(f"cyl mask radius: {cyl_mask_rad:.5g}")
+    # logger.debug(
+    #     f"normalization multiplier on volume after filtered backprojection: {final_multiplier!s:s}"
+    # )
     logger.info("Initializing FBP reconstruction...")
 
     ##########################################################
     ################# Define helper methods ##################
     ##########################################################
-    def save_current_volume(id_str: str, is_intermediate: bool) -> None:
+
+    def bytes_at_index(index: int) -> int:  # ruff: ignore[unused-function-argument]
+        return volshape[0] * volshape[1] * np.dtype(vol_dtype).itemsize
+
+    # List the number of bytes corresponding to each z index of the minivol, from bottom to top.
+    bytes_by_index: list[int] = [
+        bytes_at_index(zind) for zind in range(volshape[2])
+    ]
+    # Cumulative sum of the above
+    bytes_cumsum = np.cumsum(bytes_by_index)
+    _, gpu_VRAM_capacity_MiB = lib.gpu_tools.get_gpu_mb_used_and_total()  # ruff: ignore[non-lowercase-variable-in-function]
+    GiB_per_chunk: float = (3 / 4) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
+
+    def next_slice_zindex(last_slice: slice | None) -> slice | None:
+        last_slice = slice(0, 0) if last_slice is None else last_slice
+        if last_slice.stop >= volshape[2]:
+            return None
+        idxs = np.argwhere(
+            (
+                (
+                    bytes_cumsum.astype(np.float32)
+                    - bytes_cumsum[max(0, last_slice.stop)].astype(np.float32)
+                )
+                / (1024**3 * GiB_per_chunk)
+            )
+            < 1
+        )
+        if idxs.size == 0:
+            sl = slice(last_slice.stop, last_slice.stop + 1)
+        else:
+            sl = slice(last_slice.stop, int(idxs[-1][0]) + 1)
+        sl = slice(
+            last_slice.stop,
+            min(volshape[2], max(last_slice.stop + 1, sl.stop)),
+        )
+        if sl.stop == sl.start:
+            return None
+        return sl
+
+    def make_vols(
+        slz_: slice,
+    ) -> tuple[slice, Volume | None]:  # volume and corresponding slice
+        """Produce volume corresponding to a volume chunk."""
+        # The 'zindex' gives the index beginning from the bottom (0) of the volume.
+
+        zindex: int = slz_.start
+        znumlayers: int = slz_.stop - slz_.start
+
+        slz = slice(
+            min(volshape[2], zindex),
+            min(volshape[2], zindex + znumlayers),
+        )
+
+        volpos = (
+            args.volpos[0],
+            args.volpos[1],
+            args.volpos[2]
+            - args.voxwid
+            * ((volshape[2] - (slz.stop - slz.start)) / 2 - slz.start),
+        )
+        vol = (
+            None
+            if ((slz.stop - slz.start) <= 0)
+            else Volume.zeros(
+                (*volshape[:2], slz.stop - slz.start),
+                voxwid=args.voxwid,
+                dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
+                pos_c=volpos,
+            )
+        )
+        return (slz, vol)
+
+    def save_volume(
+        vol: np.ndarray, id_str: str, is_intermediate: bool
+    ) -> None:
         # Do nothing if the output path is None.
         if path_output is None:
             return
 
         # Get the current volume
-        x = vol.as_numpy()
+        x = vol
 
         # ty is not smart enough to understand that path_intms can be None only when path_output is None
         assert path_intms is not None
@@ -833,17 +888,35 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ################# Begin reconstruction ###################
     ##########################################################
+    logger.info(f"R: {R!s:s}")
+    logger.info(f"L: {L!s:s}")
+    logger.info(f"recon_support_radius: {recon_support_radius:.5g}")
+    logger.info(f"recon_support_height: {recon_support_height:.5g}")
+    logger.info(f"Height of source cylinder: {zs_max - zs_min!s:s}")
+
+    msg = "Allocating and zeroing the backprojection arrays..."
+    logger.info(msg)
+    # Put the z axis first, so that we can slice it in Z and have a C-contiguous array. This is necessary to copy directly from a cupy array to a numpy array.
+    vol_np = np.empty(volshape, dtype=vol_dtype)
+    lib.ne_tools.set_array_to_constant_pbar(
+        vol_np,
+        const=0,
+        pbar_desc="Allocating room for big backprojection...",
+        pbar_valunit=None,
+        pbar_logger=logger,
+        pbar_persist=False,
+    )
+
     logger.info("Beginning reconstruction...")
+    curr_slice: slice | None = None
     with logtools.ProgressBar(
         desc="Filtered Backproj.:",
-        maxval=tot_num_nonskipped_projs,
+        maxval=int(bytes_cumsum[-1]),
         valunit="proj",
         logger=logger,
         persist=True,
+        unit_is_bytes=True,
     ) as pbar:
-        if args.fan_beam:
-            sum_of_c = 0  # Will be used to do a quick calculation of the approximate attenuation in the middle voxel
-
         # I don't want the progress bar to increment until a piece of work is actually finished by the GPU,
         # not merely queued on the GPU. For this reason, I will add Events to the CUDA stream and this function
         # will check which events have completed, and how many bytes to add to the progress bar.
@@ -857,97 +930,189 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     pbar.advance(advance)
                     del prog_evs_bytes[i]
 
-        with cp.cuda.Stream(non_blocking=True) as stream:
-            for sl, pss in sl_filtps_gen:
-                # pss is None if there was nothing to do for this slice
-                if pss is not None:
-                    if two_sided:
-                        ps_ramp, ps_hilb = pss
-                        cbfp.backproject(
-                            config_bp_ramp_twosided,
-                            vol,
-                            ps_ramp,
-                            block=False,
-                            logger=logger,
-                        )
-                        cbfp.backproject(
-                            config_bp_hilb_twosided,
-                            vol,
-                            ps_hilb,
-                            block=False,
-                            logger=logger,
-                        )
-                        assert (
-                            ps_ramp.data is not None
-                        )  # useful assertion for type-checking
-                        assert (
-                            ps_hilb.data is not None
-                        )  # useful assertion for type-checking
-                        if args.fan_beam:
-                            sum_of_c += float(
-                                cp.sum(
-                                    ps_ramp.data[
-                                        :, ps_ramp.data.shape[1] // 2, :
-                                    ]
-                                )
+        while (curr_slice := next_slice_zindex(curr_slice)) is not None:
+            # Log information about which volume chunk is being worked on
+            msg = f"Computing chunk with slice: {curr_slice}; maximum index {volshape[2]:d}"
+            logger.debug(msg)
+
+            # Loop through each volume chunk.
+            sl_vol, vol = make_vols(curr_slice)
+            if vol is None:
+                msg = "Something has gone wrong. The script has a bug."
+                logger.error(msg)
+                return
+
+            # Create the ProjectionSet objects
+            (
+                _pg,
+                sl_filtps_gen,
+                R,  # ruff: ignore[non-lowercase-variable-in-function]
+                L,  # ruff: ignore[non-lowercase-variable-in-function]
+                recon_support_radius,
+                recon_support_height,
+                cyl_mask_rad,
+                final_multiplier,
+                tot_num_nonskipped_projs,
+                zs_min,
+                zs_max,
+            ) = get_filtered_projectionset_generator(
+                projdata_path=args.projs,
+                pg=cbfp.ProjGeom.load(args.geom),
+                fan_beam_mode=args.fan_beam,
+                num_rot_angs=args.num_rot_angs,
+                limit_zeta=args.limit_zeta,
+                slice_projs=args.slice_projs,
+                autorange_z=args.autorange_z,
+                flip_x=args.flip_x,
+                flip_y=args.flip_y,
+                flip_z=args.flip_z,
+                rotate_xy=args.rotate_xy,
+                logger=logger,
+                two_sided=two_sided,
+                # These two are supplied to prune irrelevant projections
+                vol_minxyz_maxxyz=vol.minxyz_maxxyz,
+                cyl_mask_rad=args.cyl_mask_rad,
+                seed_proj_rots=seed_proj_rots,
+            )
+
+            # Initialise the configuration used for backprojection
+            config_bp_ramp_onesided = cbfp.ConfigBackproject(
+                fast_approx=True,
+                cyl_mask_rad=cyl_mask_rad,
+                Z_on_val_factor_power=(-2 if args.fan_beam else -3),
+                Z_on_val_factor_val=R,
+                backproj_weighting_preset=0,
+                approx_mode_direct_raycast=True,
+                approx_mode_bilinear_interpolate=args.interpolate_measurements,
+                ssx=args.ssx,
+                ssy=args.ssy,
+                ssz=args.ssz,
+            )
+            # Configurations to backproject the ramp- and Hilbert-filtered data
+            # Combine one of these preset pairs:
+            #  - (1, 2) for a formula derived from Kudo's result
+            #  - (3, 4) for a formula derived by F. Noo.
+            #  - (1, 6) for a formula derived from a result by F. Noo.
+            config_bp_ramp_twosided = cbfp.ConfigBackproject(
+                fast_approx=True,
+                cyl_mask_rad=cyl_mask_rad,
+                Z_on_val_factor_power=(0 if args.fan_beam else -1),
+                Z_on_val_factor_val=R,
+                backproj_weighting_preset=1,  # 1,#3,
+                approx_mode_direct_raycast=True,
+                approx_mode_bilinear_interpolate=args.interpolate_measurements,
+                ssx=args.ssx,
+                ssy=args.ssy,
+                ssz=args.ssz,
+            )
+            config_bp_hilb_twosided = cbfp.ConfigBackproject(
+                fast_approx=True,
+                cyl_mask_rad=cyl_mask_rad,
+                Z_on_val_factor_power=(0 if args.fan_beam else -1),
+                Z_on_val_factor_val=R,
+                backproj_weighting_preset=6,  # 2,#4,
+                approx_mode_direct_raycast=True,
+                approx_mode_bilinear_interpolate=args.interpolate_measurements,
+                # Note: it probably isn't necessary to supersample the Hilbert transform part, since it's low frequency.
+                # I'll do it anyway, for simplicity in describing this method.
+                ssx=args.ssx,
+                ssy=args.ssy,
+                ssz=args.ssz,
+            )
+
+            with cp.cuda.Stream(non_blocking=True) as stream:
+                for sl, pss in sl_filtps_gen:
+                    # pss is None if there was nothing to do for this slice
+                    if pss is not None:
+                        if two_sided:
+                            ps_ramp, ps_hilb = pss
+                            cbfp.backproject(
+                                config_bp_ramp_twosided,
+                                vol,
+                                ps_ramp,
+                                block=False,
+                                logger=logger,
                             )
-                            sum_of_c += float(
-                                cp.sum(
-                                    ps_hilb.data[
-                                        :, ps_ramp.data.shape[1] // 2, :
-                                    ]
-                                )
+                            cbfp.backproject(
+                                config_bp_hilb_twosided,
+                                vol,
+                                ps_hilb,
+                                block=False,
+                                logger=logger,
                             )
-                    else:
-                        (ps_ramp,) = pss
-                        cbfp.backproject(
-                            config_bp_ramp_onesided, vol, ps_ramp, block=False
-                        )
-                        assert (
-                            ps_ramp.data is not None
-                        )  # useful assertion for type-checking
-                        if args.fan_beam:
-                            sum_of_c += float(
-                                cp.sum(
-                                    ps_ramp.data[
-                                        :, ps_ramp.data.shape[1] // 2, :
-                                    ]
-                                )
+                            assert (
+                                ps_ramp.data is not None
+                            )  # useful assertion for type-checking
+                            assert (
+                                ps_hilb.data is not None
+                            )  # useful assertion for type-checking
+                        else:
+                            (ps_ramp,) = pss
+                            cbfp.backproject(
+                                config_bp_ramp_onesided,
+                                vol,
+                                ps_ramp,
+                                block=False,
                             )
+                            assert (
+                                ps_ramp.data is not None
+                            )  # useful assertion for type-checking
 
-                    # ProgressBar stuff
-                    ev = cp.cuda.Event()
-                    ev.record(stream=stream)
-                    prog_evs_bytes.append(
-                        (
-                            ev,
-                            sl.stop - sl.start,
+                        # ProgressBar stuff
+                        ev = cp.cuda.Event()
+                        ev.record(stream=stream)
+                        prog_evs_bytes.append(
+                            (
+                                ev,
+                                (
+                                    (
+                                        (sl.stop - sl.start)
+                                        / tot_num_nonskipped_projs
+                                    )
+                                    * (
+                                        int(bytes_cumsum[curr_slice.stop - 1])
+                                        - int(
+                                            ([0, *bytes_cumsum])[
+                                                curr_slice.start
+                                            ]
+                                        )
+                                    )
+                                ),
+                            )
                         )
-                    )
-                update_pbar(pbar)  # update from this and previous queued work
+                    update_pbar(
+                        pbar
+                    )  # update from this and previous queued work
 
-            # Don't synchronize the ordinary way, because then we get no progress updates
-            # stream.synchronize()
-            while not stream.done:
-                update_pbar(pbar)  # update from this and previous queued work
-                time.sleep(0.05)
-            update_pbar(pbar)  # update from this and previous queued work
-            if len(prog_evs_bytes) != 0:
-                logger.error(
-                    f"It seems that not all work was completed... this is a bug in the program. Output of 'prog_evs_bytes': {prog_evs_bytes}"
-                )
+                # Don't synchronize the ordinary way, because then we get no progress updates
+                # stream.synchronize()
+                while not stream.done:
+                    update_pbar(
+                        pbar
+                    )  # update from this and previous queued work
+                    time.sleep(0.05)
+                update_pbar(pbar)
 
-    if args.fan_beam:
-        logger.debug(
-            f"Approximate attenuation coefficient of middle voxel: {sum_of_c * final_multiplier:.5f}"
-        )
+            # Scale the answer correctly
+            vol.multiply(final_multiplier)
 
-    # Scale the answer correctly
-    vol.multiply(final_multiplier)
+            # Save the backprojections into the arrays
+            msg = "Transferring backprojected volume chunk from GPU..."
+            logger.debug(msg)
+            if vol is not None:
+                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+                ans = vol.as_numpy()
+                lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
+
+            # Free some memory
+            del vol
+            lib.gpu_tools.clear_cache()
+
+        pbar.update_to(int(bytes_cumsum[-1]))
 
     # Save final output artefacts
     if path_output:
-        save_current_volume(id_str="recon", is_intermediate=False)
+        save_volume(vol=vol_np, id_str="recon", is_intermediate=False)
 
     # Perform logging updates
     logger.info("Done.")
@@ -960,7 +1125,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             msg = "Displaying plot..."
             logger.info(msg)
             with rich_console.status(msg, spinner="dots10"):
-                x = vol.as_numpy()
+                x = vol_np
                 imview.plot_volume(
                     x, plotmin=args.plotmin, plotmax=args.plotmax
                 )
@@ -975,11 +1140,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             msg = "Displaying plot..."
             logger.info(msg)
             with ng_tools.ArrayViewer3D(
-                vol.as_numpy(),
+                vol_np,
                 plotmin=args.plotmin,
                 plotmax=args.plotmax,
                 port=args.web_port,
-                voxwid_mm=vol.voxwid,
+                voxwid_mm=args.voxwid,
                 wait_for_input_before_exit_prompt=None,
             ) as av:
                 msg = f"Displaying plot at URL: {av.url} ..."

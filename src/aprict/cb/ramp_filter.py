@@ -320,6 +320,7 @@ class FBPFilterer:
     L: float
     physpixwid: float
     ss: SamplingStrategy
+    rng: np.random.Generator
 
     _hacky_fan_beam_mode: bool
 
@@ -352,7 +353,9 @@ class FBPFilterer:
         | None = None,  # limit the maximum rotation angle zeta
         include_hilbert_transform_in_output: bool = False,
         _hacky_fan_beam_mode: bool = False,  # Modifies the behaviour to be compatible with a simple fan-beam
+        rng: np.random.Generator | None = None,
     ) -> None:
+        self.rng = np.random.default_rng(seed=None) if rng is None else rng
         self._include_hilbert_transform = include_hilbert_transform_in_output
         self.hacky_fan_beam_mode = _hacky_fan_beam_mode
         self.L = L
@@ -424,6 +427,25 @@ class FBPFilterer:
                 )
             )
         )
+
+    def advance_rng(self, amount: int) -> None:
+        """Advance the internal rng counter by this many steps."""
+        [self.rng.random() for _ in range(amount)]
+
+    def uniform_rng(self, low: float, high: float, len: int) -> np.ndarray:
+        """Generate a 1D array of `len` random numbers, making exactly `len` advancement steps to the internal rng state."""
+        # Mimics the behaviour of:
+        # rotang_rads_list = self.rng.uniform(
+        #     low=-self._max_abs_rotation_angle,
+        #     high=self._max_abs_rotation_angle,
+        #     size=(v.shape[0],),
+        # )
+        # except it uses a known number of calls to self.rng.random()
+        # which I can rely upon.
+        out = np.empty((len,), dtype=np.float32)
+        for i in range(len):
+            out[i] = low + (high - low) * self.rng.random()
+        return out
 
     def get_letterbox_slice(
         self, rotation_angle: float
@@ -569,10 +591,21 @@ class FBPFilterer:
 
             # Rotate and copy into the memory buffer
             if force_rotation_angle is None:
-                rotang_rads_list = np.random.uniform(  # ruff: ignore[numpy-legacy-random]
+                # NOTE:
+                # although the commented-out code below seems to work, I think it relies
+                # upon an implementation detail. I want to be able to advance the RNG in a
+                # reliable way for the FBP recon script. I 'advance' the rng by calling
+                # rng.random(). It seems that rng.uniform(...) predictably uses one such
+                # call per random element generated.
+                # This is sensible and a predictable implementation, but I think it is
+                # undocumented, and I'm not comfortable with it. So, I'll write my own
+                # function to use the self.rng, to be sure that it behaves this way,
+                # even if those implementation details change in the future.
+                # rotang_rads_list = self.rng.uniform(
+                rotang_rads_list = self.uniform_rng(
                     low=-self._max_abs_rotation_angle,
                     high=self._max_abs_rotation_angle,
-                    size=(v.shape[0],),
+                    len=v.shape[0],
                 )
             else:
                 rotang_rads_list = force_rotation_angle * np.ones(
