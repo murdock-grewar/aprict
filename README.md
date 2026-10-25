@@ -17,6 +17,10 @@ This software requires at least one relatively recent *CUDA-capable GPU*. An RTX
 
 It is strongly recommended to use high-speed mass storage, such as an NVMe drive. The software has not been tested on slower mass storage, and is not expected to perform well without it.
 
+This software has been tested with the following GPUs: 
+* NVIDIA RTX 3090
+* NVIDIA RTX PRO 6000 Blackwell
+
 Known limitations
 ---
 
