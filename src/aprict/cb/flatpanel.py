@@ -930,9 +930,9 @@ def project(
         blocky = 20
         blocklayer = 1
     else:
-        blockx = min(10, projs.data.shape[-2])
-        blocky = min(10, projs.data.shape[-1])
-        blocklayer = min(10, projs.data.shape[-3])
+        blockx = min(32, projs.data.shape[-2])
+        blocky = min(20, projs.data.shape[-1])
+        blocklayer = min(1, projs.data.shape[-3])
     kern = _select_projection_kernel(config, volume, projs)
     block_dims = (blockx, blocky, blocklayer)
     grid_dims = (
