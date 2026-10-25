@@ -15,6 +15,7 @@
 
 """Simulate an example experiment with a helical scan."""
 
+import math
 import sys
 import time
 
@@ -33,14 +34,10 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ### Configurable parameters ###
     live_plot: bool = True
     voxwid_mm: float = 0.2  # the voxel width of the head phantom
-    scale_phantom_size: float = (
-        # 2*4/5  # make the phantom bigger, without reducing its attenuation coefficient
-        1
-    )
     apply_noise: bool = False
     R_mm: float = 700  # ruff: ignore[non-lowercase-variable-in-function]
     L_mm: float = R_mm + 700  # ruff: ignore[non-lowercase-variable-in-function]
-    num_sources: int = 30000
+    num_sources: int = 3000
     total_clearfield_photons: float = 1e14  # total number of clearfield photons in the experiment, to be distributed evenly among every detector pixel of every projection.
     detwid_mm: float = 700  # The reconstruction is not good when the reconstruction support is smaller than the masked volume region... there's a dark ring that appears when setting detwid_mm = 500, and the exterior of the reconstruction is then poor. Looks much better with detwid_mm = 700. I need to look into this. It might be improved by softening the edges of the detector when backprojecting.
     dethei_mm: float = 0.20
@@ -91,10 +88,10 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     )
     det_vvec_arr = pixel_wid_mm * np.array([[0, 0, 1]], dtype=np.float32)
     pg: cbfp.ProjGeom = cbfp.ProjGeom(
-        source_pos=source_pos_arr / voxwid_mm,
-        det_pos=det_pos_arr / voxwid_mm,
-        det_uvec=det_uvec_arr / voxwid_mm,
-        det_vvec=det_vvec_arr / voxwid_mm,
+        source_pos=source_pos_arr,
+        det_pos=det_pos_arr,
+        det_uvec=det_uvec_arr,
+        det_vvec=det_vvec_arr,
         nu=det_numpixwid,
         nv=det_numpixhei,
     )
@@ -103,11 +100,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
     vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
-    vol.scale_len(1 / voxwid_mm)
-    volwid_mm = 300  # in the future, fetch from the phantom
-    # Scale up the volume
-    vol.scale_len(scale_phantom_size)
-    volwid_mm *= scale_phantom_size
+    xyz_min, xyz_max = vol.minxyz_maxxyz
+    volwid_mm = 1.1 * 2 * max(map(abs, (*xyz_min[:2], *xyz_max[:2])))
 
     ### Do plotting of the imaging geometry
     # Prepare the 3D plot
@@ -141,8 +135,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ## Call the projection code on the prepared geometry ##
     config_project = cbfp.ConfigProject(
         # convert from attenuation as a multiple of water's attenuation to attenuation per voxel-width
-        multiply_before_adding=voxwid_mm
-        * 0.0184,  # attenuation of water ~ 0.0184 per mm
+        multiply_before_adding=0.0184,  # attenuation of water ~ 0.0184 per mm
     )
     projs = cbfp.ProjectionSet(pg, data=None)
     projs.create_buffer(dtype=proj_dtype)
@@ -195,12 +188,17 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
         out_noised_attenuation, out_noised_transmission, out_
 
     # Set up the working volume
-    vol_shape: tuple[int, int, int] = tuple(
-        int(volwid_mm // voxwid_mm) for _ in range(3)
-    )  # ty:ignore[invalid-assignment]  # ty is bugged here
-    vol_shape = (vol_shape[0], vol_shape[1], 1)
+    vol_shape: tuple[int, int, int] = (
+        math.ceil(volwid_mm / voxwid_mm),
+        math.ceil(volwid_mm / voxwid_mm),
+        1,
+    )
     print("Working volume shape: ", vol_shape)
-    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = aprict.Volume.zeros(
+        vol_shape,
+        voxwid=voxwid_mm,
+        dtype=vol_dtype,  # ty:ignore[invalid-argument-type]  # ty is bugged
+    )
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
@@ -221,7 +219,11 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     # aprict.imview.plot_volume(working_vol.as_numpy())
 
     # Make a SIRT object
-    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)  # ty:ignore[invalid-argument-type]
+    working_vol = aprict.Volume.zeros(
+        vol_shape,
+        voxwid=voxwid_mm,
+        dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
+    )
     working_vol.fill(0)
     recon = aprict.iterators.SIRT_flatpanel(
         config=aprict.iterators.SIRT_flatpanel.Config(
@@ -235,14 +237,14 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     # Set up live plot
     if live_plot:
         _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
-            title="Live plot",
+            title="Live plot -- SIRT reconstruction of FORBILD head phantom",
             histogram_label="Attenuation coefficient",
             # 0 to 100 HU
             # plotmin=0.0184 * voxwid_mm,
             # plotmax=1.1 * 0.0184 * voxwid_mm,
             # 35 to 65 HU
-            plotmin=0.0184 * voxwid_mm * 1.035,
-            plotmax=0.0184 * voxwid_mm * 1.065,
+            plotmin=0.0184 * 1.035,  # 35 HU
+            plotmax=0.0184 * 1.065,  # 65 HU
             show=False,
         )
 

@@ -46,7 +46,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         None if len(sys.argv) < 5 else pathlib.Path(sys.argv[4])
     )
 
-    reconstruct: bool = False
+    reconstruct: bool = True
     live_plot: bool = True
     # default_plot_range_HU: list[int | float] = [0, 1000]
     default_plot_range_line_attenuation: list[int | float] = [0.0, 0.4]
@@ -161,10 +161,10 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     )
     det_vvec_arr = pixel_wid_mm * np.array([[0, 0, 1]], dtype=np.float32)
     pg: cbfp.ProjGeom = cbfp.ProjGeom(
-        source_pos=source_pos_arr / voxwid_mm,
-        det_pos=det_pos_arr / voxwid_mm,
-        det_uvec=det_uvec_arr / voxwid_mm,
-        det_vvec=det_vvec_arr / voxwid_mm,
+        source_pos=source_pos_arr,
+        det_pos=det_pos_arr,
+        det_uvec=det_uvec_arr,
+        det_vvec=det_vvec_arr,
         nu=det_numpixwid,
         nv=det_numpixhei,
     )
@@ -208,27 +208,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
             xvol, title="Region of interest (axial slices)"
         )
         del xvol
-    vol.scale_len(1 / voxwid_mm)
     print("done.")
-    if False:
-        vol_numpy = vol.to_numpy(
-            xs=np.linspace(
-                -400, 400, num=1001, endpoint=True, dtype=np.float32
-            ),
-            ys=np.linspace(
-                -400, 400, num=1001, endpoint=True, dtype=np.float32
-            ),
-            zs=np.linspace(
-                2 * math.floor(zmin_mm),
-                2 * math.floor(zmax_mm),
-                endpoint=True,
-                num=1 + math.floor(zmax_mm) - math.floor(zmin_mm),
-                dtype=np.float32,
-            ),
-        )
-        aprict.imview.plot_volume(vol_numpy)
-        exit(0)
-        del vol_numpy
     print("Number of shapes in volume: ", len(vol.shapes))
     volwid_mm = 500  # in the future, fetch from the phantom
     # Scale up the volume
@@ -268,8 +248,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     ## Call the projection code on the prepared geometry ##
     config_project = cbfp.ConfigProject(
         # convert from attenuation as a multiple of water's attenuation to attenuation per voxel-width
-        multiply_before_adding=voxwid_mm
-        * 0.0184,  # attenuation of water ~ 0.0184 per mm
+        multiply_before_adding=0.0184,  # attenuation of water ~ 0.0184 per mm
     )
     projs = cbfp.ProjectionSet(pg, data=None)
     projs.create_buffer(dtype=proj_dtype)
@@ -314,7 +293,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     if show_plots_before_recon:
         aprict.imview.plot_projections(
             proj_array.reshape(-1, *proj_array.shape[-2:]),
-            title="max attenuation capped for plotting purposes",
+            title="Linearised projection data (line attenuations)",
         )
 
     # Write the projections to disk
@@ -334,12 +313,16 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     if reconstruct:
         # Set up the working volume
         vol_shape: tuple[int, int, int] = (
-            int(volwid_mm // voxwid_mm),
-            int(volwid_mm // voxwid_mm),
-            int((volwid_mm // voxwid_mm) * 2 / 4),
+            math.ceil(volwid_mm / voxwid_mm),
+            math.ceil(volwid_mm / voxwid_mm),
+            math.ceil((volwid_mm / voxwid_mm) * 2 / 4),
         )
         print("Working volume shape: ", vol_shape)
-        working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)
+        working_vol = aprict.Volume.zeros(
+            vol_shape,
+            voxwid=voxwid_mm,
+            dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
+        )
 
         # Backproject into the working volume
         config_backproject = cbfp.ConfigBackproject(
@@ -362,7 +345,11 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
         # aprict.imview.plot_volume(working_vol.as_numpy())
 
         # Make a SIRT object
-        working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=vol_dtype)
+        working_vol = aprict.Volume.zeros(
+            vol_shape,
+            voxwid=voxwid_mm,
+            dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
+        )
         working_vol.fill(0)
         recon = aprict.iterators.SIRT_flatpanel(
             config=aprict.iterators.SIRT_flatpanel.Config(
@@ -380,8 +367,6 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
                 histogram_label="Line Attenuation",
                 plotmin=default_plot_range_line_attenuation[0],
                 plotmax=default_plot_range_line_attenuation[1],
-                # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
-                # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
                 show=False,
             )
 

@@ -16,6 +16,7 @@
 """Simulate an example experiment with a triangular scanning apparatus."""
 
 import itertools
+import math
 import time
 
 import cupy as cp
@@ -244,9 +245,6 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     print("Voxel width (mm):        ", voxwid_mm)
     # vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
     vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite
-    vol.scale_len(
-        1 / voxwid_mm
-    )  # factor to change from units of mm to units of voxel-lengths
     volwid_mm = 300  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
@@ -265,15 +263,15 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ax.set_aspect("equal")
     # Plot X-ray sources
     ax.scatter(
-        voxwid_mm * sps[..., 0],
-        voxwid_mm * sps[..., 1],
-        zs=voxwid_mm * sps[..., 2],
+        sps[..., 0],
+        sps[..., 1],
+        zs=sps[..., 2],
         marker="x",
         label="X-ray source",
     )
     # Plot detectors
     # Convert the data back to plain np.float32 format so that we can do plotting with matplotlib
-    verts1_mm = voxwid_mm * np.array(
+    verts1_mm = np.array(
         [
             p1 + nu * u1 / 2 + nv * v1 / 2,
             p1 - nu * u1 / 2 + nv * v1 / 2,
@@ -282,7 +280,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
             p1 + nu * u1 / 2 + nv * v1 / 2,
         ]
     )
-    verts2_mm = voxwid_mm * np.array(
+    verts2_mm = np.array(
         [
             p2 + nu * u2 / 2 + nv * v2 / 2,
             p2 - nu * u2 / 2 + nv * v2 / 2,
@@ -291,7 +289,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
             p2 + nu * u2 / 2 + nv * v2 / 2,
         ]
     )
-    verts3_mm = voxwid_mm * np.array(
+    verts3_mm = np.array(
         [
             p3 + nu * u3 / 2 + nv * v3 / 2,
             p3 - nu * u3 / 2 + nv * v3 / 2,
@@ -342,8 +340,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     ## Call the projection code on the prepared geometry ##
     config_project = cbfp.ConfigProject(
         # convert from attenuation as a multiple of water's attenuation to attenuation per voxel-width
-        multiply_before_adding=voxwid_mm
-        * 0.0184,  # attenuation of water ~ 0.0184 per mm
+        multiply_before_adding=0.0184,  # attenuation of water ~ 0.0184 per mm
     )
     projs = cbfp.ProjectionSet(pg, data=None)
     print("Generating the linearised projection data... ", end="", flush=True)
@@ -387,7 +384,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
     # aprict.imview.plot_projections(out_noised_transmission.reshape(-1, *out_noised_transmission.shape[-2:]))
     aprict.imview.plot_projections(
         proj_array.reshape(-1, *proj_array.shape[-2:]),
-        title="max attenuation capped for plotting purposes",
+        title="Linearised projections (line attenuation)",
     )
 
     # Free up memory by deleting various unneeded variables
@@ -397,9 +394,13 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Set up the working volume
     vol_shape: tuple[int, int, int] = tuple(
-        int(volwid_mm // voxwid_mm) for _ in range(3)
+        math.ceil(volwid_mm / voxwid_mm) for _ in range(3)
     )  # ty:ignore[invalid-assignment]  # ty is bugged here
-    working_vol = aprict.Volume.zeros(vol_shape, voxwid=1, dtype=np.float32)  # ty:ignore[invalid-argument-type]  # ty is bugged
+    working_vol = aprict.Volume.zeros(
+        vol_shape,
+        voxwid=voxwid_mm,
+        dtype=np.float32,  # ty:ignore[invalid-argument-type]  # ty is bugged
+    )
 
     # Backproject into the working volume
     config_backproject = cbfp.ConfigBackproject(
@@ -420,12 +421,10 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Set up the liveplot object
     _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
-        title="Live plot -- reconstructed volume",
+        title="Live plot of SIRT reconstruction (scrub through volume with bar at bottom)",
         histogram_label="Line Attenuation",
         plotmin=0,
-        plotmax=1.8 * 0.0184 * voxwid_mm,
-        # plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_line_attenuationdefault_plot_range_HU[0] / 1000),
-        # plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
+        plotmax=1.8 * 0.0184,
         show=True,
     )
 
