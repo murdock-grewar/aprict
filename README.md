@@ -20,6 +20,7 @@ It is strongly recommended to use high-speed mass storage, such as an NVMe drive
 Known limitations
 ---
 
+* Only flat-panel X-ray data with square pixels is supported, at this time.
 * Lack of documentation:
   * The Python API is not yet documented.
   * The way that geometry is encoded in `*.json` files is not yet documented.
