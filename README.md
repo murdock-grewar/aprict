@@ -1,12 +1,4 @@
-<details open>
-
-<summary>
-    
-About
-===
-
-</summary>
-
+<details open><summary><h1>About</h1></summary>
 
 Description
 ---
@@ -54,14 +46,7 @@ Features
 
 </details>
 
-<details>
-
-<summary>
-
-Setup
-===
-
-</summary>
+<details><summary><h1>Setup</h1></summary>
 
 Installation
 ---
@@ -80,14 +65,7 @@ If you're using Windows, then it's recommended to install this inside the Window
 </details>
 
 
-<details>
-
-<summary>
-
-Example usage with the Commandline Interface (CLI)
-===
-
-</summary>
+<details><summary><h1>Example usage with the Commandline Interface (CLI)</h1></summary>
 
 
 Commandline interface (CLI)
@@ -118,14 +96,7 @@ Commands:
 You can use the `--help` option with any command to see its detailed usage information.
 
 
-<details>
-
-<summary>
-    
-Example A: cone-beam; cylindrical source distribution
----
-
-</summary>
+<details><summary><h2>Example A: cone-beam; cylindrical source distribution</h2></summary>
 
 Here's an example where we will use the CLI to simulate data from the FORBILD Head phantom, and reconstruct a tomogram from that data.
 
@@ -207,14 +178,7 @@ aprict-cli recon fbp-cone-cyl \
 </details>
 
 
-<details>
-
-<summary>
-    
-Example B: fan-beam; circular source distribution
----
-
-</summary>
+<details><summary><h2>Example B: fan-beam; circular source distribution</h2></summary>
 
 Here's an example where we will use the CLI to simulate data from a FORBILD phantom resembling a double-chambered aluminium rock canister phantom.
 
