@@ -393,6 +393,14 @@ class FBVolume:
         )
         return xyz_min, xyz_max
 
+    @property
+    def minxyz_maxxyz(
+        self,
+    ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+        """Boundary tuple: ((minx,miny,minz),(maxx,maxy,maxz))."""
+        bbox = self.get_bbox()
+        return (tuple(bbox[0]), tuple(bbox[1]))
+
     def prune_to_bbox(
         self,
         xyz_min: tuple[float, float, float]
