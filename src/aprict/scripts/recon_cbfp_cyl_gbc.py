@@ -1170,6 +1170,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     logger.info(msg)
     with rich_console.status(msg, spinner="dots"):
         # Filter the mini recon first.
+        msg = "Filtering padded minivol..."
+        logger.debug(msg)
         minivol_voxwid = args.voxwid * args.n
         ndarray_container = lib.np_tools.NDArrayContainer(array=volmini_np)
         minivol_padded_filtered_np = gbc.filters.ramp_filter_conebeam(
@@ -1190,6 +1192,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             ]
         )
         del volmini_np  # not going to reuse this, so delete this reference so the filtration can free some memory.
+        msg = "Filtering unpadded minivol..."
+        logger.debug(msg)
         minivol_unpadded_filtered_np = gbc.filters.ramp_filter_conebeam(
             ndarray_container,
             minivol_voxwid,
@@ -1200,6 +1204,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             logger=logger,
             copy_to_array=None,
         )
+        msg = "Producing minivol correction array..."
+        logger.debug(msg)
         minivol_correction_np = (
             minivol_padded_filtered_np[
                 mvc_padx : (-mvc_padx) or None,
@@ -1215,6 +1221,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             ndarray_container,
         )
         # Filter the full recon now
+        msg = "Filtering padded vol and adding upscaled minivol correction..."
+        logger.debug(msg)
         ndarray_container = lib.np_tools.NDArrayContainer(array=vol_np)
         vol_voxwid = args.voxwid
         del vol_np  # allows memory to be freed, because the gbc.filters.ramp_filter_conebeam is free to overwrite the ndarray_container.array
@@ -1254,6 +1262,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             f"Estimated DC component to be subtracted: {dc_component:.5g}"
         )
         # Correct the DC component
+        msg = "Adding DC correction..."
+        logger.debug(msg)
         ne.evaluate(
             "v - dcc",
             out=vol_filtered_np,
@@ -1273,6 +1283,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
         # Clean up
         lib.gpu_tools.clear_cache()
+        lib.gpu_tools.clear_pinned_cache()
 
     if path_output is not None:
         msg = "Saving volume to disk..."
