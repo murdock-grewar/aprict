@@ -193,8 +193,19 @@ class Volume[
             self._texture, vol._texture, tout=self._texture, eps=eps
         )
 
-    def as_numpy(self, out: np.ndarray | None = None) -> np.ndarray:
+    def as_numpy(self, out: np.ndarray | None = None, allow_indirect_copy: bool = False) -> np.ndarray:
         """Copy this volume's data into a numpy array."""
+        # Note: the option 'allow_indirect_copy' allows a fast-but-not-fastest copy when the output array is not C-contiguous.
+        if out is not None and not out.flags["C_CONTIGUOUS"]:
+            # The output volume is not C contiguous. A copy cannot be performed unless
+            # allow_indirect_copy=True is supplied.
+            if not allow_indirect_copy:
+                msg = "The array supplied to the out=... keyword is not C contiguous. The data cannot be copied directly, and indirect copying must be explicitly allowed via allow_indirect_copy=True."
+                raise ValueError(msg)
+            out_ = self.as_numpy(out=None)
+            ne_tools.fastcopy(src=out_, dst=out)
+            gpu_tools.clear_pinned_cache()
+            return out
         x = (
             out
             if out is not None
