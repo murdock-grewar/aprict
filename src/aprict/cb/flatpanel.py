@@ -33,6 +33,7 @@ import numpy.typing as npt  # ruff: ignore[unused-import]
 from .. import logtools
 from ..cuda import header_injection, structs
 from ..cuda.kern_structs import _np_dtype_to_c_type
+from ..lib import gpu_tools
 from ..volume import FBVolume, Volume
 
 _delay_compile: bool = (
@@ -800,6 +801,11 @@ class ProjectionSet:
                 data=cp.zeros(data_shape, dtype=dtype),  # ty:ignore[invalid-argument-type]
             )
         return ProjectionSet(self._proj_geom, data=cp.zeros_like(self._data))
+
+    def __del__(self) -> None:  # ruff: ignore[undocumented-magic-method]
+        # HOTFIX to work around a pinned-memory leak in CuPy
+        # Unfortunately, this reduces GPU utilisation.
+        gpu_tools.clear_pinned_cache()
 
 
 class ConfigProject:
