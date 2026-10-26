@@ -15,6 +15,7 @@ TODO for 0.1.1:
 
 TODO for 0.1.0:
  - [ ] Unload one chunk from GPU while the next is being computed
+ - [ ] Find a way to reorder volume memory as F-contiguous, to speed up transfers from GPU when slicing along Z direction
  - [x] Document status of non-square pixel support
  - [d] Allow block=False in the projection script -- this is not as straightforward as I had imagined.
  - [x] Chunk the FBP script
