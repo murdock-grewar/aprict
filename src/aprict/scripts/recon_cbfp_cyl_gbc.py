@@ -944,11 +944,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         pbar_persist=False,
     )
 
+    # Convert the progress display ta more intuitive set of units using the progratio.
+    # The displayed progress will correspond to bytes in the padded backprojection.
+    progratio: float = (math.prod(padded_volshape) * np.dtype(vol_dtype).itemsize / bytes_cumsum[-1])
     curr_slice: slice | None = None
     logger.info("Beginning reconstruction...")
     with logtools.ProgressBar(
         desc="Backproj.:",
-        maxval=int(bytes_cumsum[-1]),
+        maxval=math.ceil(bytes_cumsum[-1] * progratio),
         logger=logger,
         persist=True,
         unit_is_bytes=True,
@@ -1063,7 +1066,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                         prog_evs_bytes.append(
                             (
                                 ev,
-                                (
+                                progratio * (
                                     (
                                         (sl.stop - sl.start)
                                         / tot_num_nonskipped_projs
@@ -1147,17 +1150,21 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 logger.debug(msg)
                 # Copy minivol.
                 # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                minivol.as_numpy(out=volmini_np[..., sl_minivol], allow_indirect_copy=True)
+                minivol.as_numpy(
+                    out=volmini_np[..., sl_minivol], allow_indirect_copy=True
+                )
                 del minivol
                 lib.gpu_tools.clear_cache()
                 # Copy vol.
                 if vol is not None:
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    vol.as_numpy(out=vol_np[..., sl_vol], allow_indirect_copy=True)
+                    vol.as_numpy(
+                        out=vol_np[..., sl_vol], allow_indirect_copy=True
+                    )
                     del vol
                     lib.gpu_tools.clear_cache()
 
-        pbar.update_to(int(bytes_cumsum[-1]))
+        pbar.update_to(pbar.maxval)
 
     msg = "Filtering volumes..."
     logger.info(msg)
@@ -1281,7 +1288,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             if args.memmap_vols:
                 savepath = path_output.joinpath("tmp_backproj" + ".npy")
                 savepath.unlink()  # delete file
-                savepath = path_output.joinpath("tmp_backproj" + "_mini" + ".npy")
+                savepath = path_output.joinpath(
+                    "tmp_backproj" + "_mini" + ".npy"
+                )
                 savepath.unlink()  # delete file
             # Save slices
             for axis, axis_str in enumerate("xyz"):

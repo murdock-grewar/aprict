@@ -140,6 +140,11 @@ class ProgressBar:
                 speed_estimate_period=86400,  # period in seconds
             )
 
+    @property
+    def maxval(self) -> int | float:
+        """Maximum value of the progress bar."""
+        return self._maxval
+
     def __enter__(self) -> ProgressBar:  # ruff: ignore[undocumented-magic-method]
         if self._enable:
             self._cm.__enter__()
