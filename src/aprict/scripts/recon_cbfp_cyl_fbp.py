@@ -1139,10 +1139,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 logger.debug(msg)
                 if vol is not None:
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    ans = vol.as_numpy()
-                    lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
-                    del ans  # allow the memory to be freed
-                    lib.gpu_tools.clear_pinned_cache()
+                    vol.as_numpy(out=vol_np[..., sl_vol], allow_indirect_copy=True)
+                    del vol
+                    lib.gpu_tools.clear_cache()
             else:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
                 logger.debug(msg)
