@@ -33,8 +33,7 @@ Known limitations
   * Volume size is limited by CUDA texture limit. For example, a `(2400,2400,4800)` volume can be reconstructed, but not a `(30000,30000,1)` volume, due to a volume of this size not fitting within a single CUDA texture
   * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
   * Only one GPU is utilised by this module, at the present time. There is no defined behaviour for which GPU will be chosen.
-  * Not fully optimised: among other issues, 
-    * the GBC reconstruction script assumes that the whole volume (or more) can fit in RAM. This limitation may be lifted in the future. (Note: a present workaround is to create a large swapfile on disk, since swap space is treated as RAM when the physical RAM is exhausted.)
+  * Not fully optimised
   * CPU and GPU work not completely asynchronous: due to unresolved bugs, various asynchronous GPU operations have been disabled. This may not have much impact on large reconstructions, but could result in poor GPU utilisation for smaller reconstructions.
   * No smart batching of (back)projections: smarter code would analyse the geometry of projections, and batch together (back)projections that involve similar regions of the volume. Currently, the code does not do any kind of clever batching like this, and so the (back)projection code is not as performant as it could be.
 
@@ -61,7 +60,7 @@ You can install `aprict` like you would any python package, using `pip install`.
 Example installation using `uv`: 
 ```bash
 $ uv venv -p 3.14
-$ uv pip install aprict[gui]==0.0.19
+$ uv pip install aprict[gui]==0.0.24
 $ source .venv/bin/activate
 ```
 You should now have several executables available on `$PATH`. Try `aprict-cli --help` to see the polished commandline interface. 
@@ -80,11 +79,11 @@ Activate the environment:
 ```bash
 source .venv/bin/activate
 ```
-Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.19`:
+Now, try the shell command `aprict-cli --help`. Here is the output as at `v0.0.24`:
 ```
 Usage: aprict-cli [OPTIONS] COMMAND [ARGS]...
 
-  Entry point for aprict CLI.
+  Entry point for CLI interface to aprict version 0.0.24
 
 Options:
   --version   Show the version and exit.
@@ -132,8 +131,8 @@ aprict-cli project cbfp \
     --output projs \
     --plot-mode PYQTGRAPH
 ````
-(Time on my machine: ~2 minutes, 55 seconds) 
-The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
+(Time on my machine: ~2 minutes, 56 seconds) 
+The options `--ssu 3 --ssv 3` indicate that the line attenuation for each detector pixel is to be calculated as the average of a 3-by-3 grid of exact line integrals. This kind of improved accuracy is necessary for some phantoms, including this one, if using a large detector pixel size. The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data after it is created. (This will not be available if the module was not installed with the `[gui]` option.)
 
 Now, let's reconstruct with three different algorithms:
  1. Global Backprojection-Convolution (GBC)
@@ -148,10 +147,14 @@ aprict-cli recon gbc-cone-cyl \
     --voxwid 0.5 \
     --volshape '(525,525,525)' \
     --alg GREWAR \
+    --f1 1.2 \
+    --f2 6 \
+    --n 9 \
+    --eps 1e-9 \
     --output recon_gbc \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~37 seconds)
+(Time on my machine: ~39 seconds)
 
 To perform an FBP reconstruction, we do:
 ```bash
@@ -164,7 +167,7 @@ aprict-cli recon fbp-cone-cyl \
     --output recon_fbp \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~12 seconds)
+(Time on my machine: ~19 seconds)
 
 To perform an FBP-VM reconstruction, we change `--alg` to `NOOGREWAR`:
 ```bash
@@ -177,7 +180,7 @@ aprict-cli recon fbp-cone-cyl \
     --output recon_fbp-vw \
     --plot-mode PYQTGRAPH
 ```
-(Time on my machine: ~22 seconds)
+(Time on my machine: ~26 seconds)
 
 
 </details>
@@ -215,7 +218,7 @@ aprict-cli project cbfp \
     --output projs \
     --plot-mode PYQTGRAPH
 ````
-(Time on my machine: ~1 minute, 46 seconds) 
+(Time on my machine: ~1 minute, 48 seconds) 
 The option `--plot-mode PYQTGRAPH` will display a plot window of the projection data (a sinogram) after it is created. (This will not be available if the module was not installed with the `[gui]` option.) 
 
 You will find a copy of the `ROCK_CAN` phantom in the output directory `projs`, beside the projection data. The phantom is always copied to the output directory, to ensure a good record of the inputs to the simulation.
