@@ -1145,9 +1145,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             else:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
                 logger.debug(msg)
+                del vol
 
             # Free some memory
-            del vol
             lib.gpu_tools.clear_cache()
             lib.gpu_tools.clear_pinned_cache()
 
