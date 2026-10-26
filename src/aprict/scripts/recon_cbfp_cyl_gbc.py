@@ -294,6 +294,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         default=8080,
         help="Port to use for serving things via a web interface, if applicable.",
     ),
+    ce.option(
+        "--memmap-vols",
+        type=lib.click_tools.BoolArgType(),
+        default=True,
+        help="Memory-map volumes, rather than keeping them in RAM.",
+    ),
 )
 @ce.option_group(
     "resource options",
@@ -315,6 +321,10 @@ def validate_args(args: types.SimpleNamespace) -> None:
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
         msg = f"Output path '{args.output!s}' already exists."
+        raise ce.UsageError(msg)
+
+    if args.output is None and args.memmap_vols:
+        msg = "Cannot use --memmap-vols True while --output is not specified."
         raise ce.UsageError(msg)
 
     # If outputting intermediates, then the user must also specify the --output directory
@@ -903,9 +913,20 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     msg = "Allocating and zeroing the backprojection arrays..."
     logger.info(msg)
-    # Put the z axis first, so that we can slice it in Z and have a C-contiguous array. This is necessary to copy directly from a cupy array to a numpy array.
-    vol_np = np.empty(padded_volshape, dtype=vol_dtype)
-    volmini_np = np.empty(padded_volshape_mini, dtype=vol_dtype)
+    if args.memmap_vols:
+        assert path_output is not None  # ensured by validate_args(...)
+        # These are temporary arrays which may be overwritten during filtration.
+        savepath = path_output.joinpath("tmp_backproj" + ".npy")
+        vol_np = np.lib.format.open_memmap(
+            savepath, shape=padded_volshape, dtype=vol_dtype, mode="w+"
+        )
+        savepath = path_output.joinpath("tmp_backproj" + "_mini" + ".npy")
+        volmini_np = np.lib.format.open_memmap(
+            savepath, shape=padded_volshape_mini, dtype=vol_dtype, mode="w+"
+        )
+    else:
+        vol_np = np.empty(padded_volshape, dtype=vol_dtype)
+        volmini_np = np.empty(padded_volshape_mini, dtype=vol_dtype)
     lib.ne_tools.set_array_to_constant_pbar(
         vol_np,
         const=0,
@@ -1075,8 +1096,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             if tot_num_nonskipped_projs == 0:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
                 logger.debug(msg)
-                del vol_weightsum
-                del minivol_weightsum
             else:
                 # Normalise to the correct weighting.
                 # This will multiply both a numerator and a divisor by the same amount.
@@ -1120,26 +1139,23 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     minivol.divide_softzero(minivol_weightsum, eps=args.eps)
                     del vol_weightsum
                     del minivol_weightsum
+                    lib.gpu_tools.clear_cache()
+                    lib.gpu_tools.clear_pinned_cache()
 
                 # Save the backprojections into the arrays
                 msg = "Transferring backprojected volume chunk from GPU..."
                 logger.debug(msg)
+                # Copy minivol.
+                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
+                minivol.as_numpy(out=volmini_np[..., sl_minivol], allow_indirect_copy=True)
+                del minivol
+                lib.gpu_tools.clear_cache()
+                # Copy vol.
                 if vol is not None:
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    ans = vol.as_numpy()
-                    lib.ne_tools.fastcopy(src=ans, dst=vol_np[..., sl_vol])
-                    del ans  # allow the memory to be freed
-                    lib.gpu_tools.clear_pinned_cache()
-                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                ans = minivol.as_numpy()
-                lib.ne_tools.fastcopy(src=ans, dst=volmini_np[..., sl_minivol])
-                del ans  # allow the memory to be freed
-                lib.gpu_tools.clear_pinned_cache()
-
-            # Free some memory
-            del vol, minivol
-            lib.gpu_tools.clear_pinned_cache()
-            lib.gpu_tools.clear_cache()
+                    vol.as_numpy(out=vol_np[..., sl_vol], allow_indirect_copy=True)
+                    del vol
+                    lib.gpu_tools.clear_cache()
 
         pbar.update_to(int(bytes_cumsum[-1]))
 
@@ -1173,7 +1189,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             2 * vartheta_v,
             theta_soft=args.softspan_v,
             auto_dc_adjust=False,
-            allow_overwrite_arr=True,  # we're not going to reuse the 'minivol_cp' object after this.
+            allow_overwrite_arr=True,  # we're not going to reuse the 'volmini_np' object after this.
             logger=logger,
             copy_to_array=None,
         )
@@ -1201,7 +1217,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             2 * vartheta_v,
             theta_soft=args.softspan_v,
             auto_dc_adjust=False,
-            allow_overwrite_arr=True,
+            allow_overwrite_arr=True,  # not going to need the 'vol_np' object after this.
             logger=logger,
             copy_to_array=None,  # Should be a contiguous array. E.g., not an arbitrary view.
             lowres_correction_array=minivol_correction_np,
@@ -1261,6 +1277,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             lib.ne_tools.save(tomo_path, x)
             msg = "Full volume now saved to disk."
             logger.debug(msg)
+            # Now get rid of the temporary files, if applicable
+            if args.memmap_vols:
+                savepath = path_output.joinpath("tmp_backproj" + ".npy")
+                savepath.unlink()  # delete file
+                savepath = path_output.joinpath("tmp_backproj" + "_mini" + ".npy")
+                savepath.unlink()  # delete file
             # Save slices
             for axis, axis_str in enumerate("xyz"):
                 msg = f"Saving '{axis_str}' slice..."

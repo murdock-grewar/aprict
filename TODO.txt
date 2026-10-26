@@ -20,7 +20,7 @@ TODO for 0.1.0:
  - [d] Allow block=False in the projection script -- this is not as straightforward as I had imagined.
  - [x] Chunk the FBP script
  - [x] Add --memmap-vols option to FBP script
- - [-] Add --memmap-vols option to GBC script -- I may not figure out a good way to perform FFTs on disk. For now, I have mentioned in README.md that a swapfile can be used to emulate additional RAM. This is suitable for using GBC on large volumes.
+ - [x] Add --memmap-vols option to GBC script -- I may not figure out a good way to perform FFTs on disk. For now, I have mentioned in README.md that a swapfile can be used to emulate additional RAM. This is suitable for using GBC on large volumes.
  - [ ] Speed up GBC precomputations, maybe with GPU
  - [ ] Optimise case of 1 chunk for 
    - [ ] GBC 
