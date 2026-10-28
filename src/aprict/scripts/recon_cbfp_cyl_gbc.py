@@ -946,7 +946,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Convert the progress display ta more intuitive set of units using the progratio.
     # The displayed progress will correspond to bytes in the padded backprojection.
-    progratio: float = (math.prod(padded_volshape) * np.dtype(vol_dtype).itemsize / bytes_cumsum[-1])
+    progratio: float = (
+        math.prod(padded_volshape)
+        * np.dtype(vol_dtype).itemsize
+        / bytes_cumsum[-1]
+    )
     curr_slice: slice | None = None
     logger.info("Beginning reconstruction...")
     with logtools.ProgressBar(
@@ -1066,7 +1070,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                         prog_evs_bytes.append(
                             (
                                 ev,
-                                progratio * (
+                                progratio
+                                * (
                                     (
                                         (sl.stop - sl.start)
                                         / tot_num_nonskipped_projs
@@ -1292,7 +1297,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             x = vol_filtered
             # Save the volume as a .npy file
             tomo_path = path_output.joinpath("recon.npy")
-            lib.ne_tools.save(tomo_path, x)
+            lib.ne_tools.save(tomo_path, x, flush=True)
             msg = "Full volume now saved to disk."
             logger.debug(msg)
             # Now get rid of the temporary files, if applicable

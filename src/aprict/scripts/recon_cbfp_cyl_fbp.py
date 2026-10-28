@@ -872,7 +872,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             if logger is not None:
                 msg = f"Saving full volume to '{savepath}'..."
                 logger.debug(msg)
-            lib.ne_tools.save(savepath, x)
+            lib.ne_tools.save(savepath, x, flush=True)
             if logger is not None:
                 msg = "Full volume now saved to disk."
                 logger.debug(msg)
@@ -1139,7 +1139,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 logger.debug(msg)
                 if vol is not None:
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    vol.as_numpy(out=vol_np[..., sl_vol], allow_indirect_copy=True)
+                    vol.as_numpy(
+                        out=vol_np[..., sl_vol], allow_indirect_copy=True
+                    )
                     del vol
                     lib.gpu_tools.clear_cache()
             else:

@@ -162,12 +162,15 @@ def downbin(  # ruff: ignore[complex-structure]
     return xnew
 
 
-def save(path: pathlib.Path, arr: np.ndarray) -> None:
+def save(path: pathlib.Path, arr: np.ndarray, flush: bool = True) -> None:
     """Save an array to a path in a faster manner than np.save."""
     mm: np.memmap = np.lib.format.open_memmap(
         path, shape=arr.shape, dtype=arr.dtype, mode="w+"
     )
     ne.evaluate("x", out=mm, local_dict={"x": arr})
+    if flush:
+        # Write changes to disk now.
+        mm.flush()
 
 
 class NETHREADS(enum.Enum):

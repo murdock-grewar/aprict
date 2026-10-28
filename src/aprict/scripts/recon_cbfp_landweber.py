@@ -521,7 +521,7 @@ def main() -> None:
             save_path.joinpath("tomograms") if is_intermediate else save_path
         )
         tomo_path.mkdir(exist_ok=True)
-        lib.ne_tools.save(tomo_path.joinpath(id_str + ".npy"), x)
+        lib.ne_tools.save(tomo_path.joinpath(id_str + ".npy"), x, flush=True)
 
         # Save midslices from volume as .png files
         # The method used here can be a bit slow, because I get a full numpy array and process that.

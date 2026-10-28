@@ -193,7 +193,9 @@ class Volume[
             self._texture, vol._texture, tout=self._texture, eps=eps
         )
 
-    def as_numpy(self, out: np.ndarray | None = None, allow_indirect_copy: bool = False) -> np.ndarray:
+    def as_numpy(
+        self, out: np.ndarray | None = None, allow_indirect_copy: bool = False
+    ) -> np.ndarray:
         """Copy this volume's data into a numpy array."""
         # Note: the option 'allow_indirect_copy' allows a fast-but-not-fastest copy when the output array is not C-contiguous.
         if out is not None and not out.flags["C_CONTIGUOUS"]:
@@ -220,7 +222,7 @@ class Volume[
     def save(self, path: pathlib.Path) -> None:
         """Save this volume into a numpy array on disk."""
         x = self.as_numpy()
-        ne_tools.save(path, x)
+        ne_tools.save(path, x, flush=True)
 
     def as_cupy(self, out: cp.ndarray | None = None) -> cp.ndarray:
         """Copy this volume's data into a cupy array."""
