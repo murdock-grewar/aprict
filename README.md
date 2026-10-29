@@ -1,5 +1,5 @@
 [![Static Badge](https://img.shields.io/badge/ORCiD-0000--0002--0015--8284-green?logo=orcid)](https://orcid.org/0000-0002-0015-8284)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23632625.svg)](https://doi.org/10.5281/zenodo.23632625)
+[![Static Badge](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.23632625-blue?logo=DOI&color=blue)](https://doi.org/10.5281/zenodo.23632625)
 ![PyPI Version](https://img.shields.io/pypi/v/aprict)
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 <details open><summary><h1>About</h1></summary>
@@ -8,6 +8,10 @@ Description
 ---
 
 `aprict` is a Python module for simulating transmission experiments in X-ray Computed Tomography, and for performing reconstructions from real and simulated data. In addition to the Python API, there is a commandline interface for some common operations.
+
+API documentation
+---
+The Python API documentation is limited and incomplete, but available in the `docs/` directory. The documentation for the latest release may also be hosted at `https://murdock-grewar.github.io/aprict/`.
 
 Disclaimer
 ---
@@ -30,7 +34,6 @@ Known limitations
 
 * Only flat-panel X-ray data with square pixels is supported, at this time.
 * Lack of documentation:
-  * The Python API is not yet documented.
   * The way that geometry is encoded in `*.json` files is not yet documented.
   * The encoding of projection data and volume data is not yet documented. (Numpy arrays; memory-mapped in the case of projections.)
 * Implementation-related issues which could be alleviated in the future:
