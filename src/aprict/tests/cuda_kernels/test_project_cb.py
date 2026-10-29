@@ -539,7 +539,7 @@ class TestCB_texture_FORBILD:
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD phantom.
-        fbv = phantoms.FORBILD.HeadPhantom
+        fbv = phantoms.FORBILD.HeadPhantom()
         xs = np.arange(volres, dtype=np.float32) - (volres - 1) / 2
         voxwid_mm = 1 / volres * 25
         xs *= voxwid_mm

@@ -1,0 +1,37 @@
+{% extends "default/module.html.jinja2" %}
+
+{% block title %}
+  {% if module.name == root_module_name %}
+    {{ module.modulename }} v{{ module.obj.version.version }} API documentation
+  {% else %}
+    {{ super() }}
+  {% endif %}
+{% endblock %}
+
+{% block nav_title %}
+  {{ super() }}
+  {% if module.name == root_module_name %}
+    <small>v{{ module.obj.version.version }}</small>
+  {% endif %}
+{% endblock %}
+
+{% defaultmacro module_name() %}
+    <h1 class="modulename">
+        {% set parts = module.modulename.split(".") %}
+        {% for part in parts %}
+            {%- set fullname = ".".join(parts[:loop.index]) -%}
+            {%- if fullname in all_modules and fullname != module.modulename -%}
+                <a href="./{{ "../" * loop.revindex0 }}{{ part }}.html">{{ part }}</a>
+            {%- else -%}
+                {{ part }}
+            {%- endif -%}
+            {%- if loop.nextitem -%}
+                <wbr>.
+            {%- endif -%}
+        {% endfor %}
+        {% if module.name == root_module_name %}
+          v{{ module.obj.version.version }}
+        {% endif %}
+    </h1>
+{% enddefaultmacro %}
+

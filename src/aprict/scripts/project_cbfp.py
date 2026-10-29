@@ -60,15 +60,15 @@ class PLOTMODE(enum.Enum):  # ruff: ignore[undocumented-public-class]
 def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
     match preset:
         case PHANTOM_PRESET.HEAD:
-            v = phantoms.FORBILD.HeadPhantom
+            v = phantoms.FORBILD.HeadPhantom()
             v.multiply_attenuation(
                 0.0184
             )  # convert from multiples of water to a reasonable attenuation, corresponding to an X-ray energy of ~80 keV.
             return v
         case PHANTOM_PRESET.ROCK_CAN:
-            return phantoms.FORBILD.RockCanisterAlWithHoles
+            return phantoms.FORBILD.RockCanisterAlWithHoles()
         case PHANTOM_PRESET.UNIT_Z_CYL:
-            return phantoms.FORBILD.UnitCyl_z
+            return phantoms.FORBILD.UnitCyl_z()
         case PHANTOM_PRESET.TALLY_HALL:
             return phantoms.FORBILD.DiscResolutionPhantom(
                 4,

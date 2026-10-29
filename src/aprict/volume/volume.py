@@ -28,17 +28,17 @@ import cupyx
 import numexpr as ne
 import numpy as np
 
-from .cuda.structs import FORBILD_volumes as fv
-from .cuda.structs import bbox as ks_bbox
-from .lib import (
+from ..cuda.structs import FORBILD_volumes as fv
+from ..cuda.structs import bbox as ks_bbox
+from ..lib import (
     bboxes_FORBILD,
     gpu_tools,
     ne_tools,
     sample_FORBILD,
     texture_tools,
 )
-from .lib import process_pha_file as ppf
-from .lib.texture_tools import operations as tops
+from ..lib import process_pha_file as ppf
+from ..lib.texture_tools import operations as tops
 
 _ShapeType = tuple[int, int, int]
 _DType_base = np.float16 | np.float32 | np.float64
@@ -386,7 +386,7 @@ class FBVolume:
         np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
         np.ndarray[tuple[typing.Literal[3]], np.dtype[np.floating]],
     ]:
-        """Return a bounding box for this volume."""
+        """Return a bounding box for this volume, like (np.array([minx,miny,minz]),np.array([maxx,maxy,maxz]))."""
         b: np.dtype[ks_bbox] = bboxes_FORBILD.overall_bbox(self.shapes)  # ty:ignore[invalid-type-arguments]
         xyz_min = np.array(
             [
@@ -410,7 +410,7 @@ class FBVolume:
     def minxyz_maxxyz(
         self,
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        """Boundary tuple: ((minx,miny,minz),(maxx,maxy,maxz))."""
+        """Bounding box, like ((minx,miny,minz),(maxx,maxy,maxz))."""
         bbox = self.get_bbox()
         return (tuple(bbox[0]), tuple(bbox[1]))
 

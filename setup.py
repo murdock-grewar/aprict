@@ -55,6 +55,9 @@ setup(
     # package_data={my_module_name: ["data/"]},
     entry_points={
         "console_scripts": [
+            my_module_name + " = " + my_module_name + ".scripts.cli:main",
+        ]
+        + [
             my_module_name
             + "-"
             + f"{_filename_to_command_name(script_name):s}"

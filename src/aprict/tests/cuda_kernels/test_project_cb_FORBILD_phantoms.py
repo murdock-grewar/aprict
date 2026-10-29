@@ -95,7 +95,7 @@ class TestCB_phantom_FORBILD_head:
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         self.out_of_mem_count_arr = cp.zeros((1,), dtype=cp.uint32)
-        self.shapes_cp_arr = cp.array(phantoms.FORBILD.HeadPhantom.shapes)
+        self.shapes_cp_arr = cp.array(phantoms.FORBILD.HeadPhantom().shapes)
 
         # Set up configuration objects etc
         add_attenuations = False

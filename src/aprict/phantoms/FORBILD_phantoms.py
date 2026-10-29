@@ -14,9 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Provides FORBILD phantoms from the files published by the Arbeitsgruppe Phantome."""
+"""Provides FORBILD phantoms from the files published by the Arbeitsgruppe Phantome, as well as others."""
 
 import dataclasses
+import functools
 import itertools
 import math
 import pathlib
@@ -30,19 +31,23 @@ from ..cuda.structs import FORBILD_volumes as fv
 from ..lib import process_pha_file as ppf
 from ..volume import FBVolume
 
-path_to_FORBILD_src = pathlib.Path(str(data.__path__[0])).joinpath("FORBILD")  # ruff: ignore[mixed-case-variable-in-global-scope]
+_path_to_FORBILD_src = pathlib.Path(str(data.__path__[0])).joinpath("FORBILD")  # ruff: ignore[mixed-case-variable-in-global-scope]
 
 
-# ruff: disable[invalid-function-name,missing-trailing-period]
+# ruff: disable[non-imperative-mood,invalid-function-name]
 
 
-class _MetaPhantomContainer(type):
-    @property
+class PhantomContainer:
+    """A container for the phantom objects."""
+
+    @classmethod
+    @functools.cache
     def CustomComposite(cls) -> FBVolume:
+        """A custom phantom stitching together and slightly modifying the Hip, Abdomen, Thorax, Head and Jaw phantom."""
         hi, ab, th, he, ja = [
             FBVolume(
                 ppf.convert_ph_file_to_shapes(
-                    path_to_FORBILD_src.joinpath("custom_composite/" + fn)
+                    _path_to_FORBILD_src.joinpath("custom_composite/" + fn)
                 )
             )
             for fn in (
@@ -105,12 +110,13 @@ class _MetaPhantomContainer(type):
         v = v.superimpose_onto(cavity)
         return v  # ruff: ignore[unnecessary-assign]
 
-    @property
+    @classmethod
+    @functools.cache
     def JawPhantom(cls) -> FBVolume:
-        """The JawPhantom.txt"""
+        """The [Jaw phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/jaw-phantom)."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("jaw/JawPhantom.pha")
+                _path_to_FORBILD_src.joinpath("jaw/JawPhantom.pha")
             )
         )
         # Phantom is defined with centimeters as the unit of length.
@@ -118,12 +124,13 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def HeadPhantom(cls) -> FBVolume:
-        """HeadPhantom.pha"""
+        """The [Head phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/head-phantom)."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("head/HeadPhantom.pha")
+                _path_to_FORBILD_src.joinpath("head/HeadPhantom.pha")
             )
         )
         # Phantom is defined with centimeters as the unit of length.
@@ -131,12 +138,13 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def HipPhantom(cls) -> FBVolume:
-        """HipPhantom.pha"""
+        """The [Hip phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/hip-phantom)."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("hip/HipPhantom.pha")
+                _path_to_FORBILD_src.joinpath("hip/HipPhantom.pha")
             )
         )
         # Phantom is defined with centimeters as the unit of length.
@@ -144,13 +152,14 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def AbdomenPhantom(cls) -> FBVolume:
-        """Fixed AbdomenPhantom.txt"""
+        """Fixed [Abdomen phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/abdominal-phantom)."""
         # The AbdomenPhantom.pha file has a bug in it. Load a manually fixed version.
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath(
+                _path_to_FORBILD_src.joinpath(
                     "abdomen/AbdomenPhantom_fixed.pha"
                 )
             )
@@ -160,13 +169,14 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def LungPhantom3Generations(cls) -> FBVolume:
-        """LungPhantom3Generations.pha"""
+        """The [Lung phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/lung-phantom) to 3 generations."""
         # DEV NOTE: make sure this phantom loads the reference file published by the Arbeitsgruppe Phantome. This is used in a unittest to ensure that the generation procedure for N generations matches in this case.
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath(
+                _path_to_FORBILD_src.joinpath(
                     "lungs/LungPhantom3Generations.pha"
                 )
             )
@@ -175,12 +185,13 @@ class _MetaPhantomContainer(type):
         fbv.flip(axis="z")
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def ThoraxPhantom(cls) -> FBVolume:
-        """ThoraxPhantom.pha"""
+        """The [Thorax phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/thorax-phantom)."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("thorax/ThoraxPhantom.pha")
+                _path_to_FORBILD_src.joinpath("thorax/ThoraxPhantom.pha")
             )
         )
         # Phantom is defined with centimeters as the unit of length.
@@ -188,11 +199,13 @@ class _MetaPhantomContainer(type):
         fbv.scale_len(10)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def RockCanisterAl(cls) -> FBVolume:
+        """A phantom resembling a 6-millimeter-wide double-chambered tube of rocks."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath(
+                _path_to_FORBILD_src.joinpath(
                     "custom_other/rock_canister_01.pha"
                 ),
                 skip_preprocessing=True,  # I know that this file doesn't require preprocessing
@@ -202,26 +215,30 @@ class _MetaPhantomContainer(type):
         fbv.multiply_attenuation(0.55)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def RockCanisterCavities1e5(cls) -> FBVolume:
+        """An appendage to the RockCanisterAl phantom which adds small cavities to the aluminium canister."""
         return FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath(
+                _path_to_FORBILD_src.joinpath(
                     "custom_other/rock_canister_01_cavities_1e5.pha"
                 ),
                 skip_preprocessing=True,  # I know that this file doesn't require preprocessing
             )
         )
 
-    @property
+    @classmethod
+    @functools.cache
     def RockCanisterAlWithHoles(cls) -> FBVolume:
+        """A phantom resembling a 6-millimeter-wide double-chambered tube of rocks, with small cavities inthe aluminium cylinder."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath(
+                _path_to_FORBILD_src.joinpath(
                     "custom_other/rock_canister_01.pha"
                 ),
                 append_files=(
-                    path_to_FORBILD_src.joinpath(
+                    _path_to_FORBILD_src.joinpath(
                         "custom_other/rock_canister_01_cavities_1e5.pha"
                     ),
                 ),
@@ -232,17 +249,15 @@ class _MetaPhantomContainer(type):
         fbv.multiply_attenuation(0.55)
         return fbv
 
-    @property
+    @classmethod
+    @functools.cache
     def UnitCyl_z(cls) -> FBVolume:
+        """Unit z cylinder."""
         return FBVolume(
             ppf.convert_ph_file_to_shapes(
-                path_to_FORBILD_src.joinpath("custom_other/unit_Cyl_z.pha")
+                _path_to_FORBILD_src.joinpath("custom_other/unit_Cyl_z.pha")
             )
         )
-
-
-class PhantomContainer(metaclass=_MetaPhantomContainer):
-    """A container for the phantom objects."""
 
     @classmethod
     def _LungPhantom_phastring(  # ruff: ignore[complex-structure]
@@ -254,7 +269,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         fix: bool
         | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
     ) -> str:
-        """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
+        """Generate the [Lung phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/lung-phantom) (by Markus Blank and Marc Kachelrieß) up to generation n."""
         if type(generation) is not int or generation < 2:
             msg = "'generation' must be an integer >=2"
             raise ValueError(msg)
@@ -534,7 +549,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         fix: bool
         | None = None,  # Leave at None for default configuration. Turning this True will fix what appear to be errors in the original phantom. These errors are particularly noticeable with e.g. taper=True.
     ) -> FBVolume:
-        """Generate the Lung phantom (by Marc Kachelrieß) up to generation n."""
+        """Generate the [Lung phantom](https://www.dkfz.de/en/x-ray-imaging-and-computed-tomography/lung-phantom) (by Markus Blank and Marc Kachelrieß) up to generation n."""
         phastr: str = cls._LungPhantom_phastring(
             generation=generation,
             scale_factor=scale_factor,
@@ -657,7 +672,7 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         randomise_parity: bool = False,
         seed: int | None = None,
     ) -> FBVolume:
-        """Generate a disc-shaped resolution phantom."""
+        """Generate a disc-shaped resolution phantom (use as a 2D phantom with z=0)."""
         if generation < 1:
             msg = "Generation should be a positive integer."
             raise ValueError(msg)
@@ -996,4 +1011,4 @@ class PhantomContainer(metaclass=_MetaPhantomContainer):
         return FBVolume(np.array(shapes, dtype=fv.Shape))
 
 
-# ruff: enable[invalid-function-name,missing-trailing-period]
+# ruff: enable[non-imperative-mood,invalid-function-name]

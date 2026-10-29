@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Simulate an example experiment with a helical scan."""
+"""Simulate an example 2D fan-beam experiment and SIRT reconstruction."""
 
 import math
 import sys
@@ -99,7 +99,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
-    vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom()
     xyz_min, xyz_max = vol.minxyz_maxxyz
     volwid_mm = 1.1 * 2 * max(map(abs, (*xyz_min[:2], *xyz_max[:2])))
 

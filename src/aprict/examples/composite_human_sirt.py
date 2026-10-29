@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Simulate an example experiment with a helical scan."""
+"""Simulate an example experiment and SIRT reconstruction using the composite human phantom."""
 
 import itertools
 import math
@@ -174,7 +174,7 @@ def main() -> None:  # ruff: ignore[complex-structure, undocumented-public-funct
     print("Voxel width (mm):        ", voxwid_mm)
     print()
     print("Creating volume... ", end="", flush=True)
-    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite()
     if plot_volume:
         print("plotting volume... ", end="", flush=True)
         xs = np.linspace(-300, 300, num=601, endpoint=True)

@@ -27,7 +27,7 @@ from .. import (  # import directly from root aprict namespace
 def test_correctness_of_Lungs_3Generations() -> None:  # ruff: ignore[invalid-function-name]
     """Test that the 3rd generation lung phantom matches the definition published by the Arbeitsgruppe Phantome."""
     lungs3: FBVolume = phantoms.FORBILD.LungPhantom(generation=3)
-    lungs3_ref: FBVolume = phantoms.FORBILD.LungPhantom3Generations
+    lungs3_ref: FBVolume = phantoms.FORBILD.LungPhantom3Generations()
 
     assert len(lungs3.shapes) == len(lungs3_ref.shapes), (
         "The generated and reference lungs phantoms do not have the same number of primitive shapes."

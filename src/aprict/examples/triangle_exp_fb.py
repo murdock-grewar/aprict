@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Simulate an example experiment with a triangular scanning apparatus."""
+"""Simulate an example experiment and Landweber reconstruction with a triangular scanning apparatus."""
 
 import itertools
 import math
@@ -243,8 +243,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
-    # vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
-    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite
+    # vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom()
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.CustomComposite()
     volwid_mm = 300  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)

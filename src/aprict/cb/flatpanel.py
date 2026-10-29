@@ -15,7 +15,21 @@
 
 # flatpanel.py
 
-"""End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code."""
+"""
+End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code.
+
+The main provided methods are
+ - `project` - used to generate projection data from a `aprict.volume.Volume` or `aprict.volume.FBVolume` object.
+ - `backproject` - used to generate backprojection data from a `aprict.volume.Volume` or `aprict.volume.FBVolume` object.
+
+The main provided classes are
+ - `ProjGeom` - object to encode a flat-panel (back)projection geometry.
+ - `ProjectionSet` - object to hold a `ProjGeom` and associated projection data.
+ - `ConfigProject` - object to hold a collection of settings applied when computing projections with `project`.
+ - `ConfigBackproject` - object to hold a collection of settings applied when computing backprojections with `backproject`.
+
+Note that the `ConfigBackproject` object allows for configuring weighted backprojections and the like. The `backproj_weighting_preset` attribute passed to its constructor can significantly influence the behaviour of the backprojection, since this value is passed to the CUDA kernel, which performs some internal logic depending on this value. Currently, the end user has limited control over what kind of weightings are applied, since adding new presets requires editing the CUDA kernel. The available presets will be documented at a later time. The default value of `0` corresponds to the adjoint of the forward projection.
+"""
 
 import dataclasses
 import functools
@@ -42,7 +56,7 @@ _delay_compile: bool = (
 
 
 def force_compile(*, log_stream: object | None = None) -> None:
-    """Force the relevant CUDA kernels to compile."""
+    """Force the relevant CUDA kernels to compile, if they have not already."""
     _projection_module.compile(log_stream=log_stream)
     _backprojection_module.compile(log_stream=log_stream)
 
@@ -250,7 +264,7 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
         tuple[float, float, float],
         tuple[float, float, float],
     ]:
-        """Return a bounding box."""
+        """Return a bounding box like ((minx,miny,minz),(maxx,maxy,maxz))."""
         # Make a list of points such that the whole projection geometry
         # is contained in the convex hull. Then take the min x,y,z and max x,y,z
         # it = slice(None, None) if index_tuple is None else index_tuple
@@ -713,7 +727,7 @@ class ProjectionSet:
         tuple[float, float, float],
         tuple[float, float, float],
     ]:
-        """Return a bounding box."""
+        """Return a bounding box like ((minx,miny,minz),(maxx,maxy,maxz))."""
         return self._proj_geom.get_bbox(index_tuple=index_tuple)
 
     @property
@@ -809,19 +823,19 @@ class ProjectionSet:
 
 
 class ConfigProject:
-    """Configuration object for projections. Some options will have no effect if a Volume or FBVolume."""
+    """Configuration object for projections. This is to be passed to the `project` method. Some options will have no effect if applied improperly to a `Volume`/`FBVolume`."""
 
     _contents: np.dtype[structs.config_cb_project]  # ty:ignore[invalid-type-arguments]
     _contents_fb: np.dtype[structs.config_cb_project_FORBILD]  # ty:ignore[invalid-type-arguments]
 
     @property
     def contents(self) -> np.dtype[structs.config_cb_project]:  # ty:ignore[invalid-type-arguments]
-        """The configuration object underlying this object."""
+        """The configuration object underlying this object, when applied to `Volume`."""
         return self._contents.copy()  # ty:ignore[unresolved-attribute]
 
     @property
     def contents_fb(self) -> np.dtype[structs.config_cb_project_FORBILD]:  # ty:ignore[invalid-type-arguments]
-        """The configuration object underlying this object."""
+        """The configuration object underlying this object, when applied to `FBVolume`."""
         return self._contents_fb.copy()  # ty:ignore[unresolved-attribute]
 
     def __init__(

@@ -80,6 +80,13 @@ repos:
       entry: uv run bandit -c bandit.toml -q
       language: system
       pass_filenames: true
+    - id: build-docs
+      name: (Build docs) pdoc
+      entry: ./githooks/build-docs.sh
+      language: script
+      pass_filenames: false
+      always_run: true # run even if there are no matching filenames
+      verbose: false # true: always show output, even when test passes
     - id: pytest
       name: (Unit tests) pytest
       entry: ./.venv/bin/pytest -vvv

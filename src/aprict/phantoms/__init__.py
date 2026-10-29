@@ -13,7 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Phantom objects useful for simulations and testing."""
+"""
+Phantom objects useful for simulations and testing.
+
+These can be loaded with e.g. `aprict.phantoms.FORBILD.HeadPhantom()`.
+"""
 
 from .FORBILD_phantoms import (
     PhantomContainer as FORBILD,  # ruff: ignore[camelcase-imported-as-constant]

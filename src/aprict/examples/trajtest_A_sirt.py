@@ -1,3 +1,4 @@
+# ruff: ignore[invalid-module-name]
 # Copyright (C) 2026  Murdock Grewar
 #
 # This program is free software: you can redistribute it and/or modify
@@ -12,8 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-"""Simulate an example experiment with a helical scan."""
+"""Simulate an example experiment and SIRT reconstruction with a cylindrical scan."""
 
 import math
 import sys
@@ -106,7 +106,7 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
 
     # Create the volume to be projected
     print("Voxel width (mm):        ", voxwid_mm)
-    vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom
+    vol: aprict.FBVolume = aprict.phantoms.FORBILD.HeadPhantom()
     volwid_mm = 275  # in the future, fetch from the phantom
     # Scale up the volume
     vol.scale_len(scale_phantom_size)
@@ -246,8 +246,8 @@ def main() -> None:  # ruff: ignore[undocumented-public-function]
         _lp_process, lp_dispatcher = liveplot.start_live_plot_2d(
             title="Live plot",
             histogram_label="Attenuation coefficient",
-            plotmin=0.0184 * voxwid_mm * (1 + default_plot_range_HU[0] / 1000),
-            plotmax=0.0184 * voxwid_mm * (1 + default_plot_range_HU[1] / 1000),
+            plotmin=0.0184 * (1 + default_plot_range_HU[0] / 1000),
+            plotmax=0.0184 * (1 + default_plot_range_HU[1] / 1000),
             show=False,
         )
 

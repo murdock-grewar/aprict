@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""aprict-cli: the main command-line interface to aprict."""
+"""The main command-line interface to aprict."""
 
 import click_extra as ce
 
@@ -36,7 +36,7 @@ _cs = {
 }
 
 
-@ce.group(name="aprict-cli", params=None, help=_progdesc, context_settings=_cs)
+@ce.group(name="aprict", params=None, help=_progdesc, context_settings=_cs)
 @ce.version_option(version=version)  # add --version from click_extra
 @ce.tree_option()  # add --tree option from click_extra
 # not including the man_option because it includes incorrect information, like possible exit codes etc.
