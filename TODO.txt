@@ -6,6 +6,7 @@ Key:
  - [*] = mixed status
 
 TODO for 0.1.1:
+ - [ ] Find a way to reorder volume memory as F-contiguous, to speed up transfers from GPU when slicing along Z direction
  - [ ] consider removing --ssx, --ssy, --ssz options from GBC script
  - [ ] optimize projection GPU work
    - [ ] investigate block=False in projection script
@@ -15,7 +16,6 @@ TODO for 0.1.1:
 
 TODO for 0.1.0:
  - [ ] Unload one chunk from GPU while the next is being computed
- - [ ] Find a way to reorder volume memory as F-contiguous, to speed up transfers from GPU when slicing along Z direction
  - [x] Document status of non-square pixel support
  - [d] Allow block=False in the projection script -- this is not as straightforward as I had imagined.
  - [x] Chunk the FBP script
@@ -25,8 +25,8 @@ TODO for 0.1.0:
  - [ ] Optimise case of 1 chunk for 
    - [ ] GBC 
    - [ ] FBP
- - [*] Check that all methods are performant on my home PC.
-   - [-] GBC, rock  -- can't do full-size recon. Requires more memory/disk space than I have. Works OK on a beefier machine, though.
+ - [x] Check that all methods are performant on my home PC.
+   - [x] GBC, rock  -- can't do full-size recon, but the small recon works
    - [x] FBP, rock
    - [x] GBC, LDS
    - [x] FBP, LDS
