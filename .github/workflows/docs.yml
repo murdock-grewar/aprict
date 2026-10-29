@@ -1,4 +1,4 @@
-name: docs-on-github-pages
+name: Publish docs/ to github pages
 
 # Activate when a version tagged vX.Y.Z is pushed onto the 'release' branch, or a new such tag created on the 'release' branch
 on:
