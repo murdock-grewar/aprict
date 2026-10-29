@@ -11,7 +11,7 @@ Description
 
 API documentation
 ---
-The Python API documentation is limited and incomplete, but available in the `docs/` directory. The documentation for the latest release may also be hosted at `https://murdock-grewar.github.io/aprict/`.
+The Python API documentation is limited and incomplete, but available in the `docs/` directory. The documentation for the latest release may also be hosted at [`https://murdock-grewar.github.io/aprict/`](https://murdock-grewar.github.io/aprict/).
 
 Disclaimer
 ---
