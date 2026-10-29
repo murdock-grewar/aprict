@@ -18,19 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-  #    - uses: actions/checkout@v6
-  #      with:
-  #        persist-credentials: false
-  #    - uses: actions/setup-python@v6
-  #      with:
-  #        python-version: '3.14'
-  #
-  #    # ADJUST THIS: install all dependencies (including pdoc)
-  #    - run: pip install -e .
-  #    # ADJUST THIS: build your documentation into docs/.
-  #    # We use a custom build script for pdoc itself, ideally you just run `pdoc -o docs/ ...` here.
-  #    - run: python docs/make.py
-
+      - uses: actions/checkout@v6  # check out the repo so that the docs/ directory is available
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs/
