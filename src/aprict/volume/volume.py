@@ -14,8 +14,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # volume.py
-"""Class to abstract away the details of a 3D voxelised volume."""
-# Developer's note: this class is intended to contain the end-user API
+"""Classes to represent attenuating volumes."""
+# Developer's note: these classes are intended to contain the end-user API
 # to the volume data. The user should not have to interact with internal
 # classes like texture_tools.Texture, and the like.
 
