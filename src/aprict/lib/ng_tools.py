@@ -108,7 +108,7 @@ void main() {
 
 
 class ArrayViewer3D:
-    """A context manager to serve a volume at a URL while active."""
+    """A context manager to serve a numpy volume at a URL while active."""
 
     port: int
     array: np.ndarray | np.memmap
@@ -152,6 +152,46 @@ class ArrayViewer3D:
                 plotmin=self._initial_plotmin,
                 plotmax=self._initial_plotmax,
             )
+        self.url = "http://localhost:" + port + "/v/" + viewer.token + "/"
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
+        if self._wait_for_input_before_exit_prompt is not None:
+            while response := input(self._wait_for_input_before_exit_prompt):  # ruff: ignore[unused-variable]
+                pass
+        neuroglancer.stop()
+
+
+class OMEZarrViewer3D:
+    """A context manager to serve an OME-Zarr volume at a URL while active."""
+
+    port: int
+    zarr_url: str
+    url: str
+
+    _wait_for_input_before_exit_prompt: str | None
+
+    def __init__(
+        self,
+        zarr_url: str,
+        port: int = 8080,
+        wait_for_input_before_exit_prompt: str | None = None,
+    ) -> None:
+        self.port = port
+        self.zarr_url = zarr_url
+        self._wait_for_input_before_exit_prompt = (
+            wait_for_input_before_exit_prompt
+        )
+
+    def __enter__(self) -> OMEZarrViewer3D:  # ruff: ignore[undocumented-magic-method]
+        port = str(self.port)
+        neuroglancer.set_server_bind_address(
+            bind_address="127.0.0.1", bind_port=port
+        )
+        # neuroglancer.cli.handle_server_arguments(args)  # could be useful in the future
+        viewer = neuroglancer.Viewer()
+        with viewer.txn() as s:
+            s.layers["image"] = neuroglancer.ImageLayer(source=self.zarr_url)
         self.url = "http://localhost:" + port + "/v/" + viewer.token + "/"
         return self
 

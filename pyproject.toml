@@ -26,6 +26,7 @@ dependencies = [
     "imageio>=2.37.3",
     "numexpr>=2.14.1",
     "numpy>=2.4.3",
+    "ome-zarr>=0.21.0",
     "pcpp>=1.30",
     "pydantic>=2.12.5",
     "regex>=2026.4.4",
