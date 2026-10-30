@@ -26,7 +26,10 @@ if TYPE_CHECKING:
 
 
 def nparr_to_zarr(
-    arr: np.ndarray | np.memmap, voxwid_mm: float, out_zarr_path: pathlib.Path
+    arr: np.ndarray | np.memmap,
+    *,
+    voxwid_mm: float,
+    out_zarr_path: pathlib.Path,
 ) -> None:
     """Convert a numpy array to OME-Zarr 0.5 format."""
     # Validate args
@@ -45,8 +48,12 @@ def nparr_to_zarr(
     )
     multiscales = ome_zarr.OMEZarrMultiscale(
         image=image,
-        scale_factors=(2, 4, 8),
-        method="resize",
+        scale_factors=[
+            {"x": 2, "y": 2, "z": 2},
+            {"x": 4, "y": 4, "z": 4},
+            {"x": 8, "y": 8, "z": 8},
+        ],
+        method="local_mean",
         channel_names=["attenuation coefficient"],
     )
     multiscales.to_ome_zarr(out_zarr_path, version=verstr)
