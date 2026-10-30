@@ -15,6 +15,7 @@
 
 """Tools to interface with the OME-Zarr format."""
 
+import enum
 from typing import TYPE_CHECKING
 
 import ome_zarr
@@ -25,20 +26,28 @@ if TYPE_CHECKING:
     import numpy as np
 
 
+class OMEZarrVersion(enum.Enum):
+    """Version of OME-Zarr to use."""
+
+    V0_5 = "0.5"
+    V0_6 = "0.6"
+
+
 def nparr_to_zarr(
     arr: np.ndarray | np.memmap,
     *,
     voxwid_mm: float,
     out_zarr_path: pathlib.Path,
+    omez_version: OMEZarrVersion = OMEZarrVersion.V0_5,
 ) -> None:
-    """Convert a numpy array to OME-Zarr 0.5 format."""
+    """Convert a numpy array to OME-Zarr format."""
     # Validate args
     if out_zarr_path.is_dir():
         msg = f"Directory already exists: {out_zarr_path}"
         raise FileExistsError(msg)
 
     # Currently, neuroglancer only supports up to OME-Zarr 0.5
-    verstr: str = "0.5"
+    verstr: str = omez_version.value
 
     image = ome_zarr.OMEZarrImage(
         data=arr,
