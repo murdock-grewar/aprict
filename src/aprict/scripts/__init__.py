@@ -16,5 +16,5 @@
 """
 Scripts to use `aprict` with a commandline interface.
 
-The recommended entry point is `aprict.scripts.cli`, which is a wrapper for the other scirpts. When `aprict` is installed in the current environment, this can be called from the shell with `aprict-cli`.
+The recommended entry point is `aprict.scripts.cli`, which is a wrapper for the other scirpts. When `aprict` is installed in the current environment, this can be called from the shell with `aprict`.
 """

@@ -181,6 +181,7 @@ dependencies = [
     { name = "click-extra" },
     { name = "cuda-core", extra = ["cu13"] },
     { name = "cupy-cuda13x", extra = ["ctk"] },
+    { name = "dask" },
     { name = "gpustat" },
     { name = "imageio" },
     { name = "numexpr" },
@@ -192,6 +193,7 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "tqdm" },
+    { name = "zarr" },
 ]
 
 [package.optional-dependencies]
@@ -231,6 +233,7 @@ requires-dist = [
     { name = "click-extra", specifier = ">=9.4.0" },
     { name = "cuda-core", extras = ["cu13"], specifier = ">=1.2.0" },
     { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.2.0" },
+    { name = "dask", specifier = ">=2026.8.0" },
     { name = "gpustat", specifier = ">=1.1.1" },
     { name = "imageio", specifier = ">=2.37.3" },
     { name = "imageio", marker = "extra == 'gui'", specifier = ">=2.37.3" },
@@ -247,6 +250,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.3.3" },
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "tqdm", specifier = ">=4.68.3" },
+    { name = "zarr", specifier = ">=3.4.2" },
 ]
 provides-extras = ["gui"]
 

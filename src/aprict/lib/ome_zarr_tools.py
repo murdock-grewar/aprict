@@ -18,12 +18,13 @@
 import enum
 from typing import TYPE_CHECKING
 
+import dask.array
+import numpy as np
 import ome_zarr
+import zarr
 
 if TYPE_CHECKING:
     import pathlib
-
-    import numpy as np
 
 
 class OMEZarrVersion(enum.Enum):
@@ -66,3 +67,24 @@ def nparr_to_zarr(
         channel_names=["attenuation coefficient"],
     )
     multiscales.to_ome_zarr(out_zarr_path, version=verstr)
+
+
+def zarr_to_nparr(
+    zarr_path: pathlib.Path,
+    *,
+    out_arr_path: pathlib.Path,
+) -> None:
+    """Convert an OME-Zarr directory to a numpy array."""
+    # Validate args
+    if out_arr_path.is_file():
+        msg = f"File already exists: {out_arr_path}"
+        raise FileExistsError(msg)
+
+    zarr_group = zarr.open_group(zarr_path, mode="r")
+    ngff_image = ome_zarr.OMEZarrMultiscale.from_ome_zarr(zarr_group)
+    dask_array = ngff_image.images[0].data
+    arr = np.lib.format.open_memmap(
+        out_arr_path, mode="w+", dtype=dask_array.dtype, shape=dask_array.shape
+    )
+    dask.array.store(dask_array, arr)  # ty: ignore[invalid-argument-type]
+    arr.flush()

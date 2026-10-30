@@ -19,6 +19,8 @@ import click_extra as ce
 
 from ..lib import click_tools
 from ..version import version
+from .convert_npy_to_omezarr import main as main_convert_npy_to_omez
+from .convert_omezarr_to_npy import main as main_convert_omez_to_npy
 from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
@@ -44,6 +46,21 @@ _cs = {
 # @ce.man_option()  # add --man option from click_extra
 def main() -> None:  # ruff: ignore[undocumented-public-function]
     pass
+
+
+@ce.group(
+    name="convert",
+    params=None,
+    help="Conversion between data formats.",
+    context_settings=_cs,
+)
+def convert() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+main.add_command(convert)
+convert.add_command(cmd=main_convert_npy_to_omez, name="npy_to_omez")
+convert.add_command(cmd=main_convert_omez_to_npy, name="omez_to_npy")
 
 
 @ce.group(
