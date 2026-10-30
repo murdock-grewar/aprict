@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Convert a numpy array on disk to an OME-Zarr-compliant .zarr directory."""
+"""Convert an OME-Zarr-compliant directory on disk to a numpy array."""
 
 import pathlib
 import types
@@ -23,9 +23,7 @@ import click_extra as ce
 
 from ..lib import ome_zarr_tools
 
-_progdesc = (
-    "Convert a numpy array on disk to an OME-Zarr-compliant .zarr directory."
-)
+_progdesc = "Convert an OME-Zarr-compliant directory on disk to a numpy array."
 
 
 @ce.command(
