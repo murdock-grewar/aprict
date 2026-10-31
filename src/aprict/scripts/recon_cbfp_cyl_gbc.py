@@ -1087,6 +1087,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                                 ),
                             )
                         )
+                        del pss, ps_ramp  # allow memory to be freed
                     update_pbar(
                         pbar
                     )  # update from this and previous queued work
@@ -1099,7 +1100,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                     )  # update from this and previous queued work
                     time.sleep(0.05)
                 update_pbar(pbar)
-                del pss  # free up some memory
 
             if tot_num_nonskipped_projs == 0:
                 msg = "No need to transfer volume chunk from GPU. No work performed."
