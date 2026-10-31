@@ -1171,6 +1171,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
         pbar.update_to(pbar.maxval)
 
+    # Clean up
+    lib.gpu_tools.clear_cache()
+    lib.gpu_tools.clear_pinned_cache()
+
     msg = "Filtering volumes..."
     logger.info(msg)
     with rich_console.status(msg, spinner="dots"):
@@ -1197,6 +1201,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             ]
         )
         del volmini_np  # not going to reuse this, so delete this reference so the filtration can free some memory.
+
+        # Clean up
+        lib.gpu_tools.clear_cache()
+        lib.gpu_tools.clear_pinned_cache()
+
         msg = "Filtering unpadded minivol..."
         logger.debug(msg)
         minivol_unpadded_filtered_np = gbc.filters.ramp_filter_conebeam(
@@ -1225,6 +1234,11 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             minivol_unpadded_filtered_np,
             ndarray_container,
         )
+
+        # Clean up
+        lib.gpu_tools.clear_cache()
+        lib.gpu_tools.clear_pinned_cache()
+
         # Filter the full recon now
         msg = "Filtering padded vol and adding upscaled minivol correction..."
         logger.debug(msg)
@@ -1243,6 +1257,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             lowres_correction_array=minivol_correction_np,
         )
         del minivol_correction_np, ndarray_container
+
+        # Clean up
+        lib.gpu_tools.clear_cache()
+        lib.gpu_tools.clear_pinned_cache()
 
         # Now estimate the DC component by looking at the voxels on the boundary.
         # Due to the lowres correction interpolating on the edges, we want to move in
