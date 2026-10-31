@@ -26,7 +26,15 @@ def import_neuroglancer():  # ruff: ignore[missing-return-type-undocumented-publ
     ]  # I don't want to copy a reference to the list, I want to construct a new list with the current contents. Hence the [:].
     import neuroglancer  # ruff: ignore[import-outside-top-level]
 
-    for handler in logging.root.handlers:
+    for handler in logging.root.handlers[:]:
         if handler not in handlers:
             logging.root.removeHandler(handler)
     return neuroglancer
+
+
+def purge_root_loggers() -> None:
+    """Purge all handlers of the root logger."""
+    import logging  # ruff: ignore[import-outside-top-level]
+
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
