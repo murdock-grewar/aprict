@@ -64,7 +64,7 @@ def nparr_to_zarr(
             {"x": 8, "y": 8, "z": 8},
         ],
         method="local_mean",
-        channel_names=["attenuation coefficient"],
+        channel_names=["attenuation per mm"],
     )
     multiscales.to_ome_zarr(out_zarr_path, version=verstr)
 
