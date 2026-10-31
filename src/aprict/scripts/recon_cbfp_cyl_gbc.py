@@ -47,6 +47,7 @@ except ModuleNotFoundError:
 
 from .. import Volume, gbc, imview, lib, logtools
 from ..cb import flatpanel as cbfp
+from ..lib import import_tools
 
 _mod_avail_imview = imview._pyqtgraph_installed  # ruff: ignore[private-member-access]
 
@@ -588,6 +589,10 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ##################### Logging setup ######################
     ##########################################################
+    # Purge any existing root logger handlers.
+    # This step is necessary as a hotfix to prevent badly-behaved imports from adding
+    # their own root logger handlers.
+    import_tools.purge_root_loggers()
     # Prevent root logger from squashing child loggers from outputting
     logging.root.setLevel(logging.NOTSET)
     # Create custom logger object
