@@ -25,7 +25,7 @@ r"""
 
 ## Features
 
-`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' an 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.0.33`:
+`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' and 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.0.33`:
  - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)
  - Out-of-core analytic reconstruction for special geometries.
  - In-core iterative reconstruction for arbitrary geometries.
@@ -57,7 +57,7 @@ Follow this three-step process to get a quick flavour of the capabilities of thi
         --output projs \
         --plot-mode PYQTGRAPH  # available if `gui` extra installed
     ```
- 3. Create a tomographic reconstruction in directory `recon_gbc/`, from the geometry and simulated data. Uses the Global Backproject-Convolution (GBC) algorithm:
+ 3. Create a tomographic reconstruction in directory `recon_gbc/`, from the geometry and simulated data. Uses the Global Backprojection-Convolution (GBC) algorithm:
     ```bash
     aprict recon gbc-cone-cyl \
         --geom projs/projgeom.json \
