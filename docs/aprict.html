@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="pdoc 16.0.0"/>
-    <title>    aprict v0.0.34.dev2 API documentation
+    <title>    aprict v0.0.34.dev3 API documentation
 </title>
             <link rel="icon" href="/img/logo_pic.svg"/>
 
@@ -90,7 +90,7 @@
         <div>
               <img src="/img/logo_horz_big.svg" class="logo" alt="project logo"/>
 
-    <small>v0.0.34.dev2</small>
+    <small>v0.0.34.dev3</small>
 
             <input type="search" placeholder="Search..." role="searchbox" aria-label="search"
                    pattern=".+" required>
@@ -137,12 +137,13 @@
     <main class="pdoc">
             <section class="module-info">
                     <h1 class="modulename">
-aprict          v0.0.34.dev2
+aprict          v0.0.34.dev3
     </h1>
 
                         <div class="docstring"><p><a href="https://orcid.org/0000-0002-0015-8284"><img src="https://img.shields.io/badge/Author_ORCiD-0000--0002--0015--8284-green?logo=orcid" alt="Static Badge" /></a>
 <a href="https://doi.org/10.5281/zenodo.23632625"><img src="https://img.shields.io/badge/Project_DOI-10.5281%2Fzenodo.23632625-yellow?logo=DOI&color=yellow" alt="Static Badge" /></a>
-<img src="https://img.shields.io/pypi/v/aprict" alt="PyPI Version" />
+<a href="https://pypi.org/project/aprict/"><img src="https://img.shields.io/pypi/v/aprict" alt="PyPI Version" /></a>
+<a href="https://github.com/murdock-grewar/aprict"><img src="https://img.shields.io/badge/github-murdock--grewar%2Faprict-212121?logo=github&logoColor=white" alt="Static Badge" /></a>
 <a href="https://www.repostatus.org/#wip"><img src="https://www.repostatus.org/badges/latest/wip.svg" alt="Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public." /></a></p>
 
 <h1 id="what-is-aprict">What is <code><a href="">aprict</a></code>?</h1>
@@ -281,140 +282,141 @@ aprict          v0.0.34.dev2
 </span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="L-17"><a href="#L-17"><span class="linenos"> 17</span></a><span class="sd">[![Static Badge](https://img.shields.io/badge/Author_ORCiD-0000--0002--0015--8284-green?logo=orcid)](https://orcid.org/0000-0002-0015-8284)</span>
 </span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="sd">[![Static Badge](https://img.shields.io/badge/Project_DOI-10.5281%2Fzenodo.23632625-yellow?logo=DOI&amp;color=yellow)](https://doi.org/10.5281/zenodo.23632625)</span>
-</span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a><span class="sd">![PyPI Version](https://img.shields.io/pypi/v/aprict)</span>
-</span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a><span class="sd">[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)</span>
-</span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a>
-</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a><span class="sd"># What is `aprict`?</span>
-</span><span id="L-23"><a href="#L-23"><span class="linenos"> 23</span></a>
-</span><span id="L-24"><a href="#L-24"><span class="linenos"> 24</span></a><span class="sd">`aprict` is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).</span>
-</span><span id="L-25"><a href="#L-25"><span class="linenos"> 25</span></a>
-</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a><span class="sd">## Features</span>
-</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a>
-</span><span id="L-28"><a href="#L-28"><span class="linenos"> 28</span></a><span class="sd">`aprict` uses the GPU for all the heavy operations. The terminology &#39;in-core&#39; and &#39;out-of-core&#39; here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.0.33`:</span>
-</span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a><span class="sd"> - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)</span>
-</span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a><span class="sd"> - Out-of-core analytic reconstruction for special geometries.</span>
-</span><span id="L-31"><a href="#L-31"><span class="linenos"> 31</span></a><span class="sd"> - In-core iterative reconstruction for arbitrary geometries.</span>
-</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a>
-</span><span id="L-33"><a href="#L-33"><span class="linenos"> 33</span></a><span class="sd">## Installation</span>
-</span><span id="L-34"><a href="#L-34"><span class="linenos"> 34</span></a>
-</span><span id="L-35"><a href="#L-35"><span class="linenos"> 35</span></a><span class="sd">You can install `aprict` with `pip install aprict[gui]`.</span>
-</span><span id="L-36"><a href="#L-36"><span class="linenos"> 36</span></a>
-</span><span id="L-37"><a href="#L-37"><span class="linenos"> 37</span></a><span class="sd">## Quickstart</span>
-</span><span id="L-38"><a href="#L-38"><span class="linenos"> 38</span></a>
-</span><span id="L-39"><a href="#L-39"><span class="linenos"> 39</span></a><span class="sd">Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance are measured in millimeters.</span>
-</span><span id="L-40"><a href="#L-40"><span class="linenos"> 40</span></a>
-</span><span id="L-41"><a href="#L-41"><span class="linenos"> 41</span></a><span class="sd"> 1. Create a `projgeom.json` file encoding the experiment geometry:</span>
-</span><span id="L-42"><a href="#L-42"><span class="linenos"> 42</span></a><span class="sd">    ```bash</span>
-</span><span id="L-43"><a href="#L-43"><span class="linenos"> 43</span></a><span class="sd">    aprict make-geom cone-cyl \</span>
-</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a><span class="sd">        --num 1000 \</span>
-</span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a><span class="sd">        --type GOLDEN_THETA \</span>
-</span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a><span class="sd">        --R 250 --L-minus-R 250 --h 700 \</span>
-</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="sd">        --detwid 600 --dethei 600 \</span>
-</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a><span class="sd">        --pixwid-isoc 0.25 --pixhei-isoc 0.25 \</span>
-</span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a><span class="sd">        --output projgeom.json</span>
-</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a><span class="sd">    ```</span>
-</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a><span class="sd"> 2. Create the linearised projection data in directory `projs/`, based on the geometry encoded in `projgeom.json`:</span>
-</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a><span class="sd">    ```bash</span>
-</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a><span class="sd">    aprict project cbfp \</span>
-</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a><span class="sd">        --geom projgeom.json \</span>
-</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a><span class="sd">        --phantom-preset HEAD \</span>
-</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a><span class="sd">        --ssu 3 --ssv 3 \</span>
-</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a><span class="sd">        --output projs \</span>
-</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a><span class="sd">        --plot-mode PYQTGRAPH  # available if `gui` extra installed</span>
-</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a><span class="sd">    ```</span>
-</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a><span class="sd"> 3. Create a tomographic reconstruction in directory `recon_gbc/`, from the geometry and simulated data. Uses the Global Backprojection-Convolution (GBC) algorithm:</span>
-</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a><span class="sd">    ```bash</span>
-</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a><span class="sd">    aprict recon gbc-cone-cyl \</span>
-</span><span id="L-63"><a href="#L-63"><span class="linenos"> 63</span></a><span class="sd">        --geom projs/projgeom.json \</span>
-</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="sd">        --projs projs/projs.npy \</span>
-</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a><span class="sd">        --voxwid 0.5 \</span>
-</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a><span class="sd">        --volshape &#39;(525,525,525)&#39; \</span>
-</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a><span class="sd">        --alg GREWAR \</span>
-</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a><span class="sd">        --f1 1.2 --f2 6 --n 9 --eps 1e-9 \</span>
-</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a><span class="sd">        --plotmin 0 --plotmax 0.0368 \</span>
-</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a><span class="sd">        --output recon_gbc \</span>
-</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a><span class="sd">        --plot-mode PYQTGRAPH  # available if `gui` extra installed</span>
-</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a><span class="sd">    ```</span>
-</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a><span class="sd">    PNG previews of the reconstruction are available at `recon_gbc/output/*.png`. The full reconstruction is available at `recon_gbc/output/recon.npy`.</span>
-</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a>
-</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a><span class="sd">Optionally, the reconstruction can be converted to `OME-Zarr 5.0` format with:</span>
-</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a><span class="sd">```bash</span>
-</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a><span class="sd">aprict convert npy_to_omez \</span>
-</span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a><span class="sd">    --input recon_gbc/output/recon.npy \</span>
-</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a><span class="sd">    --output ./recon.zarr \</span>
-</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a><span class="sd">    --voxwid-mm 0.5 \</span>
-</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a><span class="sd">    --ver V0_5</span>
-</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a><span class="sd">```</span>
-</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a>
-</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a><span class="sd"># Recommended use</span>
-</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a>
-</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a><span class="sd">## Commandline interface (CLI)</span>
-</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a>
-</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a><span class="sd">The entry point for the main commandline interface is the shell command `aprict`. This shell command should be available on `$PATH` if the module is installed in the current environment. All shell commands are self-documented:</span>
-</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a><span class="sd">```bash</span>
-</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a><span class="sd">$ aprict --help</span>
-</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a><span class="sd">```</span>
-</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a>
-</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a><span class="sd">## Python API</span>
-</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a><span class="sd">### Recommended import pattern</span>
-</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a>
-</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a><span class="sd">The recommended import pattern for this module is</span>
-</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a><span class="sd">```python</span>
-</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="sd">import aprict</span>
-</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">from aprict.cb import flatpanel as cbfp</span>
-</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a><span class="sd">```</span>
-</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>
-</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a><span class="sd">### Main components of the Python API</span>
-</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a>
-</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a><span class="sd">The main components of the end-user Python API are:</span>
-</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a><span class="sd"> - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format</span>
-</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a><span class="sd"> - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format</span>
-</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a><span class="sd"> - `aprict.cb.flatpanel` - a namespace for objects and functions applying to cone-beam imaging geometries</span>
-</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a>
-</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a><span class="sd">### Examples using the Python API</span>
-</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a>
-</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a><span class="sd">For examples of Python API usage, see `aprict.examples`.</span>
-</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a>
-</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a><span class="sd">&quot;&quot;&quot;</span>  <span class="c1"># ruff: ignore[ambiguous-unicode-character-docstring, missing-blank-line-after-summary, missing-trailing-period]</span>
-</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a>
-</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a><span class="c1"># If we are just running the build script, then I don&#39;t want to initialise anything,</span>
-</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a><span class="c1"># because the imports fail because it hasn&#39;t built yet.</span>
-</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a>
-</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_os</span>
-</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a>
-</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a><span class="k">if</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;APRICT_BUILDMODE&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>  <span class="c1"># ruff: ignore[non-empty-init-module]</span>
-</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a>    <span class="k">pass</span>
-</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a><span class="k">else</span><span class="p">:</span>
-</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>    <span class="c1"># Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.</span>
-</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>    <span class="n">_nethreads_max_env</span> <span class="o">=</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>    <span class="k">if</span> <span class="n">_nethreads_max_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>        <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">_os</span><span class="o">.</span><span class="n">process_cpu_count</span><span class="p">())</span>
-</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>
-</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>    <span class="k">del</span> <span class="n">_os</span>
-</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">cb</span> <span class="k">as</span> <span class="n">cb</span>
-</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">image_view</span> <span class="k">as</span> <span class="n">imview</span>
-</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">iterators</span><span class="p">,</span> <span class="n">lib</span><span class="p">,</span> <span class="n">phantoms</span><span class="p">,</span> <span class="n">volume</span>
-</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.cuda</span><span class="w"> </span><span class="kn">import</span> <span class="n">structs</span> <span class="k">as</span> <span class="n">dtypes</span>
-</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">FBVolume</span> <span class="k">as</span> <span class="n">FBVolume</span>
-</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>
-</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>    <span class="n">FBVolume</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;@private</span><span class="se">\n</span><span class="s2">An alias to aprict.volume.FBVolume&quot;</span>  <span class="c1"># Hide from pdoc documentation of this module</span>
-</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">Volume</span> <span class="k">as</span> <span class="n">Volume</span>
-</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>
-</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>    <span class="n">Volume</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;@private</span><span class="se">\n</span><span class="s2">An alias to aprict.volume.Volume&quot;</span>  <span class="c1"># Hide from pdoc documentation of this module</span>
-</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>
-</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>    <span class="c1"># Note that __all__ determines what&#39;s listed in the documentation page.</span>
-</span><span id="L-141"><a href="#L-141"><span class="linenos">141</span></a>    <span class="c1"># So, I&#39;m selecting only those parts which I want to be documented on the main doc page here.</span>
-</span><span id="L-142"><a href="#L-142"><span class="linenos">142</span></a>    <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a>        <span class="s2">&quot;FBVolume&quot;</span><span class="p">,</span>  <span class="c1"># documented in aprict.volume</span>
-</span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a>        <span class="s2">&quot;Volume&quot;</span><span class="p">,</span>  <span class="c1"># documented in aprict.volume</span>
-</span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>        <span class="s2">&quot;cb&quot;</span><span class="p">,</span>
-</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a>        <span class="s2">&quot;dtypes&quot;</span><span class="p">,</span>
-</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>        <span class="s2">&quot;imview&quot;</span><span class="p">,</span>
-</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>        <span class="s2">&quot;iterators&quot;</span><span class="p">,</span>
-</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>        <span class="s2">&quot;lib&quot;</span><span class="p">,</span>
-</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>        <span class="s2">&quot;phantoms&quot;</span><span class="p">,</span>
-</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a>        <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
-</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a>    <span class="p">]</span>
+</span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a><span class="sd">[![PyPI Version](https://img.shields.io/pypi/v/aprict)](https://pypi.org/project/aprict/)</span>
+</span><span id="L-20"><a href="#L-20"><span class="linenos"> 20</span></a><span class="sd">[![Static Badge](https://img.shields.io/badge/github-murdock--grewar%2Faprict-212121?logo=github&amp;logoColor=white)](https://github.com/murdock-grewar/aprict)</span>
+</span><span id="L-21"><a href="#L-21"><span class="linenos"> 21</span></a><span class="sd">[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)</span>
+</span><span id="L-22"><a href="#L-22"><span class="linenos"> 22</span></a>
+</span><span id="L-23"><a href="#L-23"><span class="linenos"> 23</span></a><span class="sd"># What is `aprict`?</span>
+</span><span id="L-24"><a href="#L-24"><span class="linenos"> 24</span></a>
+</span><span id="L-25"><a href="#L-25"><span class="linenos"> 25</span></a><span class="sd">`aprict` is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).</span>
+</span><span id="L-26"><a href="#L-26"><span class="linenos"> 26</span></a>
+</span><span id="L-27"><a href="#L-27"><span class="linenos"> 27</span></a><span class="sd">## Features</span>
+</span><span id="L-28"><a href="#L-28"><span class="linenos"> 28</span></a>
+</span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a><span class="sd">`aprict` uses the GPU for all the heavy operations. The terminology &#39;in-core&#39; and &#39;out-of-core&#39; here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.0.33`:</span>
+</span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a><span class="sd"> - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)</span>
+</span><span id="L-31"><a href="#L-31"><span class="linenos"> 31</span></a><span class="sd"> - Out-of-core analytic reconstruction for special geometries.</span>
+</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a><span class="sd"> - In-core iterative reconstruction for arbitrary geometries.</span>
+</span><span id="L-33"><a href="#L-33"><span class="linenos"> 33</span></a>
+</span><span id="L-34"><a href="#L-34"><span class="linenos"> 34</span></a><span class="sd">## Installation</span>
+</span><span id="L-35"><a href="#L-35"><span class="linenos"> 35</span></a>
+</span><span id="L-36"><a href="#L-36"><span class="linenos"> 36</span></a><span class="sd">You can install `aprict` with `pip install aprict[gui]`.</span>
+</span><span id="L-37"><a href="#L-37"><span class="linenos"> 37</span></a>
+</span><span id="L-38"><a href="#L-38"><span class="linenos"> 38</span></a><span class="sd">## Quickstart</span>
+</span><span id="L-39"><a href="#L-39"><span class="linenos"> 39</span></a>
+</span><span id="L-40"><a href="#L-40"><span class="linenos"> 40</span></a><span class="sd">Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance are measured in millimeters.</span>
+</span><span id="L-41"><a href="#L-41"><span class="linenos"> 41</span></a>
+</span><span id="L-42"><a href="#L-42"><span class="linenos"> 42</span></a><span class="sd"> 1. Create a `projgeom.json` file encoding the experiment geometry:</span>
+</span><span id="L-43"><a href="#L-43"><span class="linenos"> 43</span></a><span class="sd">    ```bash</span>
+</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a><span class="sd">    aprict make-geom cone-cyl \</span>
+</span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a><span class="sd">        --num 1000 \</span>
+</span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a><span class="sd">        --type GOLDEN_THETA \</span>
+</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="sd">        --R 250 --L-minus-R 250 --h 700 \</span>
+</span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a><span class="sd">        --detwid 600 --dethei 600 \</span>
+</span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a><span class="sd">        --pixwid-isoc 0.25 --pixhei-isoc 0.25 \</span>
+</span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a><span class="sd">        --output projgeom.json</span>
+</span><span id="L-51"><a href="#L-51"><span class="linenos"> 51</span></a><span class="sd">    ```</span>
+</span><span id="L-52"><a href="#L-52"><span class="linenos"> 52</span></a><span class="sd"> 2. Create the linearised projection data in directory `projs/`, based on the geometry encoded in `projgeom.json`:</span>
+</span><span id="L-53"><a href="#L-53"><span class="linenos"> 53</span></a><span class="sd">    ```bash</span>
+</span><span id="L-54"><a href="#L-54"><span class="linenos"> 54</span></a><span class="sd">    aprict project cbfp \</span>
+</span><span id="L-55"><a href="#L-55"><span class="linenos"> 55</span></a><span class="sd">        --geom projgeom.json \</span>
+</span><span id="L-56"><a href="#L-56"><span class="linenos"> 56</span></a><span class="sd">        --phantom-preset HEAD \</span>
+</span><span id="L-57"><a href="#L-57"><span class="linenos"> 57</span></a><span class="sd">        --ssu 3 --ssv 3 \</span>
+</span><span id="L-58"><a href="#L-58"><span class="linenos"> 58</span></a><span class="sd">        --output projs \</span>
+</span><span id="L-59"><a href="#L-59"><span class="linenos"> 59</span></a><span class="sd">        --plot-mode PYQTGRAPH  # available if `gui` extra installed</span>
+</span><span id="L-60"><a href="#L-60"><span class="linenos"> 60</span></a><span class="sd">    ```</span>
+</span><span id="L-61"><a href="#L-61"><span class="linenos"> 61</span></a><span class="sd"> 3. Create a tomographic reconstruction in directory `recon_gbc/`, from the geometry and simulated data. Uses the Global Backprojection-Convolution (GBC) algorithm:</span>
+</span><span id="L-62"><a href="#L-62"><span class="linenos"> 62</span></a><span class="sd">    ```bash</span>
+</span><span id="L-63"><a href="#L-63"><span class="linenos"> 63</span></a><span class="sd">    aprict recon gbc-cone-cyl \</span>
+</span><span id="L-64"><a href="#L-64"><span class="linenos"> 64</span></a><span class="sd">        --geom projs/projgeom.json \</span>
+</span><span id="L-65"><a href="#L-65"><span class="linenos"> 65</span></a><span class="sd">        --projs projs/projs.npy \</span>
+</span><span id="L-66"><a href="#L-66"><span class="linenos"> 66</span></a><span class="sd">        --voxwid 0.5 \</span>
+</span><span id="L-67"><a href="#L-67"><span class="linenos"> 67</span></a><span class="sd">        --volshape &#39;(525,525,525)&#39; \</span>
+</span><span id="L-68"><a href="#L-68"><span class="linenos"> 68</span></a><span class="sd">        --alg GREWAR \</span>
+</span><span id="L-69"><a href="#L-69"><span class="linenos"> 69</span></a><span class="sd">        --f1 1.2 --f2 6 --n 9 --eps 1e-9 \</span>
+</span><span id="L-70"><a href="#L-70"><span class="linenos"> 70</span></a><span class="sd">        --plotmin 0 --plotmax 0.0368 \</span>
+</span><span id="L-71"><a href="#L-71"><span class="linenos"> 71</span></a><span class="sd">        --output recon_gbc \</span>
+</span><span id="L-72"><a href="#L-72"><span class="linenos"> 72</span></a><span class="sd">        --plot-mode PYQTGRAPH  # available if `gui` extra installed</span>
+</span><span id="L-73"><a href="#L-73"><span class="linenos"> 73</span></a><span class="sd">    ```</span>
+</span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a><span class="sd">    PNG previews of the reconstruction are available at `recon_gbc/output/*.png`. The full reconstruction is available at `recon_gbc/output/recon.npy`.</span>
+</span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a>
+</span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a><span class="sd">Optionally, the reconstruction can be converted to `OME-Zarr 5.0` format with:</span>
+</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a><span class="sd">```bash</span>
+</span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a><span class="sd">aprict convert npy_to_omez \</span>
+</span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a><span class="sd">    --input recon_gbc/output/recon.npy \</span>
+</span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a><span class="sd">    --output ./recon.zarr \</span>
+</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a><span class="sd">    --voxwid-mm 0.5 \</span>
+</span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a><span class="sd">    --ver V0_5</span>
+</span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a><span class="sd">```</span>
+</span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a>
+</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a><span class="sd"># Recommended use</span>
+</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a>
+</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a><span class="sd">## Commandline interface (CLI)</span>
+</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a>
+</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a><span class="sd">The entry point for the main commandline interface is the shell command `aprict`. This shell command should be available on `$PATH` if the module is installed in the current environment. All shell commands are self-documented:</span>
+</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a><span class="sd">```bash</span>
+</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a><span class="sd">$ aprict --help</span>
+</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a><span class="sd">```</span>
+</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a>
+</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a><span class="sd">## Python API</span>
+</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="sd">### Recommended import pattern</span>
+</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a>
+</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a><span class="sd">The recommended import pattern for this module is</span>
+</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="sd">```python</span>
+</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">import aprict</span>
+</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a><span class="sd">from aprict.cb import flatpanel as cbfp</span>
+</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a><span class="sd">```</span>
+</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a>
+</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a><span class="sd">### Main components of the Python API</span>
+</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a>
+</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a><span class="sd">The main components of the end-user Python API are:</span>
+</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a><span class="sd"> - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format</span>
+</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a><span class="sd"> - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format</span>
+</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a><span class="sd"> - `aprict.cb.flatpanel` - a namespace for objects and functions applying to cone-beam imaging geometries</span>
+</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a>
+</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="sd">### Examples using the Python API</span>
+</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a>
+</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="sd">For examples of Python API usage, see `aprict.examples`.</span>
+</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a>
+</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a><span class="sd">&quot;&quot;&quot;</span>  <span class="c1"># ruff: ignore[ambiguous-unicode-character-docstring, missing-blank-line-after-summary, missing-trailing-period]</span>
+</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>
+</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a><span class="c1"># If we are just running the build script, then I don&#39;t want to initialise anything,</span>
+</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a><span class="c1"># because the imports fail because it hasn&#39;t built yet.</span>
+</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a>
+</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_os</span>
+</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a>
+</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a><span class="k">if</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;APRICT_BUILDMODE&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>  <span class="c1"># ruff: ignore[non-empty-init-module]</span>
+</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>    <span class="k">pass</span>
+</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a><span class="k">else</span><span class="p">:</span>
+</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>    <span class="c1"># Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.</span>
+</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>    <span class="n">_nethreads_max_env</span> <span class="o">=</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    <span class="k">if</span> <span class="n">_nethreads_max_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>        <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">_os</span><span class="o">.</span><span class="n">process_cpu_count</span><span class="p">())</span>
+</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>
+</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="k">del</span> <span class="n">_os</span>
+</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">cb</span> <span class="k">as</span> <span class="n">cb</span>
+</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">image_view</span> <span class="k">as</span> <span class="n">imview</span>
+</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">iterators</span><span class="p">,</span> <span class="n">lib</span><span class="p">,</span> <span class="n">phantoms</span><span class="p">,</span> <span class="n">volume</span>
+</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.cuda</span><span class="w"> </span><span class="kn">import</span> <span class="n">structs</span> <span class="k">as</span> <span class="n">dtypes</span>
+</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">FBVolume</span> <span class="k">as</span> <span class="n">FBVolume</span>
+</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>
+</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="n">FBVolume</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;@private</span><span class="se">\n</span><span class="s2">An alias to aprict.volume.FBVolume&quot;</span>  <span class="c1"># Hide from pdoc documentation of this module</span>
+</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">Volume</span> <span class="k">as</span> <span class="n">Volume</span>
+</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>
+</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>    <span class="n">Volume</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;@private</span><span class="se">\n</span><span class="s2">An alias to aprict.volume.Volume&quot;</span>  <span class="c1"># Hide from pdoc documentation of this module</span>
+</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>
+</span><span id="L-141"><a href="#L-141"><span class="linenos">141</span></a>    <span class="c1"># Note that __all__ determines what&#39;s listed in the documentation page.</span>
+</span><span id="L-142"><a href="#L-142"><span class="linenos">142</span></a>    <span class="c1"># So, I&#39;m selecting only those parts which I want to be documented on the main doc page here.</span>
+</span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a>    <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a>        <span class="s2">&quot;FBVolume&quot;</span><span class="p">,</span>  <span class="c1"># documented in aprict.volume</span>
+</span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>        <span class="s2">&quot;Volume&quot;</span><span class="p">,</span>  <span class="c1"># documented in aprict.volume</span>
+</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a>        <span class="s2">&quot;cb&quot;</span><span class="p">,</span>
+</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>        <span class="s2">&quot;dtypes&quot;</span><span class="p">,</span>
+</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>        <span class="s2">&quot;imview&quot;</span><span class="p">,</span>
+</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>        <span class="s2">&quot;iterators&quot;</span><span class="p">,</span>
+</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>        <span class="s2">&quot;lib&quot;</span><span class="p">,</span>
+</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a>        <span class="s2">&quot;phantoms&quot;</span><span class="p">,</span>
+</span><span id="L-152"><a href="#L-152"><span class="linenos">152</span></a>        <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
+</span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a>    <span class="p">]</span>
 </span></pre></div>
 
 
