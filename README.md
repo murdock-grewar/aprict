@@ -1,4 +1,4 @@
-![project logo](https://raw.githubusercontent.com/murdock-grewar/aprict/release/docs/img/logo_horz_big.png)
+![project logo](https://raw.githubusercontent.com/murdock-grewar/aprict/refs/heads/release/img/logo_horz_big.svg)
 
 [![Static Badge](https://img.shields.io/badge/Author_ORCiD-0000--0002--0015--8284-green?logo=orcid)](https://orcid.org/0000-0002-0015-8284)
 [![Static Badge](https://img.shields.io/badge/Project_DOI-10.5281%2Fzenodo.23632625-yellow?logo=DOI&color=yellow)](https://doi.org/10.5281/zenodo.23632625)
