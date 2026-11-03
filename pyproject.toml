@@ -12,9 +12,16 @@ readme = 'README.md'
 requires-python = '>=3.14'
 license = 'GPL-3.0-or-later'
 classifiers = [
+    'Development Status :: 3 - Alpha',
+    'Environment :: GPU :: NVIDIA CUDA',
+    'Environment :: GPU :: NVIDIA CUDA :: 13',
+    'Intended Audience :: Science/Research',
     'Natural Language :: English',
     'Operating System :: OS Independent',
-    'Programming Language :: Python :: 3',
+    'Programming Language :: C++',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Python :: 3.14',
+    'Topic :: Scientific/Engineering',
 ]
 dependencies = [
     "asteval>=1.0.10",
@@ -37,6 +44,10 @@ dependencies = [
     "zarr>=3.4.2",
 ]
 dynamic = ['scripts', 'version']
+
+[project.urls]
+Documentation = "https://docs.aprict.au/"
+Repository = "https://github.com/murdock-grewar/aprict/"
 
 [project.optional-dependencies]
 gui = [
