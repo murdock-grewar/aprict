@@ -24,6 +24,10 @@ r"""
 
 `aprict` is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).
 
+## Requirements
+
+An NVIDIA GPU supporting CUDA 13.x is required to use `aprict`.
+
 ## Features
 
 `aprict` uses the GPU for all the heavy operations. The terminology 'in-core' and 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.0.33`:
