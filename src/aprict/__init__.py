@@ -103,8 +103,8 @@ from aprict.cb import flatpanel as cbfp
 ### Main components of the Python API
 
 The main components of the end-user Python API are:
- - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format
- - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format
+ - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format (alias for `aprict.volume.FBVolume`)
+ - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format (alias for `aprict.volume.Volume`)
  - `aprict.cb.flatpanel` - a namespace for objects and functions applying to cone-beam imaging geometries
 
 ### Examples using the Python API
@@ -132,17 +132,10 @@ else:
     from . import iterators, lib, phantoms, volume
     from .cuda import structs as dtypes
     from .volume import FBVolume as FBVolume
-
-    FBVolume.__doc__ = "@private\nAn alias to aprict.volume.FBVolume"  # Hide from pdoc documentation of this module
     from .volume import Volume as Volume
 
-    Volume.__doc__ = "@private\nAn alias to aprict.volume.Volume"  # Hide from pdoc documentation of this module
-
     # Note that __all__ determines what's listed in the documentation page.
-    # So, I'm selecting only those parts which I want to be documented on the main doc page here.
     __all__ = [
-        "FBVolume",  # documented in aprict.volume
-        "Volume",  # documented in aprict.volume
         "cb",
         "dtypes",
         "imview",

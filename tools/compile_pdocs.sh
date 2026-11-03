@@ -9,5 +9,5 @@ pdoc \
     --logo /img/logo_horz_big.svg \
     --favicon /img/logo_pic.svg \
     --footer-text "Copyright © 2026 Murdock Grewar. Licensed under GPLv3+." \
-    ./src/aprict/ ./src/aprict/examples/ ./src/aprict/phantoms/FORBILD_phantoms.py ./src/aprict/volume/volume.py
+    ./src/aprict/ ./src/aprict/examples/ ./src/aprict/phantoms/FORBILD_phantoms.py
 cp -r img docs/
