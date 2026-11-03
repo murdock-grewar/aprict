@@ -41,7 +41,7 @@ You can install `aprict` with `pip install aprict[gui]`.
 
 ## Quickstart
 
-Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance are measured in millimeters.
+Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance here are measured in millimeters.
 
  1. Create a `projgeom.json` file encoding the experiment geometry:
     ```bash
@@ -82,7 +82,8 @@ Optionally, the reconstruction can be converted to `OME-Zarr 5.0` format with:
 aprict convert npy_to_omez \
     --input recon_gbc/output/recon.npy \
     --output ./recon.zarr \
-    --voxwid-mm 0.5 \
+    --unit-len mm \
+    --voxwid 0.5 \
     --ver V0_5
 ```
 

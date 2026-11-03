@@ -68,9 +68,15 @@ _progdesc = (
     ),
 )
 @ce.option(
-    "--voxwid-mm",
+    "--voxwid",
     required=True,
     type=click.FLOAT,
+)
+@ce.option(
+    "--unit-len",
+    required=True,
+    type=click.Choice(ome_zarr_tools.UnitLen),
+    help="Unit length used to interpret '--voxwid' and also the meaning of the attenuation coefficient of the input volume, which has units of inverse length.",
 )
 def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
     """Parse input arguments using click."""
@@ -83,5 +89,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
         arr=np.lib.format.open_memmap(args.input, mode="r"),
         out_zarr_path=args.output,
         omez_version=args.ver,
-        voxwid_mm=args.voxwid_mm,
+        voxwid=args.voxwid,
+        unit_len=args.unit_len,
     )

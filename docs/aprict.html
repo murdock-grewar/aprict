@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="generator" content="pdoc 16.0.0"/>
-    <title>    aprict v0.0.37 API documentation
+    <title>    aprict v0.0.37.dev1 API documentation
 </title>
             <link rel="icon" href="/img/logo_pic.svg"/>
 
@@ -90,7 +90,7 @@
         <div>
               <img src="/img/logo_horz_big.svg" class="logo" alt="project logo"/>
 
-    <small>v0.0.37</small>
+    <small>v0.0.37.dev1</small>
 
             <input type="search" placeholder="Search..." role="searchbox" aria-label="search"
                    pattern=".+" required>
@@ -134,7 +134,7 @@
     <main class="pdoc">
             <section class="module-info">
                     <h1 class="modulename">
-aprict          v0.0.37
+aprict          v0.0.37.dev1
     </h1>
 
                         <div class="docstring"><p><a href="https://orcid.org/0000-0002-0015-8284"><img src="https://img.shields.io/badge/Author_ORCiD-0000--0002--0015--8284-green?logo=orcid" alt="Static Badge" /></a>
@@ -167,7 +167,7 @@ aprict          v0.0.37
 
 <h2 id="quickstart">Quickstart</h2>
 
-<p>Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as <code>bash</code>, from a fresh directory, with an active Python environment with <code>aprict[gui]</code> installed. Note that all units of distance are measured in millimeters.</p>
+<p>Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as <code>bash</code>, from a fresh directory, with an active Python environment with <code>aprict[gui]</code> installed. Note that all units of distance here are measured in millimeters.</p>
 
 <ol>
 <li><p>Create a <code>projgeom.json</code> file encoding the experiment geometry:</p>
@@ -218,7 +218,8 @@ aprict          v0.0.37
 <pre><span></span><code>aprict<span class="w"> </span>convert<span class="w"> </span>npy_to_omez<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--input<span class="w"> </span>recon_gbc/output/recon.npy<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--output<span class="w"> </span>./recon.zarr<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--voxwid-mm<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--unit-len<span class="w"> </span>mm<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--voxwid<span class="w"> </span><span class="m">0</span>.5<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--ver<span class="w"> </span>V0_5
 </code></pre>
 </div>
@@ -308,7 +309,7 @@ aprict          v0.0.37
 </span><span id="L-41"><a href="#L-41"><span class="linenos"> 41</span></a>
 </span><span id="L-42"><a href="#L-42"><span class="linenos"> 42</span></a><span class="sd">## Quickstart</span>
 </span><span id="L-43"><a href="#L-43"><span class="linenos"> 43</span></a>
-</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a><span class="sd">Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance are measured in millimeters.</span>
+</span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a><span class="sd">Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance here are measured in millimeters.</span>
 </span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a>
 </span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a><span class="sd"> 1. Create a `projgeom.json` file encoding the experiment geometry:</span>
 </span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="sd">    ```bash</span>
@@ -349,72 +350,73 @@ aprict          v0.0.37
 </span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a><span class="sd">aprict convert npy_to_omez \</span>
 </span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a><span class="sd">    --input recon_gbc/output/recon.npy \</span>
 </span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a><span class="sd">    --output ./recon.zarr \</span>
-</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a><span class="sd">    --voxwid-mm 0.5 \</span>
-</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a><span class="sd">    --ver V0_5</span>
-</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a><span class="sd">```</span>
-</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a>
-</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a><span class="sd"># Recommended use</span>
-</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a>
-</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a><span class="sd">## Commandline interface (CLI)</span>
-</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a>
-</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a><span class="sd">The entry point for the main commandline interface is the shell command `aprict`. This shell command should be available on `$PATH` if the module is installed in the current environment. All shell commands are self-documented:</span>
-</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a><span class="sd">```bash</span>
-</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="sd">$ aprict --help</span>
-</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a><span class="sd">```</span>
-</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a>
-</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="sd">## Python API</span>
-</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">### Recommended import pattern</span>
-</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a>
-</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a><span class="sd">The recommended import pattern for this module is</span>
-</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a><span class="sd">```python</span>
-</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a><span class="sd">import aprict</span>
-</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a><span class="sd">from aprict.cb import flatpanel as cbfp</span>
-</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a><span class="sd">```</span>
-</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a>
-</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a><span class="sd">### Main components of the Python API</span>
-</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a>
-</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a><span class="sd">The main components of the end-user Python API are:</span>
-</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="sd"> - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format (alias for `aprict.volume.FBVolume`)</span>
-</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a><span class="sd"> - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format (alias for `aprict.volume.Volume`)</span>
-</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="sd"> - `aprict.cb.flatpanel` - a namespace for objects and functions applying to cone-beam imaging geometries</span>
-</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a>
-</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a><span class="sd">### Examples using the Python API</span>
-</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a>
-</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a><span class="sd">For examples of Python API usage, see `aprict.examples`.</span>
-</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a>
-</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a><span class="sd">&quot;&quot;&quot;</span>  <span class="c1"># ruff: ignore[ambiguous-unicode-character-docstring, missing-blank-line-after-summary, missing-trailing-period]</span>
-</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a>
-</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a><span class="c1"># If we are just running the build script, then I don&#39;t want to initialise anything,</span>
-</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a><span class="c1"># because the imports fail because it hasn&#39;t built yet.</span>
-</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a>
-</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_os</span>
-</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a>
-</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a><span class="k">if</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;APRICT_BUILDMODE&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>  <span class="c1"># ruff: ignore[non-empty-init-module]</span>
-</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a>    <span class="k">pass</span>
-</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a><span class="k">else</span><span class="p">:</span>
-</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>    <span class="c1"># Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.</span>
-</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="n">_nethreads_max_env</span> <span class="o">=</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="k">if</span> <span class="n">_nethreads_max_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>        <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">_os</span><span class="o">.</span><span class="n">process_cpu_count</span><span class="p">())</span>
-</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>
-</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>    <span class="k">del</span> <span class="n">_os</span>
-</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">cb</span> <span class="k">as</span> <span class="n">cb</span>
-</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">image_view</span> <span class="k">as</span> <span class="n">imview</span>
-</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">iterators</span><span class="p">,</span> <span class="n">lib</span><span class="p">,</span> <span class="n">phantoms</span><span class="p">,</span> <span class="n">volume</span>
-</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.cuda</span><span class="w"> </span><span class="kn">import</span> <span class="n">structs</span> <span class="k">as</span> <span class="n">dtypes</span>
-</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">FBVolume</span> <span class="k">as</span> <span class="n">FBVolume</span>
-</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">Volume</span> <span class="k">as</span> <span class="n">Volume</span>
-</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>
-</span><span id="L-141"><a href="#L-141"><span class="linenos">141</span></a>    <span class="c1"># Note that __all__ determines what&#39;s listed in the documentation page.</span>
-</span><span id="L-142"><a href="#L-142"><span class="linenos">142</span></a>    <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a>        <span class="s2">&quot;cb&quot;</span><span class="p">,</span>
-</span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a>        <span class="s2">&quot;dtypes&quot;</span><span class="p">,</span>
-</span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>        <span class="s2">&quot;imview&quot;</span><span class="p">,</span>
-</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a>        <span class="s2">&quot;iterators&quot;</span><span class="p">,</span>
-</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>        <span class="s2">&quot;lib&quot;</span><span class="p">,</span>
-</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>        <span class="s2">&quot;phantoms&quot;</span><span class="p">,</span>
-</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>        <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
-</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>    <span class="p">]</span>
+</span><span id="L-85"><a href="#L-85"><span class="linenos"> 85</span></a><span class="sd">    --unit-len mm \</span>
+</span><span id="L-86"><a href="#L-86"><span class="linenos"> 86</span></a><span class="sd">    --voxwid 0.5 \</span>
+</span><span id="L-87"><a href="#L-87"><span class="linenos"> 87</span></a><span class="sd">    --ver V0_5</span>
+</span><span id="L-88"><a href="#L-88"><span class="linenos"> 88</span></a><span class="sd">```</span>
+</span><span id="L-89"><a href="#L-89"><span class="linenos"> 89</span></a>
+</span><span id="L-90"><a href="#L-90"><span class="linenos"> 90</span></a><span class="sd"># Recommended use</span>
+</span><span id="L-91"><a href="#L-91"><span class="linenos"> 91</span></a>
+</span><span id="L-92"><a href="#L-92"><span class="linenos"> 92</span></a><span class="sd">## Commandline interface (CLI)</span>
+</span><span id="L-93"><a href="#L-93"><span class="linenos"> 93</span></a>
+</span><span id="L-94"><a href="#L-94"><span class="linenos"> 94</span></a><span class="sd">The entry point for the main commandline interface is the shell command `aprict`. This shell command should be available on `$PATH` if the module is installed in the current environment. All shell commands are self-documented:</span>
+</span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="sd">```bash</span>
+</span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a><span class="sd">$ aprict --help</span>
+</span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a><span class="sd">```</span>
+</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a>
+</span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a><span class="sd">## Python API</span>
+</span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a><span class="sd">### Recommended import pattern</span>
+</span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>
+</span><span id="L-102"><a href="#L-102"><span class="linenos">102</span></a><span class="sd">The recommended import pattern for this module is</span>
+</span><span id="L-103"><a href="#L-103"><span class="linenos">103</span></a><span class="sd">```python</span>
+</span><span id="L-104"><a href="#L-104"><span class="linenos">104</span></a><span class="sd">import aprict</span>
+</span><span id="L-105"><a href="#L-105"><span class="linenos">105</span></a><span class="sd">from aprict.cb import flatpanel as cbfp</span>
+</span><span id="L-106"><a href="#L-106"><span class="linenos">106</span></a><span class="sd">```</span>
+</span><span id="L-107"><a href="#L-107"><span class="linenos">107</span></a>
+</span><span id="L-108"><a href="#L-108"><span class="linenos">108</span></a><span class="sd">### Main components of the Python API</span>
+</span><span id="L-109"><a href="#L-109"><span class="linenos">109</span></a>
+</span><span id="L-110"><a href="#L-110"><span class="linenos">110</span></a><span class="sd">The main components of the end-user Python API are:</span>
+</span><span id="L-111"><a href="#L-111"><span class="linenos">111</span></a><span class="sd"> - [`aprict.FBVolume`](aprict/volume.html#FBVolume) - an attenuating volume defined in FORBILD format (alias for `aprict.volume.FBVolume`)</span>
+</span><span id="L-112"><a href="#L-112"><span class="linenos">112</span></a><span class="sd"> - [`aprict.Volume`](aprict/volume.html#Volume) - an attenuating volume defined in voxelised format (alias for `aprict.volume.Volume`)</span>
+</span><span id="L-113"><a href="#L-113"><span class="linenos">113</span></a><span class="sd"> - `aprict.cb.flatpanel` - a namespace for objects and functions applying to cone-beam imaging geometries</span>
+</span><span id="L-114"><a href="#L-114"><span class="linenos">114</span></a>
+</span><span id="L-115"><a href="#L-115"><span class="linenos">115</span></a><span class="sd">### Examples using the Python API</span>
+</span><span id="L-116"><a href="#L-116"><span class="linenos">116</span></a>
+</span><span id="L-117"><a href="#L-117"><span class="linenos">117</span></a><span class="sd">For examples of Python API usage, see `aprict.examples`.</span>
+</span><span id="L-118"><a href="#L-118"><span class="linenos">118</span></a>
+</span><span id="L-119"><a href="#L-119"><span class="linenos">119</span></a><span class="sd">&quot;&quot;&quot;</span>  <span class="c1"># ruff: ignore[ambiguous-unicode-character-docstring, missing-blank-line-after-summary, missing-trailing-period]</span>
+</span><span id="L-120"><a href="#L-120"><span class="linenos">120</span></a>
+</span><span id="L-121"><a href="#L-121"><span class="linenos">121</span></a><span class="c1"># If we are just running the build script, then I don&#39;t want to initialise anything,</span>
+</span><span id="L-122"><a href="#L-122"><span class="linenos">122</span></a><span class="c1"># because the imports fail because it hasn&#39;t built yet.</span>
+</span><span id="L-123"><a href="#L-123"><span class="linenos">123</span></a>
+</span><span id="L-124"><a href="#L-124"><span class="linenos">124</span></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_os</span>
+</span><span id="L-125"><a href="#L-125"><span class="linenos">125</span></a>
+</span><span id="L-126"><a href="#L-126"><span class="linenos">126</span></a><span class="k">if</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;APRICT_BUILDMODE&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>  <span class="c1"># ruff: ignore[non-empty-init-module]</span>
+</span><span id="L-127"><a href="#L-127"><span class="linenos">127</span></a>    <span class="k">pass</span>
+</span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a><span class="k">else</span><span class="p">:</span>
+</span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>    <span class="c1"># Ensure that numexpr max threads is set to the number of logical cores before importing numexpr either directly or indirectly through other imports.</span>
+</span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="n">_nethreads_max_env</span> <span class="o">=</span> <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a>    <span class="k">if</span> <span class="n">_nethreads_max_env</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>        <span class="n">_os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;NUMEXPR_MAX_THREADS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">_os</span><span class="o">.</span><span class="n">process_cpu_count</span><span class="p">())</span>
+</span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>
+</span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>    <span class="k">del</span> <span class="n">_os</span>
+</span><span id="L-135"><a href="#L-135"><span class="linenos">135</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">cb</span> <span class="k">as</span> <span class="n">cb</span>
+</span><span id="L-136"><a href="#L-136"><span class="linenos">136</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">image_view</span> <span class="k">as</span> <span class="n">imview</span>
+</span><span id="L-137"><a href="#L-137"><span class="linenos">137</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">iterators</span><span class="p">,</span> <span class="n">lib</span><span class="p">,</span> <span class="n">phantoms</span><span class="p">,</span> <span class="n">volume</span>
+</span><span id="L-138"><a href="#L-138"><span class="linenos">138</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.cuda</span><span class="w"> </span><span class="kn">import</span> <span class="n">structs</span> <span class="k">as</span> <span class="n">dtypes</span>
+</span><span id="L-139"><a href="#L-139"><span class="linenos">139</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">FBVolume</span> <span class="k">as</span> <span class="n">FBVolume</span>
+</span><span id="L-140"><a href="#L-140"><span class="linenos">140</span></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.volume</span><span class="w"> </span><span class="kn">import</span> <span class="n">Volume</span> <span class="k">as</span> <span class="n">Volume</span>
+</span><span id="L-141"><a href="#L-141"><span class="linenos">141</span></a>
+</span><span id="L-142"><a href="#L-142"><span class="linenos">142</span></a>    <span class="c1"># Note that __all__ determines what&#39;s listed in the documentation page.</span>
+</span><span id="L-143"><a href="#L-143"><span class="linenos">143</span></a>    <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="L-144"><a href="#L-144"><span class="linenos">144</span></a>        <span class="s2">&quot;cb&quot;</span><span class="p">,</span>
+</span><span id="L-145"><a href="#L-145"><span class="linenos">145</span></a>        <span class="s2">&quot;dtypes&quot;</span><span class="p">,</span>
+</span><span id="L-146"><a href="#L-146"><span class="linenos">146</span></a>        <span class="s2">&quot;imview&quot;</span><span class="p">,</span>
+</span><span id="L-147"><a href="#L-147"><span class="linenos">147</span></a>        <span class="s2">&quot;iterators&quot;</span><span class="p">,</span>
+</span><span id="L-148"><a href="#L-148"><span class="linenos">148</span></a>        <span class="s2">&quot;lib&quot;</span><span class="p">,</span>
+</span><span id="L-149"><a href="#L-149"><span class="linenos">149</span></a>        <span class="s2">&quot;phantoms&quot;</span><span class="p">,</span>
+</span><span id="L-150"><a href="#L-150"><span class="linenos">150</span></a>        <span class="s2">&quot;volume&quot;</span><span class="p">,</span>
+</span><span id="L-151"><a href="#L-151"><span class="linenos">151</span></a>    <span class="p">]</span>
 </span></pre></div>
 
 

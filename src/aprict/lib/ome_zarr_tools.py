@@ -34,10 +34,34 @@ class OMEZarrVersion(enum.Enum):
     V0_6 = "0.6"
 
 
+class UnitLen(enum.Enum):
+    """Choices of unit length."""
+
+    m = 1
+    cm = 2
+    mm = 3
+    um = 4
+
+
+def _len_to_mm_factor(ul: UnitLen) -> float:
+    match ul:
+        case UnitLen.m:
+            return 1000
+        case UnitLen.cm:
+            return 10
+        case UnitLen.mm:
+            return 1
+        case UnitLen.um:
+            return 1 / 1000
+        case _:
+            raise NotImplementedError()
+
+
 def nparr_to_zarr(
     arr: np.ndarray | np.memmap,
     *,
-    voxwid_mm: float,
+    unit_len: UnitLen,
+    voxwid: float,
     out_zarr_path: pathlib.Path,
     omez_version: OMEZarrVersion = OMEZarrVersion.V0_5,
 ) -> None:
@@ -49,6 +73,15 @@ def nparr_to_zarr(
 
     # Currently, neuroglancer only supports up to OME-Zarr 0.5
     verstr: str = omez_version.value
+
+    # We'll convert the units to millimeters for consistency, mainly in the channel name
+    factor: float = _len_to_mm_factor(unit_len)
+    voxwid_mm: float = voxwid * factor
+
+    # Create a lazy dask array
+    arr = dask.array.from_array(arr)
+    # Convert the attenuation coefficient to units of inverse millimeters
+    arr = arr if factor == 1 else dask.array.divide(arr, factor)
 
     image = ome_zarr.OMEZarrImage(
         data=arr,
@@ -64,7 +97,9 @@ def nparr_to_zarr(
             {"x": 8, "y": 8, "z": 8},
         ],
         method="local_mean",
-        channel_names=["attenuation per mm"],
+        channel_names=[
+            "attenuation per mm"
+        ],  # note that channel name is always '... per mm'.
     )
     multiscales.to_ome_zarr(out_zarr_path, version=verstr)
 
