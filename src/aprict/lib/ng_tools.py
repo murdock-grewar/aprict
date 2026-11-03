@@ -190,8 +190,18 @@ class OMEZarrViewer3D:
         )
         # neuroglancer.cli.handle_server_arguments(args)  # could be useful in the future
         viewer = neuroglancer.Viewer()
-        with viewer.txn() as s:
-            s.layers["image"] = neuroglancer.ImageLayer(source=self.zarr_url)
+        with viewer.txn() as state:
+            state.layout = "xy"  # show the xy slices by default
+            state.crossSectionOrientation = [1, 0, 0, 0]
+            state.projectionOrientation = [
+                1,
+                0,
+                0,
+                0,
+            ]  # rotate 180 degrees about the x axis. I do this to flip the y axis so it points upwards rather than downwards.
+            state.layers["image"] = neuroglancer.ImageLayer(
+                source=self.zarr_url
+            )
         self.url = "http://localhost:" + port + "/v/" + viewer.token + "/"
         return self
 
