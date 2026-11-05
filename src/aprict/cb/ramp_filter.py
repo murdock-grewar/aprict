@@ -720,6 +720,21 @@ class FBPFilterer:
                         # There is some kind of synchronicity bug preventing the windowing from applying
                         # before the rotation step. So, let's wait here for it to be applied.
                         stream.synchronize()
+
+                    # There is a limit on the number of CUDA events that can be created.
+                    # For this reason, we need to cull the list of events every now and then.
+                    # See https://github.com/cupy/cupy/issues/10458
+                    max_events: int = 1000  # only approx. Might differ by one
+                    retain_events: int = 500
+                    if proj_index > 0 and proj_index % max_events == 0:
+                        for ev_idx in range(
+                            max(0, proj_index - max_events - retain_events),
+                            proj_index - retain_events,
+                        ):
+                            if events[ev_idx] is not None:
+                                stream.wait_event(events[ev_idx])
+                                events[ev_idx] = None
+
                     # Create event to mark completion of the above steps
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
@@ -736,7 +751,7 @@ class FBPFilterer:
             )
             with tmp_stream as stream:
                 for e in events:
-                    stream.wait_event(e)
+                    e is None or stream.wait_event(e)
                 # Filter the entire chunk at once. The method checks if the chunk is identical to the internal memory buffer and applies a small optimisation if true.
                 outs, self.event_completed_ramp = (
                     self.rfilt._filter_chunk_axis1(  # ruff: ignore[private-member-access]
@@ -819,7 +834,7 @@ class FBPFilterer:
             )
             with tmp_stream as stream:
                 for e in events:
-                    stream.wait_event(e)
+                    e is None or stream.wait_event(e)
                 self.event_completed_filter = cp.cuda.Event(
                     block=True, disable_timing=True, interprocess=False
                 )
