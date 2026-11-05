@@ -17,6 +17,7 @@
 
 import enum
 import logging
+import math
 import pathlib
 import time
 import types
@@ -350,8 +351,8 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     flip_y: bool,
     flip_z: bool,
     rotate_xy: float,
-    num_projs_per_chunk: int = 9,
-    filt_chunk_size: int = 3,
+    num_projs_per_chunk: int | None = None,
+    filt_chunk_size: int | None = None,
     logger: logging.Logger,  # ruff: ignore[unused-function-argument]
     two_sided: bool,
     vol_minxyz_maxxyz: tuple[
@@ -395,6 +396,17 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     )[
         slice_projs
     ]  # Note: a contiguous slice is still a memmap object  # ty:ignore[invalid-assignment]
+
+    # Default to filtering a minimum number of MiB of projection data at a time. The VRAM usage will be much, much more than this, due to unresolved inefficiences.
+    if filt_chunk_size is None:
+        target_mbs: float = 1
+        mbs_per_projs: float = (
+            data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
+        )
+        filt_chunk_size: int = max(1, math.floor(target_mbs / mbs_per_projs))
+
+    if num_projs_per_chunk is None:
+        num_projs_per_chunk: int = filt_chunk_size
 
     # Extract the needed information from the projection geometry
     if len(pg.projs_list_shape) != 1:

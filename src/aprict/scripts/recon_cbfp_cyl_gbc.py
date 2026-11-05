@@ -364,7 +364,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     flip_y: bool,
     flip_z: bool,
     rotate_xy: float,
-    num_projs_per_chunk: int = 9,
+    num_projs_per_chunk: int | None = None,
     logger: logging.Logger,  # ruff: ignore[unused-function-argument]
     vol_minxyz_maxxyz: tuple[
         tuple[float, float, float], tuple[float, float, float]
@@ -403,6 +403,15 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     )[
         slice_projs
     ]  # Note: a contiguous slice is still a memmap object  # ty:ignore[invalid-assignment]
+
+    if num_projs_per_chunk is None:
+        target_mbs: float = 100
+        mbs_per_projs: float = (
+            data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
+        )
+        num_projs_per_chunk: int = max(
+            1, math.floor(target_mbs / mbs_per_projs)
+        )
 
     # Extract the needed information from the projection geometry
     if len(pg.projs_list_shape) != 1:
