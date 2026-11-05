@@ -724,7 +724,7 @@ class FBPFilterer:
                     events[proj_index] = cp.cuda.Event(
                         block=_HOTFIX_DISABLE_ASYNCHRONICITY,
                         disable_timing=True,
-                        interprocess=True,
+                        interprocess=False,
                     )  # Note: block=False ensures that synchronizing the event does not block the CPU thread, only the current GPU which waits on the event with e.synchronize()
                     stream.record(events[proj_index])
             # Wait for all rotations to complete
