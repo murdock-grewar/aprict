@@ -404,8 +404,12 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
         slice_projs
     ]  # Note: a contiguous slice is still a memmap object  # ty:ignore[invalid-assignment]
 
+    # By default, aim to use 1/16 of the VRAM to store a projection set
+    # There seems to be some signiicant overhead for projection chunks which favours
+    # larger chunk sizes.
     if num_projs_per_chunk is None:
-        target_mbs: float = 100
+        _, gpu_capacity_mb = lib.gpu_tools.get_gpu_mb_used_and_total()
+        target_mbs: float = (1 / 16) * gpu_capacity_mb
         mbs_per_projs: float = (
             data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
         )
