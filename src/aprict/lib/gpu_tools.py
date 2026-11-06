@@ -160,7 +160,11 @@ def clear_pinned_cache(gpu_index: int | None = None) -> None:
         cp.cuda.runtime.getDevice() if gpu_index is None else gpu_index
     )
     with cp.cuda.Device(gpu_index):
-        cp.get_default_pinned_memory_pool().free_all_blocks()
+        # Wrap in a try-except block so that the keyboard interrupt isn't swallowed
+        try:
+            cp.get_default_pinned_memory_pool().free_all_blocks()
+        except KeyboardInterrupt:  # ruff: ignore[useless-try-except]
+            raise
 
 
 def get_gpu_mb_used_and_total(gpu_index: int | None = None) -> tuple[int, int]:
