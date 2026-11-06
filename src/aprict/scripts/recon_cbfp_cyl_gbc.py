@@ -183,7 +183,7 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         type=click.FLOAT,
         default=6,
         required=True,
-        help="Padding factor for full-scale backprojection.",
+        help="Padding factor for low-res backprojection.",
     ),
     ce.option(
         "--n",
