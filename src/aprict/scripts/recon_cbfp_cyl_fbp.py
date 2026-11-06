@@ -403,7 +403,9 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         mbs_per_projs: float = (
             data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
         )
-        filt_chunk_size: int = max(1, math.floor(target_mbs / mbs_per_projs))
+        filt_chunk_size: int = max(
+            1, min(pg.num_projs, math.floor(target_mbs / mbs_per_projs))
+        )
 
     if num_projs_per_chunk is None:
         num_projs_per_chunk: int = filt_chunk_size

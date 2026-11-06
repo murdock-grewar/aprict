@@ -414,7 +414,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
             data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
         )
         num_projs_per_chunk: int = max(
-            1, math.floor(target_mbs / mbs_per_projs)
+            1, min(pg.num_projs, math.floor(target_mbs / mbs_per_projs))
         )
 
     # Extract the needed information from the projection geometry
