@@ -962,6 +962,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         pbar_persist=False,
     )
 
+    # We will use these to make sure the host hread doesn't get more than one event
+    # ahead of the device thread. If it does, then the pinned memory pool can balloon
+    # and eventually lock up the system
+    prev_ev: cp.cuda.Event | None = None
+    ev: cp.cuda.Event | None = None  # initialise to None
+
     # Convert the progress display ta more intuitive set of units using the progratio.
     # The displayed progress will correspond to bytes in the padded backprojection.
     progratio: float = (
@@ -1082,6 +1088,8 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                             ps_ramp.data is not None
                         )  # useful assertion for type-checking
 
+                        prev_ev = ev
+
                         # ProgressBar stuff
                         ev = cp.cuda.Event()
                         ev.record(stream=stream)
@@ -1106,9 +1114,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                             )
                         )
                         del pss, ps_ramp  # allow memory to be freed
-                    update_pbar(
-                        pbar
-                    )  # update from this and previous queued work
+                    # Wait for previous event to finish before continuing, so that the
+                    # host thread doesn't get too far ahead.
+                    while prev_ev is not None and not prev_ev.done:
+                        update_pbar(pbar)
+                        time.sleep(0.05)
+                    update_pbar(pbar)
 
                 # Don't synchronize the ordinary way, because then we get no progress updates
                 # stream.synchronize()

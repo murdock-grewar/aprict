@@ -155,16 +155,15 @@ def all_gpu_indices() -> set[int]:
 
 def clear_pinned_cache(gpu_index: int | None = None) -> None:
     """Clear cupy's pinned memory pool which resides on the host."""
-    # ^It doesn't do this automatically. Even when Python objects go out of scope."""
+    # If there are pending htod copies (i.e. the host has advanced beyond the device),
+    # then there can be a backlog of pinned memory allocated. This can accumulate and eventually
+    # cause thrashing. Calling this method will cause the host thread to wait for those
+    # operations to complete, and then clear the pinned memory pool.
     gpu_index: int = (
         cp.cuda.runtime.getDevice() if gpu_index is None else gpu_index
     )
     with cp.cuda.Device(gpu_index):
-        # Wrap in a try-except block so that the keyboard interrupt isn't swallowed
-        try:
-            cp.get_default_pinned_memory_pool().free_all_blocks()
-        except KeyboardInterrupt:  # ruff: ignore[useless-try-except]
-            raise
+        cp.get_default_pinned_memory_pool().free_all_blocks()
 
 
 def get_gpu_mb_used_and_total(gpu_index: int | None = None) -> tuple[int, int]:
