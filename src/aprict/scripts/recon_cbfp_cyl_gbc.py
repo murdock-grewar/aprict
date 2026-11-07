@@ -894,28 +894,39 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
         )
         xs, ys, _ = vol_weightsum.xs_ys_zs
+        # Define the config object used to fetch the integrated GBC weightings
+        config_bp = cbfp.ConfigBackproject(
+            fast_approx=True,
+            cyl_mask_rad=None,
+            Z_on_val_factor_power=0,
+            Z_on_val_factor_val=R,  # This must be equal to R for the kernel to operate correctly.
+            backproj_weighting_preset=7,
+            approx_mode_direct_raycast=True,
+            approx_mode_bilinear_interpolate=args.interpolate_measurements,
+            ssx=args.ssx,
+            ssy=args.ssy,
+            ssz=args.ssz,
+            soft_vartheta_v=vartheta_v,
+            soft_vartheta_v_softspan=args.softspan_v,
+            soft_vartheta_h=vartheta_h,
+            soft_vartheta_h_softspan=args.softspan_h,
+        )
         weightsum_divisor_xygrid = np.power(
-            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
+            gbc.weightinteg.backproj_gbc_weight_integ_xygrid_GPU(
                 xs,
                 ys,
                 R,
-                soft_vartheta_v=vartheta_v,
-                soft_vartheta_v_softspan=args.softspan_v,
-                soft_vartheta_h=vartheta_h,
-                soft_vartheta_h_softspan=args.softspan_h,
+                config_bp,
             ),
             -1,
         ).astype(np.float32)
         xs, ys, _ = minivol_weightsum.xs_ys_zs
         weightsum_divisor_mini_xygrid = np.power(
-            gbc.weightinteg.backproj_gbc_weight_integ_xygrid(
+            gbc.weightinteg.backproj_gbc_weight_integ_xygrid_GPU(
                 xs,
                 ys,
                 R,
-                soft_vartheta_v=vartheta_v,
-                soft_vartheta_v_softspan=args.softspan_v,
-                soft_vartheta_h=vartheta_h,
-                soft_vartheta_h_softspan=args.softspan_h,
+                config_bp,
             ),
             -1,
         ).astype(np.float32)

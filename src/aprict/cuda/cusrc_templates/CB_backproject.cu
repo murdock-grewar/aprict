@@ -584,6 +584,8 @@ __device__ double2 _backproject_CB_getval(
                                     if (
                                             (config.backproj_weighting_preset == 7)
                                     ) {
+                                        // NOTE that this is logic branch is deprecated, with the cbfp.backproject(...) function now launching an alternate kernel instead of using this branch.
+
                                         // Backprojection weighting for GBC formula with cylindral source locus
                                         // The weighting is eq. (23) from the GBC paper.
                                         // preset 7 applies the weighting to the backprojected detector value
@@ -1077,4 +1079,67 @@ __global__ void backproject_CB_voltex_GBC_cyl(
         }
     }
 }
+
+
+// Intended to be launched with a grid shaped like (gX, gY, 1)
+// and blockdims (dX, dY, 1) such that dX * gX >= num_ang_samps
+// and dY * gY >= num_z_samps
+__global__ void get_GBC_weight_integ(
+    const float*                    r_on_R_arr,  // should be increasing monotonically
+    const unsigned int              r_on_R_arr_len,
+    float*                          output_arr, // should input an array of 0s to this kernel, equal in length to the r_on_R arr
+    const unsigned int              num_ang_samps,
+    const unsigned int              num_z_samps,
+    const config_CB_backproject     config
+)
+{
+    const unsigned int idx_x = threadIdx.x + blockIdx.x * blockDim.x;
+    const unsigned int idx_y = threadIdx.y + blockIdx.y * blockDim.y;
+    const bool in_range = ( (idx_x < num_ang_samps) && (idx_y < num_z_samps) );
+    const bool block_leader = ( (threadIdx.x == 0) && (threadIdx.y == 0) );
+
+    __shared__ cuda::atomic<float, cuda::thread_scope_block> integ;
+
+    const float maxz_on_R = 2 * tan(config.soft_vartheta_v) * (1 + r_on_R_arr[r_on_R_arr_len-1]);
+    const float zstep = maxz_on_R / (float)num_z_samps;
+    const float tstep = 3.1415926535898f / (float)num_ang_samps;
+    const float z_on_R = (0.5f + (float)idx_x) * zstep;
+    const float t = (float)idx_y * tstep;
+    const fvec3 source_pos = fvec3(cos(t), sin(t), z_on_R);
+
+    fvec3 vox_pos = fvec3(0.f, 0.f, 0.f);
+
+    if (in_range) {
+        for (unsigned int r_ind = 0; r_ind < r_on_R_arr_len; r_ind++) {
+            // Reset integ
+            // Note: if any thread within a block is in_range, then the leader is too
+            if (block_leader) {
+                integ = 0.f;
+            }
+            __syncthreads();
+
+            vox_pos.x = r_on_R_arr[r_ind];
+            integ += _GBC_weightfun<float>(
+                1.f,
+                vox_pos,
+                source_pos,
+                config.soft_vartheta_v,
+                config.soft_vartheta_h,
+                config.soft_vartheta_v_softspan,
+                config.soft_vartheta_h_softspan
+            );
+
+            // Add this block's contribution to the integral for this r_on_R value
+            __syncthreads();
+            if (block_leader) {
+                const float multiplicand = (
+                    (4 * maxz_on_R * 3.1415926535898f) /
+                    ((float)num_z_samps * (float)num_ang_samps)
+                );
+                atomicAdd(&output_arr[r_ind], integ * multiplicand);
+            }
+        }
+    }
+}
+
 

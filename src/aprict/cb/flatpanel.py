@@ -118,6 +118,9 @@ def _injected_module_backproject() -> cp.RawModule:
                     ["half", "float"], ["half", "float", "double"]
                 )
             ]
+            + [
+                "get_GBC_weight_integ"  # not used by this file, but helpful to compile it here all together
+            ]
         ),
     )
     if not _delay_compile:
