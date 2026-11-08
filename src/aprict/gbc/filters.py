@@ -259,7 +259,6 @@ def ramp_filter_conebeam(
         voxel_phys_len: float, # It needs to know the length of a voxel because the output of the ramp filter is (inversely?) proportional to it.
         cone_angle: float,
         theta_soft: float,
-        auto_dc_adjust: bool,
         logger: logging.Logger | None = None,
         log_prefix: str | None = None,
         allow_overwrite_arr: bool = False,
@@ -311,19 +310,6 @@ def ramp_filter_conebeam(
     # signal = cupyx.scipy.signal if input_array_is_cupy else scipy.signal
 
     arr_shape = arr_container.array.shape # Will copy-by-value, since arr.shape is an immutable type (Tuple).
-
-    if auto_dc_adjust:
-        # Create index masks that indicate where the backprojection is zero. Only sample the top and bottom z layers.
-        topzmask = tp.nonzero(arr_container.array[..., 0] == 0)
-        botzmask = tp.nonzero(arr_container.array[...,-1] == 0)
-        numels = len(topzmask[0]) + len(botzmask[0])
-        # approx_num_layers_zeros = numels / arr_shape[0] / arr_shape[1]
-        if numels == 0:
-            logger.warning(
-                ("" if log_prefix is None else log_prefix) +
-                f"There were no zero-valued backprojections in either the top or bottom Z slice. The auto-DC adjustment will not be able to complete."
-            )
-        del numels
 
     if log_prefix is not None:
         logger.debug(log_prefix + f"Computing forward DFT...")
@@ -480,46 +466,6 @@ def ramp_filter_conebeam(
         del xc, yc, zc, mg, add_np, add_cp
         lowres_correction_array_sliced_cp = None
         lowres_correction_array_sliced_np = None
-
-    if auto_dc_adjust:
-        cp.cuda.get_current_stream().synchronize() # Prevent log messages from being printed prematurely
-        if log_prefix is not None:
-            logger.debug(log_prefix + f"Applying auto-adjusted DC offset...")
-        numels = len(topzmask[0]) + len(botzmask[0])
-        # approx_num_layers_zeros = numels / out.shape[0] / out.shape[1]
-        if numels == 0:
-            logger.error(
-                ("" if log_prefix is None else log_prefix) +
-                f"There were no zero-valued backprojections in either the top or bottom Z slice. The auto-DC adjustment cannot proceed. Skipping DC adjustment."
-            )
-        else:
-            numels_thresh: int = 1000
-            if (numels < numels_thresh): # Combined top and bottom layers
-                logger.warning(
-                    ("" if log_prefix is None else log_prefix) +
-                    f"There are comparitively few (<{numels_thresh:d}) zero-valued backprojections in the top and bottom Z slices. The auto-DC adjustment may be incorrect."
-                )
-            zero_mean = np.concatenate([
-                out[..., -1][topzmask].flatten(),
-                out[...,  0][botzmask].flatten(),
-            ]).mean()
-            # zextremities_mean = (out[..., -1].mean() + out[...,  0].mean())/2
-            if log_prefix is not None:
-                logger.debug(log_prefix + f"Number of should-be zeros reference by DC correction: {numels:d}")
-                logger.debug(log_prefix + f"Mean of should-be zeros referenced by DC correction: {zero_mean:.2g}")
-                # logger.debug(log_prefix + f"Mean of top and bottom Z slice before DC correction: {zextremities_mean:.2g}")
-            if tp is cp:
-                cp.subtract(out, zero_mean, out=out)
-            else:
-                ne.evaluate('out - zero_mean', out=out, casting='same_kind')
-            if log_prefix is not None:
-                zero_mean = np.concatenate([
-                    out[..., -1][topzmask].flatten(),
-                    out[...,  0][botzmask].flatten(),
-                ]).mean()
-            #     zextremities_mean = (out[..., -1].mean() + out[...,  0].mean())/2
-                logger.debug(log_prefix + f"Mean of should-be zeros referenced by DC correction, after DC correction: {zero_mean:.2g}")
-            #     logger.debug(log_prefix + f"Mean of top and bottom Z slice after DC correction: {zextremities_mean:.2g}")
 
     if softener is not None:
         cp.cuda.get_current_stream().synchronize() # Prevent log messages from being printed prematurely

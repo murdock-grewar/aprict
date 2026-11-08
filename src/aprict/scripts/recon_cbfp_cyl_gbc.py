@@ -1228,7 +1228,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             minivol_voxwid,
             2 * vartheta_v,
             theta_soft=args.softspan_v,
-            auto_dc_adjust=False,
             allow_overwrite_arr=False,  # we're going to reuse the minivol_cp in the next filtration
             logger=logger,
             copy_to_array=None,
@@ -1253,7 +1252,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             minivol_voxwid,
             2 * vartheta_v,
             theta_soft=args.softspan_v,
-            auto_dc_adjust=False,
             allow_overwrite_arr=True,  # we're not going to reuse the 'volmini_np' object after this.
             logger=logger,
             copy_to_array=None,
@@ -1290,7 +1288,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             vol_voxwid,
             2 * vartheta_v,
             theta_soft=args.softspan_v,
-            auto_dc_adjust=False,
             allow_overwrite_arr=True,  # not going to need the 'vol_np' object after this.
             logger=logger,
             copy_to_array=None,  # Should be a contiguous array. E.g., not an arbitrary view.
