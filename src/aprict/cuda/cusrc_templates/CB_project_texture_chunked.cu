@@ -148,16 +148,16 @@ __device__ Tp exact_line_integral_unitvoxwid(
     // This way, integer values for x,y,z correspond to voxel boundaries.
     float xstart = v1.x - texchunkspec.texpos.x;
     float xend   = v2.x - texchunkspec.texpos.x;
-    if ((xstart < minxyz.x) && (xend < minxyz.x)) { return 0.; }
-    if ((xstart > maxxyz.x) && (xend > maxxyz.x)) { return 0.; }
+    if ((xstart < minxyz.x) && (xend < minxyz.x)) { return 0; }
+    if ((xstart > maxxyz.x) && (xend > maxxyz.x)) { return 0; }
     float ystart = v1.y - texchunkspec.texpos.y;
     float yend   = v2.y - texchunkspec.texpos.y;
-    if ((ystart < minxyz.y) && (yend < minxyz.y)) { return 0.; }
-    if ((ystart > maxxyz.y) && (yend > maxxyz.y)) { return 0.; }
+    if ((ystart < minxyz.y) && (yend < minxyz.y)) { return 0; }
+    if ((ystart > maxxyz.y) && (yend > maxxyz.y)) { return 0; }
     float zstart = v1.z - texchunkspec.texpos.z;
     float zend   = v2.z - texchunkspec.texpos.z;
-    if ((zstart < minxyz.z) && (zend < minxyz.z)) { return 0.; }
-    if ((zstart > maxxyz.z) && (zend > maxxyz.z)) { return 0.; }
+    if ((zstart < minxyz.z) && (zend < minxyz.z)) { return 0; }
+    if ((zstart > maxxyz.z) && (zend > maxxyz.z)) { return 0; }
 
     Tp accum_val = 0;
 
@@ -187,12 +187,12 @@ __device__ Tp exact_line_integral_unitvoxwid(
     int3  vol_idx;
     //// Skip to the first intersection with the volume (plus an extra voxel for safety)
     float advance_steps = 0;
-    if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 1./2. - lis.x)/lis.dx); }
-    if (xdir > 0) { advance_steps = max(advance_steps, (minxyz.x - 1./2. - lis.x)/lis.dx); }
-    if (ydir < 0) { advance_steps = max(advance_steps, (maxxyz.y + 1./2. - lis.y)/lis.dy); }
-    if (ydir > 0) { advance_steps = max(advance_steps, (minxyz.y - 1./2. - lis.y)/lis.dy); }
-    if (zdir < 0) { advance_steps = max(advance_steps, (maxxyz.z + 1./2. - lis.z)/lis.dz); }
-    if (zdir > 0) { advance_steps = max(advance_steps, (minxyz.z - 1./2. - lis.z)/lis.dz); }
+    if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 0.5f - lis.x)/lis.dx); }
+    if (xdir > 0) { advance_steps = max(advance_steps, (minxyz.x - 0.5f - lis.x)/lis.dx); }
+    if (ydir < 0) { advance_steps = max(advance_steps, (maxxyz.y + 0.5f - lis.y)/lis.dy); }
+    if (ydir > 0) { advance_steps = max(advance_steps, (minxyz.y - 0.5f - lis.y)/lis.dy); }
+    if (zdir < 0) { advance_steps = max(advance_steps, (maxxyz.z + 0.5f - lis.z)/lis.dz); }
+    if (zdir > 0) { advance_steps = max(advance_steps, (minxyz.z - 0.5f - lis.z)/lis.dz); }
     if (advance_steps > 0) {
         lis.x += advance_steps * lis.dx;
         lis.y += advance_steps * lis.dy;
@@ -276,7 +276,7 @@ __device__ Tp exact_line_integral_unitvoxwid(
             }
         } else {
             if (return_false_steps) {
-                accum_val += 1.;
+                accum_val += 1.f;
             }
         }
 
@@ -332,8 +332,8 @@ __device__ fvec3 detpos(
         // Not implemented!
     } else if (dspec.type == 0) {
         // Flat panel detector
-        float xnum = (det_idx_x_f - (dspec.nu-1)/2.);
-        float ynum = (det_idx_y_f - (dspec.nv-1)/2.);
+        float xnum = (det_idx_x_f - (dspec.nu-1)/2.f);
+        float ynum = (det_idx_y_f - (dspec.nv-1)/2.f);
         dpos = dspec.pos + (dspec.u*xnum) + (dspec.v*ynum);
     }
     return dpos;
@@ -408,7 +408,7 @@ __global__ void project_CB_texture_chunked(
                 source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
             val *= config.multiply_before_adding;
             // Do things ...
-            //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+            //val = 18.f/norm_fvec3(det_pos - projspec.sourcepos);
 
             accumulator += val;
         }
@@ -586,7 +586,7 @@ __global__ void project_CB_FORBILD_shapes(
                 }
                 val *= config.multiply_before_adding;
                 // Do things ...
-                //val = 18./norm_fvec3(det_pos - projspec.sourcepos);
+                //val = 18.f/norm_fvec3(det_pos - projspec.sourcepos);
                 accumulator += val;
             }
         }

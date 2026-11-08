@@ -124,13 +124,13 @@ __device__ fvec2 FORBILD_clip_line_segment(
         const float dy = dv.y;
         const float dz = dv.z;
         const float rdiff_on_l = rdiff/l;
-        const double a = dx*dx + dy*dy - (dz*rdiff_on_l * dz*rdiff_on_l);
+        const float a = dx*dx + dy*dy - (dz*rdiff_on_l * dz*rdiff_on_l);
         //const float a = max(dx*dx,0.000001f) + max(dy*dy,0.000001f) - (dz*rdiff_on_l * dz*rdiff_on_l);
-        const double b = (
+        const float b = (
             -(dz*rdiff/l)*(2*r1 + rdiff*(1 + 2*vz/l))
             + 2*(dx*vx + dy*vy)
         );
-        const double c = (
+        const float c = (
             - r1*r1 - r1*rdiff - 0.25f*rdiff*rdiff + vx*vx + vy*vy
             - (vz*rdiff/l)*(2*r1 + rdiff*(1 + vz/l)) // no factor of 2 next to vz/l
         );
@@ -155,7 +155,7 @@ __device__ fvec2 FORBILD_clip_line_segment(
             // a < 0: line is closer to vertical than the cone angle
             // a > 0: line is further from vertical than the cone angle
             //const float disc = b*b - 4*a*c;// + 0.0001f;
-            const float b_on_2a = b/a/2.;
+            const float b_on_2a = b/a/2.f;
 
             // Original code:
             //const float disc_on_4asq = b_on_2a*b_on_2a - (c/a);
