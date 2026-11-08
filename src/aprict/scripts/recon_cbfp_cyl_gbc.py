@@ -301,6 +301,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         default=True,
         help="Memory-map volumes, rather than keeping them in RAM.",
     ),
+    ce.option(
+        "--vram-alloc",
+        type=click.FLOAT,
+        default=0.95,
+        help="Number in (0,1] indicating the _approximate_ percentage of GPU VRAM to assume available for this script.",
+    ),
 )
 @ce.option_group(
     "resource options",
@@ -322,6 +328,10 @@ def validate_args(args: types.SimpleNamespace) -> None:
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
         msg = f"Output path '{args.output!s}' already exists."
+        raise ce.UsageError(msg)
+
+    if args.vram_alloc <= 0 or args.vram_alloc > 1:
+        msg = "--vram-alloc must be a number in the interval (0,1]."
         raise ce.UsageError(msg)
 
     if args.output is None and args.memmap_vols:
@@ -369,6 +379,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     vol_minxyz_maxxyz: tuple[
         tuple[float, float, float], tuple[float, float, float]
     ],  # used to quickly skip projections out of range for this algorithm
+    vram_alloc: float,  # number in (0,1]
 ) -> tuple[
     cbfp.ProjGeom,
     typing.Iterable[
@@ -409,7 +420,7 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
     # larger chunk sizes.
     if num_projs_per_chunk is None:
         _, gpu_capacity_mb = lib.gpu_tools.get_gpu_mb_used_and_total()
-        target_mbs: float = (1 / 16) * gpu_capacity_mb
+        target_mbs: float = vram_alloc * (1 / 16) * gpu_capacity_mb
         mbs_per_projs: float = (
             data_mm.itemsize * math.prod(data_mm.shape[1:]) / 1024**2
         )
@@ -705,7 +716,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     # Cumulative sum of the above
     bytes_cumsum = np.cumsum(bytes_by_zindex_mini)
     _, gpu_VRAM_capacity_MiB = lib.gpu_tools.get_gpu_mb_used_and_total()  # ruff: ignore[non-lowercase-variable-in-function]
-    GiB_per_chunk: float = (3 / 4) * gpu_VRAM_capacity_MiB / 1024  # ruff: ignore[non-lowercase-variable-in-function]
+    GiB_per_chunk: float = (  # ruff: ignore[non-lowercase-variable-in-function]
+        args.vram_alloc * (10 / 16) * gpu_VRAM_capacity_MiB / 1024
+    )
 
     def next_slice_zindex_mini(last_slice: slice | None) -> slice | None:
         last_slice = slice(0, 0) if last_slice is None else last_slice
@@ -892,6 +905,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             # These two are supplied to prune irrelevant projections
             # This value shouldn't matter here, since we're only using the values like vartheta_v and vartheta_h...
             vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
+            vram_alloc=args.vram_alloc,
         )
         xs, ys, _ = vol_weightsum.xs_ys_zs
         # Define the config object used to fetch the integrated GBC weightings
@@ -1051,6 +1065,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 logger=logger,
                 # These two are supplied to prune irrelevant projections
                 vol_minxyz_maxxyz=minivol.minxyz_maxxyz,  # this should be the largest volume
+                vram_alloc=args.vram_alloc,
             )
 
             # Initialise the configuration used for backprojection
