@@ -33,7 +33,7 @@ from ..cb import flatpanel as cbfp
 _progdesc = "Produce a ProjGeom object for a cylindrical cone-beam scan, and save it as a .json file."
 
 
-class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+class GeomType(enum.Enum):  # ruff: ignore[undocumented-public-class]
     GOLDEN_THETA = 1
     LDS_SIMPLE = 2
 
@@ -50,8 +50,8 @@ class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
 )
 @ce.option(
     "--type",
-    type=click.Choice(TYPE),
-    default=TYPE.GOLDEN_THETA,
+    type=click.Choice(GeomType),
+    default=GeomType.GOLDEN_THETA,
     help="How the source points should be distributed.",
 )
 @ce.option(
@@ -231,7 +231,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
 
     # Make geometry
     match args.type:
-        case TYPE.GOLDEN_THETA:
+        case GeomType.GOLDEN_THETA:
             zs = np.linspace(
                 -args.h / 2,
                 args.h / 2,
@@ -246,7 +246,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
                 * (np.sqrt(5) - 1)
                 * np.pi
             )
-        case TYPE.LDS_SIMPLE:
+        case GeomType.LDS_SIMPLE:
             zs, ts = zip(
                 *list(
                     itertools.islice(

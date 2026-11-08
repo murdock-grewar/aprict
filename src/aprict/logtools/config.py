@@ -27,7 +27,7 @@ from ..version import version
 _module_name = "aprict"
 
 
-class _STREAM_TYPE(enum.Enum):  # ruff: ignore[invalid-class-name]
+class _StreamType(enum.Enum):
     STDOUT = 1
     STDERR = 2
 
@@ -48,9 +48,9 @@ class LogLevel(enum.Enum):
 # See the discussion here:
 # https://github.com/Textualize/rich/discussions/1578
 class _CustomStreamHandler(logging.Handler):
-    _type: _STREAM_TYPE
+    _type: _StreamType
 
-    def __init__(self, type: _STREAM_TYPE) -> None:
+    def __init__(self, type: _StreamType) -> None:
         """Initialize a Textual logging handler.
 
         Args:
@@ -63,9 +63,9 @@ class _CustomStreamHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         """Invoke by logging."""
         match self._type:
-            case _STREAM_TYPE.STDOUT:
+            case _StreamType.STDOUT:
                 stream = sys.stdout
-            case _STREAM_TYPE.STDERR:
+            case _StreamType.STDERR:
                 stream = sys.stderr
         message = self.format(record)
         print(message, file=stream)
@@ -118,7 +118,7 @@ def make_logger(  # ruff: ignore[complex-structure]
 
     # Adjust the stderr handler to the specified log level
     # stderr_handler = logging.StreamHandler(stream=sys.stderr)
-    stderr_handler = _CustomStreamHandler(type=_STREAM_TYPE.STDERR)
+    stderr_handler = _CustomStreamHandler(type=_StreamType.STDERR)
     stderr_handler.setLevel(stderr_loglevel_)
     stderr_handler.setFormatter(formatter)
     stderr_handler.addFilter(filter)

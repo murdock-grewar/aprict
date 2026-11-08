@@ -51,12 +51,12 @@ from ..lib import import_tools
 _mod_avail_imview = imview._pyqtgraph_installed  # ruff: ignore[private-member-access]
 
 
-class ALG(enum.Enum):  # ruff: ignore[undocumented-public-class]
+class Alg(enum.Enum):  # ruff: ignore[undocumented-public-class]
     STANDARD = 1
     NOOGREWAR = 2
 
 
-class PLOTMODE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+class PlotMode(enum.Enum):  # ruff: ignore[undocumented-public-class]
     NONE = 1
     PYQTGRAPH = 2
     NEUROGLANCER = 3
@@ -167,8 +167,8 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     "FBP options",
     ce.option(
         "--alg",
-        type=click.Choice(ALG),
-        default=ALG.STANDARD,
+        type=click.Choice(Alg),
+        default=Alg.STANDARD,
         help="The FBP algorithm to use.",
     ),
     ce.option(
@@ -274,8 +274,8 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     ),
     ce.option(
         "--plot-mode",
-        type=click.Choice(PLOTMODE),
-        default=PLOTMODE.NONE,
+        type=click.Choice(PlotMode),
+        default=PlotMode.NONE,
         help="How to plot.",
     ),
     ce.option(
@@ -295,8 +295,8 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
     "resource options",
     ce.option(
         "--ne-threads",
-        type=click.Choice(lib.ne_tools.NETHREADS),
-        default=lib.ne_tools.NETHREADS.ALL_LOGICAL_CORES,
+        type=click.Choice(lib.ne_tools.NEThreads),
+        default=lib.ne_tools.NEThreads.ALL_LOGICAL_CORES,
         help="Set the number of threads to be used by numexpr. This will attempt to override the env NUMEXPR_MAX_THREADS as necessary.",
     ),
 )
@@ -312,7 +312,7 @@ def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-
         msg = "Only one of --fan-beam or --fdk-geom may be used."
         raise ce.UsageError(msg)
 
-    if args.fdk_geom and args.alg is not ALG.STANDARD:
+    if args.fdk_geom and args.alg is not Alg.STANDARD:
         msg = "Only --alg STANDARD is supported when given --fdk-geom True."
         raise ce.UsageError(msg)
 
@@ -330,7 +330,7 @@ def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-
         msg = "Cannot output intermediate tomograms when no output directory was specified. Specify an output directory with --output path/to/new/dir"
         raise ce.UsageError(msg)
 
-    if not args.output and args.plot_mode is PLOTMODE.NONE:
+    if not args.output and args.plot_mode is PlotMode.NONE:
         msg = "No output directory specified and no plotting option chosen. There is no point running the recon."
         raise ce.UsageError(msg)
 
@@ -342,11 +342,11 @@ def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-
         msg = "--ssx, --ssy, --ssz must all be positive integers."
         raise ce.UsageError(msg)
 
-    if args.plot_mode is PLOTMODE.PYQTGRAPH and not _mod_avail_imview:
+    if args.plot_mode is PlotMode.PYQTGRAPH and not _mod_avail_imview:
         msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
         raise ce.UsageError(msg)
 
-    if args.plot_mode is PLOTMODE.NEUROGLANCER and not _mod_avail_neuroglancer:
+    if args.plot_mode is PlotMode.NEUROGLANCER and not _mod_avail_neuroglancer:
         msg = "Cannot use --plot-mode NEUROGLANCER because the relevant modules are not installed."
         raise ce.UsageError(msg)
 
@@ -753,7 +753,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         else tuple(n for n in args.volshape)
     )
 
-    two_sided = args.alg is ALG.NOOGREWAR
+    two_sided = args.alg is Alg.NOOGREWAR
 
     # Do some computations to figure out geometry attributes, and log them
     dummy_vol: Volume = Volume.zeros(
@@ -1228,9 +1228,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
 
     # Plot, if applicable
     match args.plot_mode:
-        case PLOTMODE.NONE:
+        case PlotMode.NONE:
             pass
-        case PLOTMODE.PYQTGRAPH:
+        case PlotMode.PYQTGRAPH:
             msg = "Displaying plot..."
             logger.info(msg)
             with rich_console.status(msg, spinner="dots10"):
@@ -1245,7 +1245,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                         plotmin=args.plotmin,
                         plotmax=args.plotmax,
                     )
-        case PLOTMODE.NEUROGLANCER:
+        case PlotMode.NEUROGLANCER:
             msg = "Displaying plot..."
             logger.info(msg)
             with ng_tools.ArrayViewer3D(

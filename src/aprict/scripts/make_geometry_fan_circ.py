@@ -32,7 +32,7 @@ from ..cb import flatpanel as cbfp
 _progdesc = "Produce a ProjGeom object for a circular fan-beam scan, and save it as a .json file."
 
 
-class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+class GeomType(enum.Enum):  # ruff: ignore[undocumented-public-class]
     EQUISPACED = 1
     GOLDEN = 2
 
@@ -49,8 +49,8 @@ class TYPE(enum.Enum):  # ruff: ignore[undocumented-public-class]
 )
 @ce.option(
     "--type",
-    type=click.Choice(TYPE),
-    default=TYPE.EQUISPACED,
+    type=click.Choice(GeomType),
+    default=GeomType.EQUISPACED,
     help="How the source points should be distributed.",
 )
 @ce.option(
@@ -214,7 +214,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
     # Make geometry
     zs = np.zeros((args.num,), dtype=np.float64)
     match args.type:
-        case TYPE.EQUISPACED:
+        case GeomType.EQUISPACED:
             ts = np.linspace(
                 theta_start,
                 theta_start + 2 * np.pi * (-1 if args.clockwise else 1),
@@ -222,7 +222,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[undocum
                 num=args.num,
                 dtype=np.float64,
             )
-        case TYPE.GOLDEN:
+        case GeomType.GOLDEN:
             ts = (
                 theta_start
                 + (-1 if args.clockwise else 1)

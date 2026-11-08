@@ -33,19 +33,7 @@ def fastcopy(
     dst: np.ndarray | np.memmap,
     src: np.ndarray | np.memmap | int | float | bool,
 ) -> None:
-    (
-        """Copy data from `src` to `dst`.
-
-    Parameters
-    ----------
-    dst : np.ndarray | np.memmap
-        The destination numpy array view. Can be a view into a memory-mapped array.
-    src : np.ndarray | np.memmap | int | float | bool
-        The source of the data. Can be a numpy array view of matching shape, or a constant.
-
-    """
-        ""
-    )
+    """Copy data from `src` to `dst`."""
     ne.evaluate("src", out=dst, casting="same_kind", local_dict={"src": src})
 
 
@@ -173,7 +161,7 @@ def save(path: pathlib.Path, arr: np.ndarray, flush: bool = True) -> None:
         mm.flush()
 
 
-class NETHREADS(enum.Enum):
+class NEThreads(enum.Enum):
     """Presets for how to control the number of numexpr threads."""
 
     NE_DEFAULT = 1  # default numexpr behaviour--- don't change anything
@@ -182,7 +170,7 @@ class NETHREADS(enum.Enum):
 
 
 def try_set_nethreads(
-    nethreads: NETHREADS, logger: logging.Logger | None = None
+    nethreads: NEThreads, logger: logging.Logger | None = None
 ) -> int:
     """Import the numexpr module with the specified thread configuration."""
     # Set the target number of threads
@@ -202,13 +190,13 @@ def try_set_nethreads(
     )
     logger and logger.info(f"Setting for --ne-threads: {nethreads.name:s}")
     match nethreads:
-        case NETHREADS.NE_DEFAULT:
+        case NEThreads.NE_DEFAULT:
             nthreads_target: int | None = (
                 None  # env_num_threads or env_max_threads
             )
-        case NETHREADS.NE_DEFAULT_MAXTHREADS:
+        case NEThreads.NE_DEFAULT_MAXTHREADS:
             nthreads_target: int = ne.MAX_THREADS
-        case NETHREADS.ALL_LOGICAL_CORES:
+        case NEThreads.ALL_LOGICAL_CORES:
             nthreads_target: int = int(
                 os.process_cpu_count()
             )  # number of logical cores

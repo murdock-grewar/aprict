@@ -40,37 +40,37 @@ _mod_avail_imview = imview._pyqtgraph_installed  # ruff: ignore[private-member-a
 _progdesc = "Compute flat-panel projection data."
 
 
-class PHANTOM_PRESET(enum.Enum):  # ruff: ignore[invalid-class-name, undocumented-public-class]
+class PhantomPreset(enum.Enum):  # ruff: ignore[undocumented-public-class]
     HEAD = 1
     ROCK_CAN = 2
     UNIT_Z_CYL = 3
     TALLY_HALL = 4
 
 
-class OUTPUT_DTYPE(enum.Enum):  # ruff: ignore[invalid-class-name, undocumented-public-class]
+class OutputDtype(enum.Enum):  # ruff: ignore[undocumented-public-class]
     FP16 = 1
     FP32 = 2
     FP64 = 3
 
 
-class PLOTMODE(enum.Enum):  # ruff: ignore[undocumented-public-class]
+class PlotMode(enum.Enum):  # ruff: ignore[undocumented-public-class]
     NONE = 1
     PYQTGRAPH = 2
 
 
-def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
+def _ph_preset_to_phantom(preset: PhantomPreset, seed: int) -> FBVolume:
     match preset:
-        case PHANTOM_PRESET.HEAD:
+        case PhantomPreset.HEAD:
             v = phantoms.FORBILD.HeadPhantom()
             v.multiply_attenuation(
                 0.0184
             )  # convert from multiples of water to a reasonable attenuation, corresponding to an X-ray energy of ~80 keV.
             return v
-        case PHANTOM_PRESET.ROCK_CAN:
+        case PhantomPreset.ROCK_CAN:
             return phantoms.FORBILD.RockCanisterAlWithHoles()
-        case PHANTOM_PRESET.UNIT_Z_CYL:
+        case PhantomPreset.UNIT_Z_CYL:
             return phantoms.FORBILD.UnitCyl_z()
-        case PHANTOM_PRESET.TALLY_HALL:
+        case PhantomPreset.TALLY_HALL:
             return phantoms.FORBILD.DiscResolutionPhantom(
                 4,
                 radius=2.95,
@@ -85,14 +85,14 @@ def _ph_preset_to_phantom(preset: PHANTOM_PRESET, seed: int) -> FBVolume:
 
 
 def _outdtype_to_dtype(
-    outdt: OUTPUT_DTYPE,
+    outdt: OutputDtype,
 ) -> type[np.float16 | np.float32 | np.float64]:
     match outdt:
-        case OUTPUT_DTYPE.FP16:
+        case OutputDtype.FP16:
             return np.float16
-        case OUTPUT_DTYPE.FP32:
+        case OutputDtype.FP32:
             return np.float32
-        case OUTPUT_DTYPE.FP64:
+        case OutputDtype.FP64:
             return np.float64
         case _:
             raise ValueError()
@@ -141,7 +141,7 @@ def _outdtype_to_dtype(
     ),
     ce.option(
         "--phantom-preset",
-        type=click.Choice(PHANTOM_PRESET),
+        type=click.Choice(PhantomPreset),
         help="Choose from among a set of preset phantoms.",
     ),
     constraint=cloup.constraints.RequireExactly(1),
@@ -223,14 +223,14 @@ def _outdtype_to_dtype(
     ),
     ce.option(
         "--out-dtype",
-        type=click.Choice(OUTPUT_DTYPE),
-        default=OUTPUT_DTYPE.FP32,
+        type=click.Choice(OutputDtype),
+        default=OutputDtype.FP32,
         help="The dtype of the output.",
     ),
     ce.option(
         "--plot-mode",
-        type=click.Choice(PLOTMODE),
-        default=PLOTMODE.NONE,
+        type=click.Choice(PlotMode),
+        default=PlotMode.NONE,
         help="How to plot.",
     ),
 )
@@ -252,7 +252,7 @@ def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
 
 def validate_args(args: types.SimpleNamespace) -> None:
     """Validate a set of args."""
-    if args.plot_mode is PLOTMODE.PYQTGRAPH and not _mod_avail_imview:
+    if args.plot_mode is PlotMode.PYQTGRAPH and not _mod_avail_imview:
         msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
         raise ValueError(msg)
 
@@ -480,9 +480,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             pbar.update_to(sls[-1].stop * projs_per_unit * bytes_per_proj)
     logger.info("Done.")
     match args.plot_mode:
-        case PLOTMODE.NONE:
+        case PlotMode.NONE:
             pass
-        case PLOTMODE.PYQTGRAPH:
+        case PlotMode.PYQTGRAPH:
             msg = "Displaying plot..."
             logger.info(msg)
             with rich_console.status(msg, spinner="dots10"):

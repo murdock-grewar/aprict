@@ -24,9 +24,7 @@ from .convert_omezarr_to_npy import main as main_convert_omez_to_npy
 from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
-from .recon_cbfp_cyl_fbp import (
-    ALG as fbp_ALG,  # ruff: ignore[constant-imported-as-non-constant]
-)
+from .recon_cbfp_cyl_fbp import Alg as fbp_Alg
 from .recon_cbfp_cyl_fbp import main as main_fbp
 from .recon_cbfp_cyl_gbc import main as main_gbc
 
@@ -99,7 +97,7 @@ main_fdk = click_tools.command_with_option_substitutions(
     fixed_option_values={
         "fan_beam": False,
         "fdk_geom": True,
-        "alg": fbp_ALG.STANDARD,
+        "alg": fbp_Alg.STANDARD,
         "limit_zeta": None,
         "num_rot_angs": None,
     },
