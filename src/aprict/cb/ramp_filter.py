@@ -323,6 +323,7 @@ class FBPFilterer:
     rng: np.random.Generator
 
     _hacky_fan_beam_mode: bool
+    _hacky_fdk_mode: bool
 
     event_completed_filter: cp.cuda.Event
     event_completed_ramp: cp.cuda.Event
@@ -353,11 +354,13 @@ class FBPFilterer:
         | None = None,  # limit the maximum rotation angle zeta
         include_hilbert_transform_in_output: bool = False,
         _hacky_fan_beam_mode: bool = False,  # Modifies the behaviour to be compatible with a simple fan-beam
+        _hacky_fdk_mode: bool = False,
         rng: np.random.Generator | None = None,
     ) -> None:
         self.rng = np.random.default_rng(seed=None) if rng is None else rng
         self._include_hilbert_transform = include_hilbert_transform_in_output
         self.hacky_fan_beam_mode = _hacky_fan_beam_mode
+        self.hacky_fdk_mode = _hacky_fdk_mode
         self.L = L
         self.physpixwid = physpixwid
         self.ss = sampling_strategy
@@ -373,7 +376,10 @@ class FBPFilterer:
             int(proj_2d_shape[1]),
         )  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
         self._expanded_2d_shape = self.get_expanded_proj_2d_shape(
-            proj_2d_shape, self._max_abs_rotation_angle, _hacky_fan_beam_mode
+            proj_2d_shape,
+            self._max_abs_rotation_angle,
+            _hacky_fan_beam_mode,
+            _hacky_fdk_mode,
         )
         # FFT is more efficient with certain sizes.
         self.chunk_shape = (
@@ -416,17 +422,31 @@ class FBPFilterer:
                 - (self._expanded_2d_shape[1] - 1) / 2
             )
         )
-        self._multmask_2d = cp.array(
-            1
-            / (
-                np.float_power(np.sqrt(1 + np.square(varr[np.newaxis, :])), 3)
-                * np.sqrt(
-                    1
-                    + np.square(varr[np.newaxis, :])
-                    + np.square(uarr[:, np.newaxis])
+        if self.hacky_fdk_mode:
+            self._multmask_2d = cp.array(
+                1
+                / (
+                    np.sqrt(
+                        1
+                        + np.square(varr[np.newaxis, :])
+                        + np.square(uarr[:, np.newaxis])
+                    )
                 )
             )
-        )
+        else:
+            self._multmask_2d = cp.array(
+                1
+                / (
+                    np.float_power(
+                        np.sqrt(1 + np.square(varr[np.newaxis, :])), 3
+                    )
+                    * np.sqrt(
+                        1
+                        + np.square(varr[np.newaxis, :])
+                        + np.square(uarr[:, np.newaxis])
+                    )
+                )
+            )
 
     def advance_rng(self, amount: int) -> None:
         """Advance the internal rng counter by this many steps."""
@@ -516,13 +536,18 @@ class FBPFilterer:
         ],  # I keep accidentally passing in uint32 objects, so let's just handle it explicitly.
         max_abs_rotation_angle: float,
         _hacky_fan_beam_mode: bool = False,
+        _hacky_fdk_mode: bool = False,
     ) -> tuple[int, int]:
         """Get the 2D shape of the expanded shape of the arrays. They need to be expanded in order to accommodate a rotation."""
+        if _hacky_fan_beam_mode and _hacky_fdk_mode:
+            msg = "Cannot use both _hacky_fan_beam_mode and _hacky_fdk_mode."
+            raise ValueError(msg)
+
         proj_2d_shape = (
             int(proj_2d_shape[0]),
             int(proj_2d_shape[1]),
         )  # fixing a common pitfall, where I supply np.uint32 as the proj shapes, e.g. by passing in nu and nv directly from a ProjGeom object
-        if _hacky_fan_beam_mode:
+        if _hacky_fan_beam_mode or _hacky_fdk_mode:
             return tuple(proj_2d_shape)
 
         # Compute the expanded projection shape. It needs to expand in the horizontal direction
@@ -665,7 +690,7 @@ class FBPFilterer:
                     # Apply the letterbox
                     # NOTE: THIS IS A PROBBALE SOURCE OF ERROR FOR SMALL ZETA
                     # TO TEST THIS, CONSIDER TESTING THE FAN BEAM RECON BUT ENABLE THE FOLLOWING LOGIC AND SEE WHAT HAPPENS
-                    if not self.hacky_fan_beam_mode:
+                    if not (self.hacky_fan_beam_mode or self.hacky_fdk_mode):
                         sl = self.get_letterbox_slice(
                             rotang_rads_list[proj_index]
                         )

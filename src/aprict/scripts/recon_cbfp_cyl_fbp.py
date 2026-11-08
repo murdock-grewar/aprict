@@ -178,6 +178,12 @@ _progdesc = "Perform an FBP reconstruction from cylindrical flat-panel cone-beam
         help="Set to True to activate fan-beam reconstruction mode. This may avoid some other settings to make it work on 2D circular fan-beam data.",
     ),
     ce.option(
+        "--fdk-geom",
+        type=bool,
+        default=False,
+        help="Set to True allow an FDK-like geometry, with a circular scan using a detector of nonzero height, to reconstruct a 3D volume approximately.",
+    ),
+    ce.option(
         "--limit-zeta",
         metavar="1.23",
         type=lib.click_tools.MaybeType(click.FLOAT),
@@ -300,8 +306,16 @@ def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
     main_from_args(args)
 
 
-def validate_args(args: types.SimpleNamespace) -> None:
+def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure]
     """Validate a set of args."""
+    if args.fdk_geom and args.fan_beam:
+        msg = "Only one of --fan-beam or --fdk-geom may be used."
+        raise ce.UsageError(msg)
+
+    if args.fdk_geom and args.alg is not ALG.STANDARD:
+        msg = "Only --alg STANDARD is supported when given --fdk-geom True."
+        raise ce.UsageError(msg)
+
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
         msg = f"Output path '{args.output!s}' already exists."
@@ -344,6 +358,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     | None,  # set to None to use a single random angle per CB projection
     *,
     fan_beam_mode: bool,
+    fdk_mode: bool,
     limit_zeta: float | None,
     slice_projs: slice[int | None, int | None, None] | None,
     autorange_z: bool,
@@ -377,7 +392,10 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     float,
 ]:
     """Process input data and output something which can be given to an FBP recon object."""
-    if fan_beam_mode:
+    if fan_beam_mode and fdk_mode:
+        msg = "Cannot use both fan_beam_mode and fdk_mode."
+        raise ValueError(msg)
+    if fan_beam_mode or fdk_mode:
         num_rot_angs = 1
     if autorange_z:
         pg = pg.translated(
@@ -500,10 +518,11 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         limit_zeta=limit_zeta,
         include_hilbert_transform_in_output=two_sided,
         _hacky_fan_beam_mode=fan_beam_mode,
+        _hacky_fdk_mode=fdk_mode,
         rng=rng_proj_rots,
     )
 
-    if fan_beam_mode:
+    if fan_beam_mode or fdk_mode:
         final_multiplier = (
             # 1
             # / (8 * np.square(np.pi) * R)
@@ -575,7 +594,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                         block=True,
                     )
                     stream.wait_event(event_completed)
-                    assert not fan_beam_mode
+                    assert not (fan_beam_mode or fdk_mode)
                     mult = (
                         2
                         * filt.zeta
@@ -614,7 +633,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                                 pss[index].data,
                                 out=pss[index].data,
                             )
-                    if not fan_beam_mode:
+                    if not (fan_beam_mode or fdk_mode):
                         mult = (
                             2
                             * filt.zeta
@@ -760,6 +779,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         projdata_path=args.projs,
         pg=pg_raw,
         fan_beam_mode=args.fan_beam,
+        fdk_mode=args.fdk_geom,
         num_rot_angs=args.num_rot_angs,
         limit_zeta=args.limit_zeta,
         slice_projs=args.slice_projs,
@@ -1020,6 +1040,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 projdata_path=args.projs,
                 pg=pg_raw,
                 fan_beam_mode=args.fan_beam,
+                fdk_mode=args.fdk_geom,
                 num_rot_angs=args.num_rot_angs,
                 limit_zeta=args.limit_zeta,
                 slice_projs=args.slice_projs,
@@ -1040,7 +1061,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             config_bp_ramp_onesided = cbfp.ConfigBackproject(
                 fast_approx=True,
                 cyl_mask_rad=cyl_mask_rad,
-                Z_on_val_factor_power=(-2 if args.fan_beam else -3),
+                Z_on_val_factor_power=(
+                    -2 if (args.fan_beam or args.fdk_geom) else -3
+                ),
                 Z_on_val_factor_val=R,
                 backproj_weighting_preset=0,
                 approx_mode_direct_raycast=True,
@@ -1057,7 +1080,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             config_bp_ramp_twosided = cbfp.ConfigBackproject(
                 fast_approx=True,
                 cyl_mask_rad=cyl_mask_rad,
-                Z_on_val_factor_power=(0 if args.fan_beam else -1),
+                Z_on_val_factor_power=(
+                    0 if (args.fan_beam or args.fdk_geom) else -1
+                ),
                 Z_on_val_factor_val=R,
                 backproj_weighting_preset=1,  # 1,#3,
                 approx_mode_direct_raycast=True,
@@ -1069,7 +1094,9 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
             config_bp_hilb_twosided = cbfp.ConfigBackproject(
                 fast_approx=True,
                 cyl_mask_rad=cyl_mask_rad,
-                Z_on_val_factor_power=(0 if args.fan_beam else -1),
+                Z_on_val_factor_power=(
+                    0 if (args.fan_beam or args.fdk_geom) else -1
+                ),
                 Z_on_val_factor_val=R,
                 backproj_weighting_preset=6,  # 2,#4,
                 approx_mode_direct_raycast=True,

@@ -24,6 +24,9 @@ from .convert_omezarr_to_npy import main as main_convert_omez_to_npy
 from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
 from .project_cbfp import main as main_project_cbfp
+from .recon_cbfp_cyl_fbp import (
+    ALG as fbp_ALG,  # ruff: ignore[constant-imported-as-non-constant]
+)
 from .recon_cbfp_cyl_fbp import main as main_fbp
 from .recon_cbfp_cyl_gbc import main as main_gbc
 
@@ -81,12 +84,27 @@ main_fbp_fan = click_tools.command_with_option_substitutions(
     help="Filtered backprojection for a fan-beam geometry with a circular source locus.",
     fixed_option_values={
         "fan_beam": True,
+        "fdk_geom": False,
         "limit_zeta": None,
         "num_rot_angs": None,
         "ssz": 1,
     },
 )
 recon.add_command(cmd=main_fbp_fan)
+
+main_fdk = click_tools.command_with_option_substitutions(
+    main_fbp,
+    name="fdk-cone-circ",
+    help="FDK algorithm for a circular scan with a cone-beam.",
+    fixed_option_values={
+        "fan_beam": False,
+        "fdk_geom": True,
+        "alg": fbp_ALG.STANDARD,
+        "limit_zeta": None,
+        "num_rot_angs": None,
+    },
+)
+recon.add_command(cmd=main_fdk)
 
 main_fbp_cone = click_tools.command_with_option_substitutions(
     main_fbp,
