@@ -295,7 +295,7 @@ __device__ float cossq_soft(
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
-__device__ double2 _backproject_CB_getval(
+__device__ float2 _backproject_CB_getval(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
         const uivec3                    vol_chunk_shape,
@@ -311,7 +311,7 @@ __device__ double2 _backproject_CB_getval(
     if ((vol_idx.x >= vol_chunk_shape.x) ||
         (vol_idx.y >= vol_chunk_shape.y) ||
         (vol_idx.z >= vol_chunk_shape.z)) {
-        return double2({0., 0.});
+        return float2({0.f, 0.f});
     }
 
     // Get the center position of this voxel
@@ -320,7 +320,7 @@ __device__ double2 _backproject_CB_getval(
     // Skip if masking to the cylinder, and out of range
     if (config.mask_to_cylinder) {
         if ((vox_pos_c.x*vox_pos_c.x + vox_pos_c.y*vox_pos_c.y) > config.mask_to_cyl_rad*config.mask_to_cyl_rad) {
-            return double2({0., 0.});
+            return float2({0.f, 0.f});
         }
     }
 
@@ -467,11 +467,11 @@ __device__ double2 _backproject_CB_getval(
                         // Zeroth-order interpolation
                         // 3 voxels across: middle of detector is 0, which has index 1
                         // 4 voxels across: middle of detector is 0, which has index (4-1)/2 = 1.5
-                        // below 1.5 should be rounded down to 1. above 1.5 should be rounded up to 2
+                        // below 1.5 should be rounded down to 1.f above 1.5f should be rounded up to 2
                         // So, we need to take floor(coord + N/2)
-                        int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.));
+                        int det_idx_x = floor(det_coords_c.x + (projspec.dspec.nu/2.f));
                         if ((det_idx_x < 0) || (det_idx_x >= projspec.dspec.nu)) { continue; }
-                        int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.));
+                        int det_idx_y = floor(det_coords_c.y + (projspec.dspec.nv/2.f));
                         if ((det_idx_y < 0) || (det_idx_y >= projspec.dspec.nv)) { continue; }
                         // Find the detector value there
                         det_idx = (
@@ -677,8 +677,8 @@ __device__ double2 _backproject_CB_getval(
                     const float sep = config.soften_edge_proportion;
                     if ((sep > 0.f) && (sub_accumulator != (Tv)0)) {
                         // Define distances from center, from 0 to 1
-                        // float udist = abs((det_coords_c.x - (projspec.dspec.nu-1)/2.)/(projspec.dspec.nu/2.f));
-                        // float vdist = abs((det_coords_c.y - (projspec.dspec.nv-1)/2.)/(projspec.dspec.nv/2.f));
+                        // float udist = abs((det_coords_c.x - (projspec.dspec.nu-1)/2.f)/(projspec.dspec.nu/2.f));
+                        // float vdist = abs((det_coords_c.y - (projspec.dspec.nv-1)/2.f)/(projspec.dspec.nv/2.f));
                         float udist = abs(det_coords_c.x)/(projspec.dspec.nu/2.f);
                         float vdist = abs(det_coords_c.y)/(projspec.dspec.nv/2.f);
                         // Scale each from 0 to 1, where 0 is completely softened (set to 0), and 1 is not softened at all
@@ -711,7 +711,7 @@ __device__ double2 _backproject_CB_getval(
     }
     ssx_accumulator /= ssx;
     ssx_accumulator_secondary /= ssx;
-    return double2({(double)ssx_accumulator, (double)ssx_accumulator_secondary});
+    return float2({ssx_accumulator, ssx_accumulator_secondary});
 }
 
 
@@ -774,7 +774,7 @@ __device__ const Tp _GBC_weightfun(
 template<
     typename Tv,  // type of volume data. e.g. float or double.
     typename Tp>  // type of projection data. e.g. float or double
-__device__ double2 _backproject_CB_getval_GBC_cyl(
+__device__ float2 _backproject_CB_getval_GBC_cyl(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const fvec3                     pos_000_c,       // absolute x,y,z position of the center of the voxel with index 0,0,0 within the chunk
         const uivec3                    vol_chunk_shape,
@@ -790,7 +790,7 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
     if ((vol_idx.x >= vol_chunk_shape.x) ||
         (vol_idx.y >= vol_chunk_shape.y) ||
         (vol_idx.z >= vol_chunk_shape.z)) {
-        return double2({0., 0.});
+        return float2({0.f, 0.f});
     }
 
     // Get the center position of this voxel
@@ -883,7 +883,7 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
     }
     ssx_accumulator /= ssx;
     ssx_accumulator_secondary /= ssx;
-    return double2({(double)ssx_accumulator, (double)ssx_accumulator_secondary});
+    return float2({ssx_accumulator, ssx_accumulator_secondary});
 }
 
 
@@ -906,7 +906,7 @@ __global__ void backproject_CB_volmem(
     const uivec3 vol_chunk_shape = volchunkspec.shape;
     const fvec3  pos_000_c       = volchunkspec.pos_000;
 
-    const double2 values = _backproject_CB_getval<Tv,Tp>(
+    const float2 values = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
@@ -954,7 +954,7 @@ __global__ void backproject_CB_voltex(
     const fvec3  pos_000_c       = voltexchunkspec.texpos + (
             fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets)*voxwid;
 
-    const double2 values = _backproject_CB_getval<Tv,Tp>(
+    const float2 values = _backproject_CB_getval<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
@@ -1029,7 +1029,7 @@ __global__ void backproject_CB_voltex_GBC_cyl(
     const fvec3  pos_000_c       = voltexchunkspec.texpos + (
             fvec3(0.5f, 0.5f, 0.5f) + voltexchunkspec.offsets)*voxwid;
 
-    const double2 values = _backproject_CB_getval_GBC_cyl<Tv,Tp>(
+    const float2 values = _backproject_CB_getval_GBC_cyl<Tv,Tp>(
         config,
         pos_000_c,
         vol_chunk_shape,
