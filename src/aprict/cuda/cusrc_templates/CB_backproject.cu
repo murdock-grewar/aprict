@@ -21,7 +21,7 @@
 template <typename T>
 __device__ T powint(T base, short exponent) {
     // Protect against negative values
-    T ans = 1.;
+    T ans = 1;
     if (exponent < 0) {
         for (unsigned short e = 0; e < -exponent; e++) {
             ans /= base;
@@ -87,9 +87,9 @@ __device__ float exact_line_integral_backproject_linelen_unitvoxwid(
     // Flip coordinate as necessary so that dv has positive components
     const fvec3 sgnvec = {sgn(dv.x), sgn(dv.y), sgn(dv.z)};
     const fvec3 dv2    = sgnvec * dv;
-    const fvec3 maxxyz2 = sgnvec * relvoxpos + fvec3(1./2., 1./2., 1./2.);
+    const fvec3 maxxyz2 = sgnvec * relvoxpos + fvec3(0.5f, 0.5f, 0.5f);
     // Maybe insert return here if any component of maxxyz2 is nonpositive...
-    const fvec3 minxyz2 = maxxyz2         - fvec3(1., 1., 1.);
+    const fvec3 minxyz2 = maxxyz2         - fvec3(1.f, 1.f, 1.f);
     const fvec3 minstepxyz = minxyz2 / dv2;
     const fvec3 maxstepxyz = maxxyz2 / dv2;
     const float a1 = max(0.f, max_of_components(minstepxyz));
@@ -122,8 +122,8 @@ __device__ void exact_line_integral_backproject_fast(
         Tv*                 accumulator
     )
 {
-    const fvec3 maxxyz2 = relvoxpos + fvec3(1./2., 1./2., 1./2.);
-    const fvec3 minxyz2 = maxxyz2   - fvec3(1.,    1.,    1.);
+    const fvec3 maxxyz2 = relvoxpos + fvec3(0.5f, 0.5f, 0.5f);
+    const fvec3 minxyz2 = maxxyz2   - fvec3(1.f,   1.f,  1.f);
     const fvec3 maxstepxyz = maxxyz2 / dv2;
     const float a1 = min(0.f, max_of_components(minstepxyz));
     const float a2 = min(a1,  min_of_components(maxstepxyz));
@@ -143,8 +143,8 @@ __device__ fvec3 detpos(
         // Not implemented!
     } else if (dspec.type == 0) {
         // Flat panel detector
-        float xnum = ((float)det_idx_x - (dspec.nu-1)/2.);
-        float ynum = ((float)det_idx_y - (dspec.nv-1)/2.);
+        float xnum = ((float)det_idx_x - (dspec.nu-1)/2.f);
+        float ynum = ((float)det_idx_y - (dspec.nv-1)/2.f);
         dpos = dspec.pos + (dspec.u*xnum) + (dspec.v*ynum);
     }
     return dpos;
@@ -338,22 +338,22 @@ __device__ double2 _backproject_CB_getval(
 
     // Loop over all detector pixels and add the backprojection
     const fvec3 _vox_corner_offsets[8] = {
-        fvec3(-1./2., -1./2., -1./2.) * voxwid,
-        fvec3(-1./2., -1./2.,  1./2.) * voxwid,
-        fvec3(-1./2.,  1./2., -1./2.) * voxwid,
-        fvec3(-1./2.,  1./2.,  1./2.) * voxwid,
-        fvec3( 1./2., -1./2., -1./2.) * voxwid,
-        fvec3( 1./2., -1./2.,  1./2.) * voxwid,
-        fvec3( 1./2.,  1./2., -1./2.) * voxwid,
-        fvec3( 1./2.,  1./2.,  1./2.) * voxwid
+        fvec3(-0.5f, -0.5f, -0.5f) * voxwid,
+        fvec3(-0.5f, -0.5f,  0.5f) * voxwid,
+        fvec3(-0.5f,  0.5f, -0.5f) * voxwid,
+        fvec3(-0.5f,  0.5f,  0.5f) * voxwid,
+        fvec3( 0.5f, -0.5f, -0.5f) * voxwid,
+        fvec3( 0.5f, -0.5f,  0.5f) * voxwid,
+        fvec3( 0.5f,  0.5f, -0.5f) * voxwid,
+        fvec3( 0.5f,  0.5f,  0.5f) * voxwid
     };
 
     const unsigned int ssx = config.ssx;
     const unsigned int ssy = config.ssy;
     const unsigned int ssz = config.ssz;
-    const float offx = 1./((float)ssx);
-    const float offy = 1./((float)ssy);
-    const float offz = 1./((float)ssz);
+    const float offx = 1.f/((float)ssx);
+    const float offy = 1.f/((float)ssy);
+    const float offz = 1.f/((float)ssz);
     Tv ssx_accumulator = 0;
     Tv ssx_accumulator_secondary = 0;
     for (unsigned int ssi = 0; ssi < ssx; ssi++) {
@@ -364,16 +364,16 @@ __device__ double2 _backproject_CB_getval(
             Tv ssz_accumulator_secondary = 0;
             for (unsigned int ssk = 0; ssk < ssz; ssk++) {
 
-                Tv accumulator = 0.;
-                Tv sub_accumulator = 0.;
-                Tv accumulator_secondary = 0.;
-                Tv sub_accumulator_secondary = 0.;
+                Tv accumulator = 0;
+                Tv sub_accumulator = 0;
+                Tv accumulator_secondary = 0;
+                Tv sub_accumulator_secondary = 0;
                 for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
 
                     const fvec3 vox_pos = vox_pos_c + fvec3(
-                        -1./2. + offx*(0.5f + ssi),
-                        -1./2. + offy*(0.5f + ssj),
-                        -1./2. + offz*(0.5f + ssk)
+                        -0.5f + offx*(0.5f + ssi),
+                        -0.5f + offy*(0.5f + ssj),
+                        -0.5f + offz*(0.5f + ssk)
                     ) * voxwid;
 
                     // Get the start point of the projection line
@@ -409,8 +409,8 @@ __device__ double2 _backproject_CB_getval(
                             for (int det_idx_y = det_idx_y_min; det_idx_y <= det_idx_y_max; det_idx_y++) {
 
                                 fvec3 det_pos      = projspec.dspec.pos + (
-                                    projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.) +
-                                    projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.)
+                                    projspec.dspec.u * (det_idx_x - (projspec.dspec.nu-1)/2.f) +
+                                    projspec.dspec.v * (det_idx_y - (projspec.dspec.nv-1)/2.f)
                                 );
 
                                 float intersect_linelen = exact_line_integral_backproject_linelen(
@@ -420,7 +420,7 @@ __device__ double2 _backproject_CB_getval(
                                     // Find the detector value there
                                     Tp det_value;
                                     if (config.backproject_all_1s) {
-                                        det_value = 1.;
+                                        det_value = 1;
                                     } else {
                                         det_idx = (
                                             input_projs_strides.y * det_idx_x +
@@ -433,8 +433,8 @@ __device__ double2 _backproject_CB_getval(
                                     /*
                                     float det_value = tex2DLayered<Tp>(
                                         detector_texture,
-                                        det_idx_y + 1./2.f,
-                                        det_idx_x + 1./2.f,
+                                        det_idx_y + 0.5f,
+                                        det_idx_x + 0.5f,
                                         proj_idx + tex_start_layer
                                     );
                                     */
@@ -592,7 +592,7 @@ __device__ double2 _backproject_CB_getval(
                                         // preset 8 pretends the detector value was "1".
 
                                         // c_on_R = |cos(\theta_h)|
-                                        float cos_theta_el = max(0.f, min(1.f, 1. / sqrt(
+                                        float cos_theta_el = max(0.f, min(1.f, 1.f / sqrt(
                                             1 + powint(r_minus_s.z/R/max(0.000000001f, ell_on_R), 2)
                                         )));
                                         float weight = (
@@ -807,9 +807,9 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
     const unsigned int ssx = config.ssx;
     const unsigned int ssy = config.ssy;
     const unsigned int ssz = config.ssz;
-    const float offx = 1./((float)ssx);
-    const float offy = 1./((float)ssy);
-    const float offz = 1./((float)ssz);
+    const float offx = 1.f/((float)ssx);
+    const float offy = 1.f/((float)ssy);
+    const float offz = 1.f/((float)ssz);
 
     Tv ssx_accumulator = 0;
     Tv ssx_accumulator_secondary = 0;
@@ -822,13 +822,13 @@ __device__ double2 _backproject_CB_getval_GBC_cyl(
             for (unsigned int ssk = 0; ssk < ssz; ssk++) {
 
                 const fvec3 vox_pos = vox_pos_c + fvec3(
-                    -1./2. + offx*(0.5f + ssi),
-                    -1./2. + offy*(0.5f + ssj),
-                    -1./2. + offz*(0.5f + ssk)
+                    -0.5f + offx*(0.5f + ssi),
+                    -0.5f + offy*(0.5f + ssj),
+                    -0.5f + offz*(0.5f + ssk)
                 ) * voxwid;
 
-                Tv accumulator = 0.;
-                Tv accumulator_secondary = 0.;
+                Tv accumulator = 0;
+                Tv accumulator_secondary = 0;
                 for (unsigned int proj_idx = 0; proj_idx < num_projs; proj_idx++) {
 
                     // Get the start point of the projection line
@@ -967,10 +967,10 @@ __global__ void backproject_CB_voltex(
 
     // Return early without reading surfaces, if there's nothing to do.
     if (
-        (values.x == 0.) &&
+        (values.x == 0) &&
         (
             (!secondary_volume_expected) ||
-            (values.y == 0.)
+            (values.y == 0)
         )
     ) { return; }
 
@@ -979,7 +979,7 @@ __global__ void backproject_CB_voltex(
     if (config.apply_summand_multiplier) {
         summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
     } else {
-        summand_multiplier = fcast<Tv>(1.);
+        summand_multiplier = fcast<Tv>(1.f);
     }
 
 
@@ -1042,10 +1042,10 @@ __global__ void backproject_CB_voltex_GBC_cyl(
 
     // Return early without reading surfaces, if there's nothing to do.
     if (
-        (values.x == 0.) &&
+        (values.x == 0) &&
         (
             (!secondary_volume_expected) ||
-            (values.y == 0.)
+            (values.y == 0)
         )
     ) { return; }
 
@@ -1054,7 +1054,7 @@ __global__ void backproject_CB_voltex_GBC_cyl(
     if (config.apply_summand_multiplier) {
         summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
     } else {
-        summand_multiplier = fcast<Tv>(1.);
+        summand_multiplier = fcast<Tv>(1.f);
     }
 
 
