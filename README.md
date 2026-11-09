@@ -9,6 +9,12 @@
 # Description
 `aprict` is a Python module for simulating transmission experiments in X-ray Computed Tomography, and for performing reconstructions from real and simulated data. In addition to the Python API, there is a commandline interface for some common operations.
 
+## Installation
+Check the CUDA toolkit version installed with `nvidia-smi`. With version 13.4 installed on the system, we would install `aprict` with:
+```bash
+pip install cuda-toolkit~=13.4.0 cuda-bindings~=13.4.0 aprict[gui]==0.0.45
+```
+
 ## Disclaimer
 This software is provided with no warranty or guarantee of correctness. This is my research code sandbox, subject to breaking changes on a whim. This is not mature software. So, if you like it and wish to use it, then it is best to download a fixed version and use that. Updates may break things.
 

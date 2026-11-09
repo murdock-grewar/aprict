@@ -39,6 +39,22 @@ An NVIDIA GPU supporting CUDA 13.x is required to use `aprict`.
 
 You can install `aprict` with `pip install aprict[gui]`.
 
+## Troubleshooting
+
+If you don't have the latest NVIDIA drivers installed, then you may receive this error when you try to run `aprict`:
+```
+cuda.core._utils.cuda_utils.CUDAError: CUDA_ERROR_UNSUPPORTED_PTX_VERSION: This indicates that the provided PTX was compiled with an unsupported toolchain.
+```
+This occurs because when `aprict` first runs some commands, it generates PTX for the GPU, using the cuda toolchain available in the Python environment. The version of this toolchain may exceed the commensurate driver versions installed on the system.
+
+If you see this error, then you have two options to resolve it:
+
+ 1. Update your system's NVIDIA drivers to the latest version.
+ 2. Uninstall `aprict`, check the CUDA toolkit version installed on the system (e.g. with `nvidia-smi`), and reinstall `aprict` alongside the correct version of the toolchain. E.g. with CUDA toolkit version 13.4 displayed in `nvidia-smi`, we would do:
+    ```bash
+    pip uninstall aprict && pip install cuda-toolkit~=13.4.0 cuda-bindings~=13.4.0 aprict[gui]
+    ```
+
 ## Quickstart
 
 Follow this three-step process to get a quick flavour of the capabilities of this package. Run these commands in a shell such as `bash`, from a fresh directory, with an active Python environment with `aprict[gui]` installed. Note that all units of distance here are measured in millimeters.
