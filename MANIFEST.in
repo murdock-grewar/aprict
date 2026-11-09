@@ -1,2 +1,4 @@
 recursive-include src/aprict/data *
+recursive-exclude src/aprict/data/ptx *
+recursive-exclude src/aprict/data/dtypes *
 recursive-include src/aprict/cuda/structs/cu *
