@@ -28,6 +28,14 @@ will generate the .h files in a directory structure that mirrors this
 directory.
 """
 
+# NOTE: inside the __init_subclass__ method of KernelStruct,
+# it compiles the ptx code etc. Therefore, importing this
+# module should be enough to trigger compilation of the relevant ptx code.
+# I am relying on this for my build pipeline, where I import this
+# module in orter to trigger the compilation of all the struct-related ptx code.
+# So, try not to add any new KernelStruct objects unless they are directly imported
+# in this __init__.py file.
+
 from . import FORBILD_volumes as FORBILD_volumes
 from . import test_subdir as test_subdir
 from .base import *

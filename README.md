@@ -10,9 +10,8 @@
 `aprict` is a Python module for simulating transmission experiments in X-ray Computed Tomography, and for performing reconstructions from real and simulated data. In addition to the Python API, there is a commandline interface for some common operations.
 
 ## Installation
-Check the CUDA toolkit version installed with `nvidia-smi`. With version 13.4 installed on the system, we would install `aprict` with:
 ```bash
-pip install cuda-toolkit~=13.4.0 cuda-bindings~=13.4.0 aprict[gui]
+pip install aprict[gui]
 ```
 
 ## Disclaimer
@@ -35,7 +34,7 @@ The documentation may be viewed locally by cloning the repository and running `p
 
 # Caveats
 ## Hardware Requirements
-This software requires at least one relatively recent *CUDA-capable GPU*. An RTX 3090 is recent enough. The relevant drivers will also need to be installed. You may need up-to-date drivers, depending on when the code was last updated.
+This software requires CUDA toolkit `13.x` or newer to be installed on the system.
 
 It is strongly recommended to use high-speed mass storage, such as an NVMe drive. The software has not been tested on slower mass storage, and is not expected to perform well without it.
 

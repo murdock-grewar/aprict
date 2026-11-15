@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-githooks/flush-dtypes.sh
-githooks/flush-ptx.sh
-githooks/generate-cusrc.sh
+bash githooks/uv-sync.sh  # ensure correct CUDA toolchain version is installed before building
+bash githooks/flush-dtypes.sh
+bash githooks/flush-ptx.sh
+bash githooks/generate-cusrc.sh
+bash githooks/generate-struct-ptx.sh

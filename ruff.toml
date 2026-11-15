@@ -31,6 +31,7 @@ exclude = [
     "src/*/phantoms/FORBILD_head.py",
     "conftest.py",
     "src/*/gbc/filters.py",  # vendored from legacy `apricot` module
+    "src/aprict/cuda/_generate_struct_ptx.py",  # it complains about an import with side-effects
 ]
 
 line-length = 79

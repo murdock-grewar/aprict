@@ -1,4 +1,0 @@
-# the PTX will differ by platform. These need to be compiled freshly by the end-user.
-ptx
-# the dtypes may in principle differ by platform. These need to be compiled freshly by the end-user.
-dtypes

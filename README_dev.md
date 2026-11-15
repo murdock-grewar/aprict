@@ -10,3 +10,9 @@ To activate the Python environment, you can use `source .venv/bin/activate`.
 You can use `deactivate` to deactivate it.
 
 The various pre-commit tests can be run without committing with `./verify.sh`.
+
+The python environment should be activated when developing or building the module.
+
+Important note on CUDA toolchain version: the versions of cuda-toolkit and 
+cuda-bindings is controlled by the uv.lock file to ensure that the generated ptx
+code is compatible with CUDA version 13.X.

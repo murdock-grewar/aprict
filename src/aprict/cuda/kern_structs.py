@@ -291,6 +291,9 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
         | None = None,  # extra code to put after the structure definiton. Useful for e.g. defining operators.
     ) -> None:
 
+        # NOTE: when the subclass is initiated, the relevant ptx code is compiled.
+        # So, defining a subclass is enough to fill the ptx cache.
+
         # Validate inputs #
         if len(names) != len(dtypes):
             msg = f"Mismatch in length of `names` and `dtypes`. Names: {names}. dtypes: {dtypes}"

@@ -71,9 +71,11 @@ def compile_module(
                 module=str(p.resolve()), symbol_mapping=None
             )
     # Compile the ptx, save it in the cache, and return it
+    # NOTE: sm_75 (Turing) is the earliest architecture compatible with CUDA 13.X
+    arch: str = "sm_75" if dev is None else f"sm_{dev.arch}"
     program_options = cuda.core.ProgramOptions(
         std="c++17",
-        arch=f"sm_{(dev if dev is not None else _get_default_device()).arch}",
+        arch=arch,
         device_as_default_execution_space=True,
     )
     prog_ptx = cuda.core.Program(

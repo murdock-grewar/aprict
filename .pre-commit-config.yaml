@@ -1,6 +1,14 @@
 repos:
 - repo: local
   hooks:
+    - id: uv-sync
+      name: (sync) sync Python environment (including CUDA toolchain) to uv lockfile
+      entry: ./githooks/uv-sync.sh
+      language: script
+      pass_filenames: false
+      always_run: true
+      verbose: false
+  hooks:
     - id: flush-dtypes
       name: (Build) Flush any cached dtypes
       entry: ./githooks/flush-dtypes.sh
@@ -20,6 +28,14 @@ repos:
     - id: generate-cusrc
       name: (Build) Generate CUDA source files
       entry: ./githooks/generate-cusrc.sh
+      language: script
+      pass_filenames: false
+      always_run: true
+      verbose: false
+  hooks:
+    - id: generate-struct-ptx
+      name: (Build) Build struct PTX files
+      entry: ./githooks/generate-struct-ptx.sh
       language: script
       pass_filenames: false
       always_run: true
