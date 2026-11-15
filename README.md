@@ -12,7 +12,7 @@
 ## Installation
 Check the CUDA toolkit version installed with `nvidia-smi`. With version 13.4 installed on the system, we would install `aprict` with:
 ```bash
-pip install cuda-toolkit~=13.4.0 cuda-bindings~=13.4.0 aprict[gui]==0.0.45
+pip install cuda-toolkit~=13.4.0 cuda-bindings~=13.4.0 aprict[gui]
 ```
 
 ## Disclaimer
