@@ -16,9 +16,9 @@
 """
 A submodule containing example scripts using the Python API.
 
-Browse the `aprict` source code and navigate to this directory to see the examples.
+Browse the `aprict` source code and navigate to this directory to see the examples. Some of these examples may not run out-of-the-box unless your GPU has at least 24GiB of VRAM. You can copy and edit the scripts as desired.
 
-Examples can be run with e.g. `python -m aprict.examples.EXAMPLE_NAME`.
+An example with filename `EXAMPLE_NAME.py` can be run with `python -c 'import aprict.examples; aprict.examples.EXAMPLE_NAME.main()'`.
 
 """
 
