@@ -6,7 +6,7 @@ Key:
  - [d] = deferred
  - [*] = mixed status
 
-TODO for 0.1.1:
+TODO for 0.2.0:
  - [x] Find a way to reorder volume memory as F-contiguous, to speed up transfers from GPU when slicing along Z direction
  - [ ] consider removing --ssx, --ssy, --ssz options from GBC script
  - [ ] optimize projection GPU work
@@ -32,5 +32,5 @@ TODO for 0.1.0:
    - [x] GBC, LDS
    - [x] FBP, LDS
  - [d] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections. -- deferred due to low priority. The scripts already skip projection chunks which don't intersect the volume. Also, the CUDA thread blocks not intersecting the backprojections should be returning quickly anyway. Implementing this point might squeeze some more performance for cases where parts of the volume don't receive backprojections at all. In that case, the time spent transferring data to/from the GPU could be reduced. But this would probably be minor.
-  - [ ] Document the expected memory layout of projections and volumes in the cbfp submodule. E.g. include PDFs illustrating the du, dv vectors for the projection. Explain the indexing.
+  - [d] Document the expected memory layout of projections and volumes in the cbfp submodule. E.g. include PDFs illustrating the du, dv vectors for the projection. Explain the indexing. -- partially accomplished; no figures included but described in words and with examples.
   - [x] Add `aprict view` subcommand tree.
