@@ -109,6 +109,7 @@ The recommended import pattern for this module is
 import aprict
 from aprict.cb import flatpanel as cbfp
 ```
+It is recommended to read the documentation for `aprict.cb.flatpanel` for more information.
 
 ### Main components of the Python API
 

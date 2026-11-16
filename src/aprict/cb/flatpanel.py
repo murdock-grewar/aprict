@@ -16,7 +16,9 @@
 # flatpanel.py
 
 """
-End-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code.
+# Overview of API
+
+This module contains the end-user interfaces to the flat-panel cone-beam projection and backprojection CUDA code.
 
 The main provided methods are
  - `project` - used to generate projection data from a `aprict.volume.Volume` or `aprict.volume.FBVolume` object.
@@ -29,7 +31,61 @@ The main provided classes are
  - `ConfigBackproject` - object to hold a collection of settings applied when computing backprojections with `backproject`.
 
 Note that the `ConfigBackproject` object allows for configuring weighted backprojections and the like. The `backproj_weighting_preset` attribute passed to its constructor can significantly influence the behaviour of the backprojection, since this value is passed to the CUDA kernel, which performs some internal logic depending on this value. Currently, the end user has limited control over what kind of weightings are applied, since adding new presets requires editing the CUDA kernel. The available presets will be documented at a later time. The default value of `0` corresponds to the adjoint of the forward projection.
-"""
+
+# Projection data format
+
+Projection data for a flat panel detector is stored inside a `ProjectionSet` object. This is comprised of two components:
+ - A `ProjGeom` object encoding the geometry.
+ - A cupy array containing the line attenuations.
+
+Large datasets may be processed by progressively constructing `ProjectionSet` objects with slices of the full projection dataset (see `ProjGeom.sliced`).
+
+## Geometry
+Experiment geometries are encoded with `ProjGeom` objects. These may be saved and loaded to/from `.json` format. Example:
+```python
+from aprict import cb.flatpanel as cbfp
+pg: cbfp.ProjGeom = cbfp.ProjGeom(
+    source_pos=<(M,3)-numpy array>,
+    det_pos=<(M,3)-numpy array>,
+    det_uvec=<(M,3)-numpy array>,
+    det_vvec=<(M,3)-numpy array>,
+    nu=<int>,
+    nv=<int>,
+)
+pg.save('./projgeom.json')
+del pg
+pg_loaded = cbfp.ProjGeom.load('./projgeom.json')
+```
+
+Note the following conventions:
+ - `det_pos[i]` refers to the centre of the detector in cone-beam projection `i`. The centre may or may not be located at the centre of a pixel.
+ - `det_uvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same row.
+ - `det_vvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same column.
+
+As the time of writing (`aprict==0.0.49`), most API operations assume that the detector pixels are square, i.e. that `det_uvec[i]` and `det_vvec[i]` are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!
+
+## Data storage
+Projection data is typically stored on-disk as a numpy array, until it is loaded into a `ProjectionSet` object, at which time it is loaded onto the GPU. You don't need to hold an entire numpy array in memory to manipulate it&mdash; you can use `numpy`'s `np.memmap` type to memory-map it. 'Memory-mapping' is basically when a resource is mapped to a virtual space in memory. This means that it can be treated as if it were an object in memory, but reads and writes will actually happen on disk. This can support very large arrays, e.g. 1TB+.
+
+Here's an example of a tiny randomly-generated projection dataset:
+```python
+import numpy as np
+
+# five small 3x3 cone-beam projections
+p = np.lib.format.open_memmap(
+    "./projs.npy", shape=(5, 3, 3), mode="w+", dtype=np.float32
+)
+p[...] = np.random.randn(5, 3, 3)
+```
+
+Observe these important rules for how the data layout interacts with the geometry encoding inside a corresponding `ProjGeom` object called `pg`:
+ - the pixel centre of data point `p[i][j+1][k]`, in 3D space, is located at the pixel centre of `p[i][j][k]` plus the 3D vector `pg.det_uvec[i]`.
+ - the pixel centre of data point `p[i][j][k+1]`, in 3D space, is located at the pixel centre of `p[i][j][k]` plus the 3D vector `pg.det_vvec[i]`.
+
+Note that `numpy` does not multithread most array operations, like addition, multiplication etc. For multi-threaded operations on large numpy arrays, including memory-mapped arrays, I'd suggest using `numexpr`.
+
+
+"""  # ruff: ignore[missing-trailing-period]
 
 import dataclasses
 import functools
