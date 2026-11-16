@@ -18,7 +18,7 @@ pip install aprict[gui]
 This software is provided with no warranty or guarantee of correctness. This is my research code sandbox, subject to breaking changes on a whim. This is not mature software. So, if you like it and wish to use it, then it is best to download a fixed version and use that. Updates may break things.
 
 ## Features
-`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' an 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of aprict==0.0.33:
+`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' an 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). It is assumed that the RAM on the machine is at least twice the size of the used VRAM on the GPU. Included features as of aprict==0.1.0:
 
  - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)
  - Out-of-core analytic reconstruction for special geometries:
