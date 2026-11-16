@@ -33,4 +33,4 @@ TODO for 0.1.0:
    - [x] FBP, LDS
  - [d] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections. -- deferred due to low priority. The scripts already skip projection chunks which don't intersect the volume. Also, the CUDA thread blocks not intersecting the backprojections should be returning quickly anyway. Implementing this point might squeeze some more performance for cases where parts of the volume don't receive backprojections at all. In that case, the time spent transferring data to/from the GPU could be reduced. But this would probably be minor.
   - [ ] Document the expected memory layout of projections and volumes in the cbfp submodule. E.g. include PDFs illustrating the du, dv vectors for the projection. Explain the indexing.
-  - [ ] Add `aprict view` subcommand tree.
+  - [x] Add `aprict view` subcommand tree.
