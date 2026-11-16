@@ -23,6 +23,7 @@ from .convert_npy_to_omezarr import main as main_convert_npy_to_omez
 from .convert_omezarr_to_npy import main as main_convert_omez_to_npy
 from .make_geometry_cone_cyl import main as main_make_geom_cone_cyl
 from .make_geometry_fan_circ import main as main_make_geom_fan_circ
+from .neuroglance import main as main_neuroglance
 from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import Alg as fbp_Alg
 from .recon_cbfp_cyl_fbp import main as main_fbp
@@ -47,6 +48,20 @@ _cs = {
 # @ce.man_option()  # add --man option from click_extra
 def main() -> None:  # ruff: ignore[undocumented-public-function]
     pass
+
+
+@ce.group(
+    name="view",
+    params=None,
+    help="View data.",
+    context_settings=_cs,
+)
+def view() -> None:  # ruff: ignore[undocumented-public-function]
+    pass
+
+
+main.add_command(view)
+view.add_command(cmd=main_neuroglance, name="neuroglance")
 
 
 @ce.group(

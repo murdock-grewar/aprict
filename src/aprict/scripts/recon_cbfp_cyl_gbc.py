@@ -1445,7 +1445,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 plotmin=args.plotmin,
                 plotmax=args.plotmax,
                 port=args.web_port,
-                voxwid_mm=vol_voxwid,
+                voxwid=vol_voxwid,
                 wait_for_input_before_exit_prompt=None,
             ) as av:
                 msg = f"Displaying plot at URL: {av.url} ..."

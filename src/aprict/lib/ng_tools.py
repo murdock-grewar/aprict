@@ -15,9 +15,10 @@
 
 """Tools for use with the neuroglancer package."""
 
+# import platform  # can be used to find domain name of this machine via platform.node()
 from typing import TYPE_CHECKING
 
-from . import import_tools
+from . import import_tools, ome_zarr_tools
 
 neuroglancer = import_tools.import_neuroglancer()
 
@@ -29,7 +30,8 @@ if TYPE_CHECKING:
 def _add_ndarray_layer(
     state,  # ruff: ignore[missing-type-function-argument]
     input_array: np.ndarray | np.memmap,
-    voxel_size_mm: float | None = None,
+    voxwid: float | None = None,
+    unit_len: ome_zarr_tools.UnitLen | None = None,
     plotmin: float | None = None,
     plotmax: float | None = None,
 ) -> None:
@@ -37,22 +39,16 @@ def _add_ndarray_layer(
     # data = np.cast[np.float32](input_array)
     data = input_array
 
-    if voxel_size_mm is None:
+    if voxwid is None or unit_len is None:
         dimensions = neuroglancer.CoordinateSpace(
             names=["x", "y", "z"], scales=[1, 1, 1]
         )
     else:
         dimensions = neuroglancer.CoordinateSpace(
             names=["x", "y", "z"],
-            units=["mm", "mm", "mm"],
-            scales=[voxel_size_mm, voxel_size_mm, voxel_size_mm],
+            units=list((unit_len.name,) * 3),
+            scales=list((voxwid,) * 3),
         )
-    shader = f"#uicontrol invlerp normalized(range=[{data.min():.3g}, {data.max():.3g}], clamp=true)"
-    shader += """
-void main() {
-  emitGrayscale(normalized());
-}
-"""
 
     #     shader_example="""
     # void main() {
@@ -94,14 +90,22 @@ void main() {
         url=local_vol, transform=coord_transform
     )
 
-    pmin = float(plotmin) if plotmin is not None else float(input_array.min())
-    pmax = float(plotmax) if plotmax is not None else float(input_array.max())
+    pmin = (
+        float(plotmin) if plotmin is not None else 0
+    )  # don't calculate the minimum of the array here; that can take a long time
+    pmax = float(plotmax) if plotmax is not None else 1
+    shader = f"#uicontrol invlerp normalized(range=[{pmin:.3g}, {pmax:.3g}], clamp=true)"
+    shader += """
+void main() {
+  emitGrayscale(normalized());
+}
+"""
     state.layers.append(
         name="recon",
         # layer=local_vol,
         layer=neuroglancer.ImageLayer(
             source=source,
-            shader_controls={"normalized": {"range": [pmin, pmax]}},
+            # shader_controls={"normalized": neuroglancer.InvlerpParameters(range=[pmin, pmax])},
         ),
         shader=shader,
     )
@@ -112,7 +116,8 @@ class ArrayViewer3D:
 
     port: int
     array: np.ndarray | np.memmap
-    voxwid_mm: float | None
+    voxwid: float | None
+    unit_len: ome_zarr_tools.UnitLen | None
     url: str
 
     _initial_plotmin: float | None
@@ -125,12 +130,14 @@ class ArrayViewer3D:
         plotmin: float | None = None,
         plotmax: float | None = None,
         port: int = 8080,
-        voxwid_mm: float | None = None,
+        voxwid: float | None = None,
+        unit_len: ome_zarr_tools.UnitLen | None = None,
         wait_for_input_before_exit_prompt: str | None = None,
     ) -> None:
         self.port = port
         self.array = arr
-        self.voxwid_mm = voxwid_mm
+        self.voxwid = voxwid
+        self.unit_len = unit_len
         self._initial_plotmin = plotmin
         self._initial_plotmax = plotmax
         self._wait_for_input_before_exit_prompt = (
@@ -138,6 +145,7 @@ class ArrayViewer3D:
         )
 
     def __enter__(self) -> ArrayViewer3D:  # ruff: ignore[undocumented-magic-method]
+        # hostname: str = platform.node()
         port = str(self.port)
         neuroglancer.set_server_bind_address(
             bind_address="127.0.0.1", bind_port=port
@@ -148,11 +156,14 @@ class ArrayViewer3D:
             _add_ndarray_layer(
                 s,
                 self.array,
-                voxel_size_mm=self.voxwid_mm,
+                voxwid=self.voxwid,
+                unit_len=self.unit_len,
                 plotmin=self._initial_plotmin,
                 plotmax=self._initial_plotmax,
             )
         self.url = "http://localhost:" + port + "/v/" + viewer.token + "/"
+        # self.url = f"http://{hostname:s}:" + port + "/v/" + viewer.token + "/"
+
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
@@ -162,28 +173,35 @@ class ArrayViewer3D:
         neuroglancer.stop()
 
 
-class OMEZarrViewer3D:
-    """A context manager to serve an OME-Zarr volume at a URL while active."""
+class URIViewer3D:
+    """A context manager to serve a volume located at a generic URI while active."""
 
     port: int
-    zarr_url: str
+    uri: str
     url: str
+    _init_plotmin: float
+    _init_plotmax: float
 
     _wait_for_input_before_exit_prompt: str | None
 
     def __init__(
         self,
-        zarr_url: str,
+        uri: str,
         port: int = 8080,
         wait_for_input_before_exit_prompt: str | None = None,
+        plotmin: float | None = None,
+        plotmax: float | None = None,
     ) -> None:
         self.port = port
-        self.zarr_url = zarr_url
+        self.uri = uri
+        self._init_plotmin = plotmin if plotmin is not None else 0
+        self._init_plotmax = plotmax if plotmax is not None else 1
         self._wait_for_input_before_exit_prompt = (
             wait_for_input_before_exit_prompt
         )
 
-    def __enter__(self) -> OMEZarrViewer3D:  # ruff: ignore[undocumented-magic-method]
+    def __enter__(self) -> URIViewer3D:  # ruff: ignore[undocumented-magic-method]
+        # hostname: str = platform.node()
         port = str(self.port)
         neuroglancer.set_server_bind_address(
             bind_address="127.0.0.1", bind_port=port
@@ -199,10 +217,19 @@ class OMEZarrViewer3D:
                 0,
                 0,
             ]  # rotate 180 degrees about the x axis. I do this to flip the y axis so it points upwards rather than downwards.
+
+            shader = f"#uicontrol invlerp normalized(range=[{self._init_plotmin:.3g}, {self._init_plotmax:.3g}], clamp=true)"
+            shader += """
+void main() {
+  emitGrayscale(normalized());
+}"""
             state.layers["image"] = neuroglancer.ImageLayer(
-                source=self.zarr_url
+                source=self.uri,
+                # shader_controls={"normalized": neuroglancer.InvlerpParameters(range=[self._init_plotmin, self._init_plotmax])},
+                shader=shader,
             )
         self.url = "http://localhost:" + port + "/v/" + viewer.token + "/"
+        # self.url = f"http://{hostname:s}:" + port + "/v/" + viewer.token + "/"
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb) -> None:  # ruff: ignore[missing-type-function-argument, undocumented-magic-method]
