@@ -1052,6 +1052,7 @@ def project(
                 input_proj_array_len,
                 texchunkspec,
                 volume._texture.surfobj,  # ruff: ignore[private-member-access]
+                np.bool(volume._texture.order == "F"),  # ruff: ignore[private-member-access]
                 input_proj_array_strides,  # strides in bytes
                 input_proj_array_ptr,  # pointer to the beginning of the det data
             )
@@ -1188,13 +1189,24 @@ def backproject(
                     config.contents,
                     texchunkspec,
                     volume._texture.surfobj,  # ruff: ignore[private-member-access]
-                    None
-                    if summand_multiplier is None
-                    else summand_multiplier._texture.surfobj,  # ruff: ignore[private-member-access]
+                    np.bool(volume._texture.order == "F"),  # ruff: ignore[private-member-access]
+                    *(
+                        (None, None)
+                        if summand_multiplier is None
+                        else (
+                            summand_multiplier._texture.surfobj,  # ruff: ignore[private-member-access]
+                            np.bool(summand_multiplier._texture.order == "F"),  # ruff: ignore[private-member-access]
+                        )
+                    ),
                     input_proj_chunk_spec,
-                    None
-                    if secondary_volume is None
-                    else secondary_volume._texture.surfobj,  # used for some configurations of the backprojection  # ruff: ignore[private-member-access]
+                    *(
+                        (None, None)
+                        if secondary_volume is None
+                        else (
+                            secondary_volume._texture.surfobj,  # ruff: ignore[private-member-access]
+                            np.bool(secondary_volume._texture.order == "F"),  # ruff: ignore[private-member-access]
+                        )  # used for some configurations of the backprojection
+                    ),
                 )
                 kern(grid_dims, block_dims, args)
                 pbar.update_to(

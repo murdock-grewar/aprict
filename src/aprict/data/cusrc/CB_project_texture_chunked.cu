@@ -52,6 +52,8 @@ __device__ half fcast<half>(const double f)
     return __double2half(f);
 }
 
+// See https://en.cppreference.com/w/cpp/language/partial_specialization.html for partial template specialisation
+
 /* Note on the 'half' type, used for 16-bit floating point precision:
  * The texture writing function, 'surf3Dwrite' or 'surf2Dwrite', doesn't support
  * input values of type 'half'. So, I wrote the function below which has a template
@@ -59,72 +61,51 @@ __device__ half fcast<half>(const double f)
  * by temporarily converting them to unsigned shorts, using CUDA's fp16 API included
  * with #include <cuda_fp16.h>.
  */
-// See https://en.cppreference.com/w/cpp/language/partial_specialization.html for partial
-// template specialisation
-template<typename T, typename V>
+template<typename T>
 __device__ void write_to_surf3D(
     T                       value,
     cudaSurfaceObject_t     surface,
-    V                       idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        surf3Dwrite(value, surface,  idx.x * sizeof(T), idx.y, idx.z);
+    } else {
+        surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x);
+    }
+}
 
-template<typename V>
-__device__ void write_to_surf3D<half, V>(
+template<>
+__device__ void write_to_surf3D<half>(
     half                    value,
     cudaSurfaceObject_t     surface,
-    V                       idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ write_to_surf3D<unsigned short, V>(__half_as_ushort(value), surface, idx); }
+{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx, reverse_dims); }
 
-// I don't know why this template partial specialisation fails.
-/*
-template<typename T, typename V>
-__device__ T read_from_surf3D(
-    cudaSurfaceObject_t     surface,
-    V                       idx
-)
-{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
-
-template<typename V>
-__device__ half read_from_surf3D<half, V>(
-    cudaSurfaceObject_t     surface,
-    V                       idx
-)
-{ return __ushort_as_half(read_from_surf3D<unsigned short, V>(surface, idx)); }
-*/
-// Using this as a hotfix
 template<typename T>
 __device__ T read_from_surf3D(
     cudaSurfaceObject_t     surface,
-    int3                    idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        return surf3Dread<T>(surface, idx.x * sizeof(T), idx.y, idx.z);
+    }
+    return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x);
+}
 
 template<>
 __device__ half read_from_surf3D<half>(
     cudaSurfaceObject_t     surface,
-    int3                    idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx, reverse_dims)); }
 
-
-// WARNING on reading from a texture: I believe the texture is internally converted to a 32-bit float type before interpolation... something like that... be wary of potential issues reading from a texture in the fp16/half format.
-/* I have not tested this code
-template<typename T, V>
-__device__ T read_from_tex3D(
-    cudaTextureObject_t     tex,
-    V                       coords
-)
-{ return tex3D<T>(tex, coords.z, coords.y, coords.x); }
-
-template<>
-__device__ half read_from_tex3D<half>(
-    cudaTextureObject_t     tex,
-    V                       coords
-)
-{ return __ushort_as_half(read_from_tex3D<unsigned short>(surface, coords)); }
-*/
 
 
 template<
@@ -135,6 +116,7 @@ __device__ Tp exact_line_integral_unitvoxwid(
         const fvec3                 v2,
         const vol_tex_chunk_spec    texchunkspec,
         cudaSurfaceObject_t         volume_surface,
+        const bool                  reverse_dims_vol,
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
         const bool                  return_false_steps = false)
 {
@@ -184,7 +166,7 @@ __device__ Tp exact_line_integral_unitvoxwid(
     float steps_to_end = 1.f; // By definition of lis.dx,dy,dz, a single step goes from start to end.
     float steps_to_take;
     float steps_to_take_x, steps_to_take_y, steps_to_take_z;
-    int3  vol_idx;
+    int3  vol_idx;  // I think I might have written this kernel with the allowance that vol_idx can be negative to indicate out-of-bounds in that direction. To be safe, don't change this to uint3.
     //// Skip to the first intersection with the volume (plus an extra voxel for safety)
     float advance_steps = 0;
     if (xdir < 0) { advance_steps = max(advance_steps, (maxxyz.x + 0.5f - lis.x)/lis.dx); }
@@ -272,7 +254,7 @@ __device__ Tp exact_line_integral_unitvoxwid(
                 if (steps_to_take < 0) {
                     printf("Negative value encountered! %.3f\n", steps_to_take);
                 }
-                accum_val += steps_to_take * (float)read_from_surf3D<Tv>(volume_surface, vol_idx);
+                accum_val += steps_to_take * (float)read_from_surf3D<Tv>(volume_surface, uint3({vol_idx.x, vol_idx.y, vol_idx.z}), reverse_dims_vol);
             }
         } else {
             if (return_false_steps) {
@@ -297,6 +279,7 @@ __device__ Tp exact_line_integral(
         const fvec3                 v2,
         const vol_tex_chunk_spec    texchunkspec,
         cudaSurfaceObject_t         volume_surface,
+        const bool                  reverse_dims_vol,
         // A debug option. Instead of returning the line intgeral, return the number of steps taken which were through a region not contained in the chunk. This indicates the inefficient.
         const bool                  return_false_steps = false)
 {
@@ -317,6 +300,7 @@ __device__ Tp exact_line_integral(
         v2 / voxwid,
         vtcs,
         volume_surface,
+        reverse_dims_vol,
         return_false_steps
     );
 }
@@ -349,6 +333,7 @@ __global__ void project_CB_texture_chunked(
         const unsigned int        num_projs,       // length of projspecs array
         const vol_tex_chunk_spec  texchunkspec,
         cudaSurfaceObject_t       volume_surface,
+        const bool                reverse_dims_vol,
         const ulvec3              output_projs_strides,
         Tp*                       output_projs
 )
@@ -405,7 +390,7 @@ __global__ void project_CB_texture_chunked(
             // ...
             Tp val = 0;
             val = exact_line_integral<Tv, Tp>(
-                source_pos*svf, det_pos*svf, texchunkspec, volume_surface);
+                source_pos*svf, det_pos*svf, texchunkspec, volume_surface, reverse_dims_vol);
             val *= config.multiply_before_adding;
             // Do things ...
             //val = 18.f/norm_fvec3(det_pos - projspec.sourcepos);
@@ -572,11 +557,6 @@ __global__ void project_CB_FORBILD_shapes(
                 // ...
                 Tp val = 0;
                 if (config.overlap_addition) {
-                    /*
-                    for (unsigned int i = 0; i < num_shapes; i++) {
-                        val += exact_line_integral<Tp>(source_pos, det_pos, shapes_glob[i]);
-                    }
-                    */
                     for (unsigned int j = 0; j < num_shapes_relevant; j++) {
                         fvec2 interval = intervals[j];
                         val += rhos[j] * (interval.y - interval.x);

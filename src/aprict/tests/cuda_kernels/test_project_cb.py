@@ -19,6 +19,7 @@
 import itertools  # ruff: ignore[unsorted-imports]
 import time  # ruff: ignore[unused-import]
 
+import typing
 import cupy as cp
 import numexpr as ne
 import numpy as np
@@ -190,6 +191,7 @@ class TestCB_texture_randomnoise:
                     np.uint32(num_projs),
                     texchunkspec,
                     vtex.surfobj,
+                    np.bool(vtex.order == "F"),
                     output_projs_strides_bytes,
                     np.uint64(output_projs.data.ptr),
                 ),
@@ -211,27 +213,29 @@ class TestCB_texture_randomnoise:
 
 
 @pytest.mark.parametrize(
-    argnames=["volres", "dtype_vol"],
+    argnames=["volres", "dtype_vol", "order"],
     argvalues=[
-        (156, np.float32),
-        (312, np.float32),
-        # (625, np.float32),
-        (156, np.float16),
-        (312, np.float16),
-        # (625, np.float16),
-    ],  # , 625])  # , 1250])
+        (156, np.float32, "C"),
+        (312, np.float32, "F"),
+        (156, np.float16, "C"),
+        (312, np.float16, "F"),
+    ],
     ids=[
-        "project-FORBILD-156-fp32",
-        "project-FORBILD-312-fp32",
-        # "project-FORBILD-625-fp32",
-        "project-FORBILD-156-fp16",
-        "project-FORBILD-312-fp16",
-        # "project-FORBILD-625-fp16",
+        "project-FORBILD-156-fp32-C",
+        "project-FORBILD-312-fp32-F",
+        "project-FORBILD-156-fp16-C",
+        "project-FORBILD-312-fp16-F",
     ],
 )
 class TestCB_texture_FORBILD:
     @pytest.fixture(scope="function", autouse=True)
-    def setup_and_teardown(self, volres: int, dtype_vol: np.dtype, request):  # ruff: ignore[missing-type-function-argument]
+    def setup_and_teardown(
+        self,
+        volres: int,
+        dtype_vol: np.dtype,
+        order: typing.Literal["C", "F"],
+        request,  # ruff: ignore[missing-type-function-argument]
+    ):
         test_id: str = request.node.callspec.id  # ruff: ignore[unused-variable]
         # Setup phase
         # Get the FORBILD phantom.
@@ -247,13 +251,14 @@ class TestCB_texture_FORBILD:
 
         # Convert from Hounsfield units to attenuation coefficient
         # v = v[:,:,v.shape[2]//4:-(v.shape[2]//4)]
-        self.vol = np.empty(v.shape, dtype=dtype_vol)
+        self.vol = np.empty(v.shape, dtype=dtype_vol, order=order)
         ne.evaluate("(v/1000 + 1)*0.02*voxwid_mm", out=self.vol)
         # Create a texture
         self.vtex = texture_tools.Texture(
             self.vol,
             address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
             filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
+            order=order,
         )
         # Set up configuration objects etc
         self.config = np.array((1.0, 1.0, 1, 1), dtype=ks_config.dtype)
@@ -348,6 +353,7 @@ class TestCB_texture_FORBILD:
                 np.uint32(self.output_projs.shape[0]),
                 texchunkspec,
                 self.vtex.surfobj,
+                np.bool(self.vtex.order == "F"),
                 self.output_projs_strides_bytes,
                 np.uint64(self.output_projs.data.ptr),
             ),

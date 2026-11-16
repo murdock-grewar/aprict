@@ -12,45 +12,68 @@ template<typename T>
 __device__ void write_to_surf3D(
     T                       value,
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        surf3Dwrite(value, surface,  idx.x * sizeof(T), idx.y, idx.z);
+    } else {
+        surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x);
+    }
+}
 
 template<>
 __device__ void write_to_surf3D<half>(
     half                    value,
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx); }
+{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx, reverse_dims); }
 
 template<typename T>
 __device__ T read_from_surf3D(
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        return surf3Dread<T>(surface, idx.x * sizeof(T), idx.y, idx.z);
+    }
+    return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x);
+}
 
 template<>
 __device__ half read_from_surf3D<half>(
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx, reverse_dims)); }
 
 template<typename T>
 __device__ T read_from_surf2DLayered(
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return surf2DLayeredread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        return surf2DLayeredread<T>(surface, idx.x * sizeof(T), idx.y, idx.z);
+
+    }
+    return surf2DLayeredread<T>(surface, idx.z * sizeof(T), idx.y, idx.x);
+}
 
 template<>
 __device__ half read_from_surf2DLayered<half>(
     cudaSurfaceObject_t     surface,
-    uint3                   idx
+    uint3                   idx,
+    const bool              reverse_dims
 )
-{ return __ushort_as_half(read_from_surf2DLayered<unsigned short>(surface, idx)); }
+{ return __ushort_as_half(read_from_surf2DLayered<unsigned short>(surface, idx, reverse_dims)); }
 
 
 // General math functions
@@ -102,19 +125,21 @@ template <typename T>
 __global__ void fill_surface(
     const T                     value,
     cudaSurfaceObject_t         surface,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims
 )
 {
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
-    write_to_surf3D(value, surface, idx);
+    write_to_surf3D(value, surface, idx, reverse_dims);
 }
 
 template <typename T> // type of the volumed data. E.g. half or float.
 __global__ void softmask_surface_to_cylinder_xy(
     const float                 relrad_start,
     cudaSurfaceObject_t         surface,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims
 )
 {
     const uint3 idx = get_vol_idx();
@@ -131,15 +156,16 @@ __global__ void softmask_surface_to_cylinder_xy(
     // Get the multiplier
     T multiplier = min(1.f, max(0.f, (1+cos(rrel * PI))/2.f));
     // Read the existing value, apply the multiplier and write it back
-    T value = read_from_surf3D<T>(surface, idx);
+    T value = read_from_surf3D<T>(surface, idx, reverse_dims);
     value *= multiplier;
-    write_to_surf3D(value, surface, idx);
+    write_to_surf3D(value, surface, idx, reverse_dims);
 }
 
 template <typename T> // type of the volumed data. E.g. half or float.
 __global__ void multiplicatively_invert_surface(
     cudaSurfaceObject_t         surface,
-    uint3                       surfaceDimensions,
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims,
     const bool                  ignore_zeros,
     const float                 eps  // used to replace zeros with small positive values.
 )
@@ -147,7 +173,7 @@ __global__ void multiplicatively_invert_surface(
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
     // Read the existing value
-    T value = read_from_surf3D<T>(surface, idx);
+    T value = read_from_surf3D<T>(surface, idx, reverse_dims);
     if (ignore_zeros && (value == (T)0)) { return; }
     // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
     // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
@@ -155,28 +181,30 @@ __global__ void multiplicatively_invert_surface(
         value = value + (T)(eps * exp(-(float)value/eps));
     }
     value = powint(value, -1);
-    write_to_surf3D(value, surface, idx);
+    write_to_surf3D(value, surface, idx, reverse_dims);
 }
 
 template <typename T>
 __global__ void multiply_surface(
     const T                     value,
     cudaSurfaceObject_t         surface,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims
 )
 {
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
-    T existing_value = read_from_surf3D<T>(surface, idx);
-    write_to_surf3D(value * existing_value, surface, idx);
+    T existing_value = read_from_surf3D<T>(surface, idx, reverse_dims);
+    write_to_surf3D(value * existing_value, surface, idx, reverse_dims);
 }
 
 template <typename T>  // type of both the surface and the output array
 __global__ void slice_nth_axis_to_3d_array(
         cudaSurfaceObject_t surf,
-        const unsigned int arr_shape_x,
+        const unsigned int arr_shape_x,  // shape after reversing dims, if applicable
         const unsigned int arr_shape_y,
         const unsigned int arr_shape_z,
+        const bool         reverse_dims,
         const unsigned int sl_start,
         const unsigned int sl_stop,
         const unsigned char axis_index_to_slice,
@@ -187,11 +215,7 @@ __global__ void slice_nth_axis_to_3d_array(
         T* output_array
 )
 {
-    uint3 idx = uint3({
-        threadIdx.x + blockDim.x * blockIdx.x,
-        threadIdx.y + blockDim.y * blockIdx.y,
-        threadIdx.z + blockDim.z * blockIdx.z
-    });
+    uint3 idx = get_vol_idx();
     if (idx.x >= arr_shape_x) { return; }
     if (idx.y >= arr_shape_y) { return; }
     if (idx.z >= arr_shape_z) { return; }
@@ -208,9 +232,9 @@ __global__ void slice_nth_axis_to_3d_array(
 
     T val;
     if (surf_is_layered) {
-        val = read_from_surf2DLayered<T>(surf, idx);
+        val = read_from_surf2DLayered<T>(surf, idx, reverse_dims);
     } else {
-        val = read_from_surf3D<T>(surf, idx);
+        val = read_from_surf3D<T>(surf, idx, reverse_dims);
     }
     output_array[
             (i*output_array_stride_x + j*output_array_stride_y + k*output_array_stride_z)/sizeof(T)
@@ -220,9 +244,10 @@ __global__ void slice_nth_axis_to_3d_array(
 template <typename T>  // type of both the surface and the output array
 __global__ void sum_along_nth_axis_to_2d_array(
         cudaSurfaceObject_t surf,
-        const unsigned int surf_shape_x,
+        const unsigned int surf_shape_x,  // shape after reversing dims, if applicable
         const unsigned int surf_shape_y,
         const unsigned int surf_shape_z,
+        const bool reverse_dims,
         const unsigned char axis_index_to_sum,
         const unsigned long output_array_stride_x,  // measured in bytes
         const unsigned long output_array_stride_y,
@@ -230,11 +255,7 @@ __global__ void sum_along_nth_axis_to_2d_array(
         T* output_array
 )
 {
-    uint3 idx = uint3({
-        threadIdx.x + blockDim.x * blockIdx.x,
-        threadIdx.y + blockDim.y * blockIdx.y,
-        threadIdx.z + blockDim.z * blockIdx.z
-    });
+    const uint3 idx = get_vol_idx();
     if (idx.x >= surf_shape_x) { return; }
     if (idx.y >= surf_shape_y) { return; }
     if (idx.z >= surf_shape_z) { return; }
@@ -250,9 +271,9 @@ __global__ void sum_along_nth_axis_to_2d_array(
 
     T val;
     if (surf_is_layered) {
-        val = read_from_surf2DLayered<T>(surf, idx);
+        val = read_from_surf2DLayered<T>(surf, idx, reverse_dims);
     } else {
-        val = read_from_surf3D<T>(surf, idx);
+        val = read_from_surf3D<T>(surf, idx, reverse_dims);
     }
     atomicAdd(&output_array[
             (iarr*output_array_stride_x + jarr*output_array_stride_y)/sizeof(T)
@@ -265,7 +286,8 @@ __global__ void inner_product_3D_surfaces(
     double*                     output,
     cudaSurfaceObject_t         surface1,
     cudaSurfaceObject_t         surface2,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims
 )
 {
     const uint3 idx = get_vol_idx();
@@ -276,7 +298,7 @@ __global__ void inner_product_3D_surfaces(
     }
     __syncthreads();
     if (!(out_of_max_bounds(idx, surfaceDimensions))) {
-        dotprod += (double)read_from_surf3D<T1>(surface1, idx) * (double)read_from_surf3D<T2>(surface2, idx);
+        dotprod += (double)read_from_surf3D<T1>(surface1, idx, reverse_dims) * (double)read_from_surf3D<T2>(surface2, idx, reverse_dims);
     }
     __syncthreads();
     if (is_block_leader) {
@@ -289,7 +311,8 @@ __global__ void multiply_surfaces(
     cudaSurfaceObject_t         surface1,
     cudaSurfaceObject_t         surface2,
     cudaSurfaceObject_t         surfaceOut,
-    uint3                       surfaceDimensions,
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims,
     const bool                  broadcast_surface2_over_z_axis
 )
 {
@@ -297,13 +320,13 @@ __global__ void multiply_surfaces(
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
     // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
     // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
-    TO val = read_from_surf3D<T1>(surface1, idx);
+    TO val = read_from_surf3D<T1>(surface1, idx, reverse_dims);
     if (broadcast_surface2_over_z_axis) {
-        val *= (TO)read_from_surf3D<T2>(surface2, uint3({idx.x, idx.y, 0}));
+        val *= (TO)read_from_surf3D<T2>(surface2, uint3({idx.x, idx.y, 0}), reverse_dims);
     } else {
-        val *= (TO)read_from_surf3D<T2>(surface2, idx);
+        val *= (TO)read_from_surf3D<T2>(surface2, idx, reverse_dims);
     }
-    write_to_surf3D(val, surfaceOut, idx);
+    write_to_surf3D(val, surfaceOut, idx, reverse_dims);
 }
 
 template <typename T1, typename T2, typename TO>
@@ -311,7 +334,8 @@ __global__ void divide_surfaces_softzero(
     cudaSurfaceObject_t         surface1,
     cudaSurfaceObject_t         surface2,
     cudaSurfaceObject_t         surfaceOut,
-    uint3                       surfaceDimensions,
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims,
     float                       eps
 )
 {
@@ -319,13 +343,13 @@ __global__ void divide_surfaces_softzero(
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
     // NOTE WARNING: shouldn't I be casting T1 to TO in a safer manner here...?
     // A simple typecast isn't enough to correctly convert between float16 and float/double, I think. I should use fcast<TO>(...), where fcast is in the backprojection code.
-    TO val = read_from_surf3D<T1>(surface1, idx);
-    TO val2 = read_from_surf3D<T2>(surface2, idx);
+    TO val = read_from_surf3D<T1>(surface1, idx, reverse_dims);
+    TO val2 = read_from_surf3D<T2>(surface2, idx, reverse_dims);
     if (eps > 0.f) {
         val2 = val2 + (TO)(eps*exp(-(float)val2/eps));
     }
     val2 = powint(val2, -1);
-    write_to_surf3D(val * val2, surfaceOut, idx);
+    write_to_surf3D(val * val2, surfaceOut, idx, reverse_dims);
 }
 
 template <typename T1, typename T2, typename TO>
@@ -333,12 +357,13 @@ __global__ void add_surfaces(
     cudaSurfaceObject_t         surface1,
     cudaSurfaceObject_t         surface2,
     cudaSurfaceObject_t         surfaceOut,
-    uint3                       surfaceDimensions
+    uint3                       surfaceDimensions,  // dimensions after reversing dims, if applicable
+    const bool                  reverse_dims
 )
 {
     const uint3 idx = get_vol_idx();
     if (out_of_max_bounds(idx, surfaceDimensions)) { return; }
-    TO val = read_from_surf3D<T1>(surface1, idx);
-    val += (TO)read_from_surf3D<T2>(surface2, idx);
-    write_to_surf3D(val, surfaceOut, idx);
+    TO val = read_from_surf3D<T1>(surface1, idx, reverse_dims);
+    val += (TO)read_from_surf3D<T2>(surface2, idx, reverse_dims);
+    write_to_surf3D(val, surfaceOut, idx, reverse_dims);
 }

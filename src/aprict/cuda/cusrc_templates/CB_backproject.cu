@@ -51,28 +51,46 @@ template<typename T>
 __device__ void write_to_surf3D(
     T                       value,
     cudaSurfaceObject_t     surface,
-    uivec3                  idx
+    uivec3                  idx,
+    const bool              reverse_dims
 )
-{ surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        surf3Dwrite(value, surface,  idx.x * sizeof(T), idx.y, idx.z);
+    } else {
+        surf3Dwrite(value, surface,  idx.z * sizeof(T), idx.y, idx.x);
+    }
+}
+
 template<>
 __device__ void write_to_surf3D<half>(
     half                    value,
     cudaSurfaceObject_t     surface,
-    uivec3                  idx
+    uivec3                  idx,
+    const bool              reverse_dims
 )
-{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx); }
+{ write_to_surf3D<unsigned short>(__half_as_ushort(value), surface, idx, reverse_dims); }
+
 template<typename T>
 __device__ T read_from_surf3D(
     cudaSurfaceObject_t     surface,
-    uivec3                  idx
+    uivec3                  idx,
+    const bool              reverse_dims
 )
-{ return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x); }
+{
+    if (reverse_dims) {
+        return surf3Dread<T>(surface, idx.x * sizeof(T), idx.y, idx.z);
+    }
+    return surf3Dread<T>(surface, idx.z * sizeof(T), idx.y, idx.x);
+}
+
 template<>
 __device__ half read_from_surf3D<half>(
     cudaSurfaceObject_t     surface,
-    uivec3                  idx
+    uivec3                  idx,
+    const bool              reverse_dims
 )
-{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx)); }
+{ return __ushort_as_half(read_from_surf3D<unsigned short>(surface, idx, reverse_dims)); }
 
 
 __device__ float exact_line_integral_backproject_linelen_unitvoxwid(
@@ -938,9 +956,12 @@ __global__ void backproject_CB_voltex(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const vol_tex_chunk_spec        voltexchunkspec,
         const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
+        const bool                      reverse_dims_vol,
         const cudaSurfaceObject_t       summand_multiplier_surface,  // if configured to do so, then the backprojection will be multiplied by the corresponding value in this multiplier before being added to the volume
+        const bool                      reverse_dims_summand,
         const proj_chunk_spec_maxlen10  proj_chunk_spec,
-        const cudaSurfaceObject_t       volume_surface_secondary
+        const cudaSurfaceObject_t       volume_surface_secondary,
+        const bool                      reverse_dims_vol_secondary
 )
 {
     // Get the position within the chunk
@@ -977,7 +998,7 @@ __global__ void backproject_CB_voltex(
     // Read the summand multiplier once, to save on reading for both output volumes.
     Tv summand_multiplier;
     if (config.apply_summand_multiplier) {
-        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_summand);
     } else {
         summand_multiplier = fcast<Tv>(1.f);
     }
@@ -989,8 +1010,8 @@ __global__ void backproject_CB_voltex(
     if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
         // Multiply by the multiplier, if applicable
         value *= summand_multiplier;
-        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
-        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
+        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_vol);
+        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_vol);
     }
 
     if (secondary_volume_expected) {
@@ -999,8 +1020,8 @@ __global__ void backproject_CB_voltex(
         if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
             // Multiply by the multiplier, if applicable
             value *= summand_multiplier;
-            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
-            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets, reverse_dims_vol_secondary);
+            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets, reverse_dims_vol_secondary);
         }
     }
 }
@@ -1013,9 +1034,12 @@ __global__ void backproject_CB_voltex_GBC_cyl(
         const config_CB_backproject     config,          // any miscellaneous config for the CB projection
         const vol_tex_chunk_spec        voltexchunkspec,
         const cudaSurfaceObject_t       volume_surface,  // CUDA surface object used to read and write to the volume
+        const bool                      reverse_dims_vol,
         const cudaSurfaceObject_t       summand_multiplier_surface,  // if configured to do so, then the backprojection will be multiplied by the corresponding value in this multiplier before being added to the volume
+        const bool                      reverse_dims_summand,
         const proj_chunk_spec_maxlen10  proj_chunk_spec,
-        const cudaSurfaceObject_t       volume_surface_secondary
+        const cudaSurfaceObject_t       volume_surface_secondary,
+        const bool                      reverse_dims_vol_secondary
 )
 {
     // Get the position within the chunk
@@ -1052,7 +1076,7 @@ __global__ void backproject_CB_voltex_GBC_cyl(
     // Read the summand multiplier once, to save on reading for both output volumes.
     Tv summand_multiplier;
     if (config.apply_summand_multiplier) {
-        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets);
+        summand_multiplier = read_from_surf3D<Tv>(summand_multiplier_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_summand);
     } else {
         summand_multiplier = fcast<Tv>(1.f);
     }
@@ -1064,8 +1088,8 @@ __global__ void backproject_CB_voltex_GBC_cyl(
     if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
         // Multiply by the multiplier, if applicable
         value *= summand_multiplier;
-        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets);
-        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets);
+        value += read_from_surf3D<Tv>(volume_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_vol);
+        write_to_surf3D<Tv>(value, volume_surface, vol_idx + voltexchunkspec.offsets, reverse_dims_vol);
     }
 
     if (secondary_volume_expected) {
@@ -1074,8 +1098,8 @@ __global__ void backproject_CB_voltex_GBC_cyl(
         if (!(value == (Tv)0)) {  // Generally not safe to typecast a number to the half type, but OK when 0.
             // Multiply by the multiplier, if applicable
             value *= summand_multiplier;
-            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
-            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets);
+            value += read_from_surf3D<Tv>(volume_surface_secondary, vol_idx + voltexchunkspec.offsets, reverse_dims_vol_secondary);
+            write_to_surf3D<Tv>(value, volume_surface_secondary, vol_idx + voltexchunkspec.offsets, reverse_dims_vol_secondary);
         }
     }
 }

@@ -139,7 +139,8 @@ def fill(t: Texture, value: float) -> None:
         raise ValueError(msg)
 
     val = np.array(value).astype(t.dtype)  # convert to the correct datatype
-    args = (val, t.surfobj, _shape_to_uint3(t.shape))
+    reverse_dims = t.order == "F"
+    args = (val, t.surfobj, _shape_to_uint3(t.shape), np.bool(reverse_dims))
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -158,7 +159,8 @@ def multiply(t: Texture, value: float) -> None:
         raise ValueError(msg)
 
     val = np.array(value).astype(t.dtype)  # convert to the correct datatype
-    args = (val, t.surfobj, _shape_to_uint3(t.shape))
+    reverse_dims = t.order == "F"
+    args = (val, t.surfobj, _shape_to_uint3(t.shape), reverse_dims)
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -176,8 +178,19 @@ def inner_prod(t1: Texture, t2: Texture) -> float:
         msg = "Shape mismatch between input textures."
         raise ValueError(msg)
 
+    if t1.order != t2.order:
+        msg = "Mismatch in memory-ordering of the two input textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
     output = cp.array([0], dtype=cp.float64)
-    args = (output, t1.surfobj, t2.surfobj, _shape_to_uint3(t1.shape))
+    reverse_dims = t1.order == "F"
+    args = (
+        output,
+        t1.surfobj,
+        t2.surfobj,
+        _shape_to_uint3(t1.shape),
+        np.bool(reverse_dims),
+    )
     ctype1 = _get_c_type_name(t1)
     ctype2 = _get_c_type_name(t2)
     kern = _module.get_function(
@@ -213,17 +226,27 @@ def multiply_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
         msg = "Input textures do not have matching shape. t2 can be of length 1 in the z axis."
         raise ValueError(msg)
 
+    if t1.order != t2.order:
+        msg = "Mismatch in memory-ordering of the two input textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
+    if t1.order != tout.order:
+        msg = "Mismatch in memory-ordering of the input and output textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
     ctypes = list(map(_get_c_type_name, (t1, t2, tout)))
     kern = _module.get_function(
         f"multiply_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
     broadcast_t2_over_t1 = (t1.shape[2] != 1) and (t2.shape[2] == 1)
+    reverse_dims = t1.order == "F"
     args = (
         t1.surfobj,
         t2.surfobj,
         tout.surfobj,
         _shape_to_uint3(t1.shape),
+        np.bool(reverse_dims),
         np.bool(broadcast_t2_over_t1),
     )
     kern(*_get_grid_block_dims(t1), args)
@@ -249,16 +272,26 @@ def divide_textures_softzero(
         msg = "Input textures do not have matching shape."
         raise ValueError(msg)
 
+    if t1.order != t2.order:
+        msg = "Mismatch in memory-ordering of the two input textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
+    if t1.order != tout.order:
+        msg = "Mismatch in memory-ordering of the input and output textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
     ctypes = list(map(_get_c_type_name, (t1, t2, tout)))
     kern = _module.get_function(
         f"divide_surfaces_softzero<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
+    reverse_dims = t1.order == "F"
     args = (
         t1.surfobj,
         t2.surfobj,
         tout.surfobj,
         _shape_to_uint3(t1.shape),
+        np.bool(reverse_dims),
         np.float32(eps),
     )
     kern(*_get_grid_block_dims(t1), args)
@@ -287,12 +320,27 @@ def add_textures(t1: Texture, t2: Texture, tout: Texture) -> None:
         msg = "Input textures do not have matching shape."
         raise ValueError(msg)
 
+    if t1.order != t2.order:
+        msg = "Mismatch in memory-ordering of the two input textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
+    if t1.order != tout.order:
+        msg = "Mismatch in memory-ordering of the input and output textures. They should both be order='C' or both be order='F'."
+        raise ValueError(msg)
+
     ctypes = list(map(_get_c_type_name, (t1, t2, tout)))
     kern = _module.get_function(
         f"add_surfaces<{ctypes[0]:s},{ctypes[1]:s},{ctypes[2]:s}>"
     )
 
-    args = (t1.surfobj, t2.surfobj, tout.surfobj, _shape_to_uint3(t1.shape))
+    reverse_dims = t1.order == "F"
+    args = (
+        t1.surfobj,
+        t2.surfobj,
+        tout.surfobj,
+        _shape_to_uint3(t1.shape),
+        np.bool(reverse_dims),
+    )
     kern(*_get_grid_block_dims(t1), args)
 
 
@@ -315,7 +363,14 @@ def invert(
         raise ValueError(msg)
 
     eps = np.float32(softmax_epsilon or 0)
-    args = (t.surfobj, _shape_to_uint3(t.shape), np.bool(ignore_zeros), eps)
+    reverse_dims = t.order == "F"
+    args = (
+        t.surfobj,
+        _shape_to_uint3(t.shape),
+        np.bool(reverse_dims),
+        np.bool(ignore_zeros),
+        eps,
+    )
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -336,7 +391,13 @@ def softmask_to_cylinder_xy(t: Texture, relrad_start: float) -> None:
         raise ValueError(msg)
 
     rr_start = np.float32(relrad_start)  # convert to the correct datatype
-    args = (rr_start, t.surfobj, _shape_to_uint3(t.shape))
+    reverse_dims = t.order == "F"
+    args = (
+        rr_start,
+        t.surfobj,
+        _shape_to_uint3(t.shape),
+        np.bool(reverse_dims),
+    )
     kern(*_get_grid_block_dims(t), args)
 
 
@@ -410,9 +471,11 @@ def slice_nth_axis_to_3d_cupy_array(  # ruff: ignore[complex-structure]
     )
     block_dims = (BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z)
 
+    reverse_dims = t.order == "F"
     args = (
         t.surfobj,
         *(np.uint32(l) for l in out_shape),
+        np.bool(reverse_dims),
         np.uint32(sl_start),
         np.uint32(sl_stop),
         np.uint8(axis),
@@ -487,9 +550,11 @@ def sum_along_nth_axis_to_2d_cupy_array(  # ruff: ignore[complex-structure]
     )
     block_dims = (BLOCKDIM_X, BLOCKDIM_Y, BLOCKDIM_Z)
 
+    reverse_dims = t.order == "F"
     args = (
         t.surfobj,
         *(np.uint32(l) for l in t.shape),
+        np.bool(reverse_dims),
         np.uint8(axis),
         *(np.uint64(l) for l in out.strides),
         np.bool_(t.is_flagset_layered),

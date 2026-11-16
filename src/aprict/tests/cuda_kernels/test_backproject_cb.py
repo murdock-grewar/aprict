@@ -19,6 +19,7 @@
 import itertools  # ruff: ignore[unsorted-imports]
 import time  # ruff: ignore[unused-import]
 
+import typing
 import cupy as cp
 import numpy as np
 import pytest
@@ -81,22 +82,29 @@ def kern_BP_voltex():  # ruff: ignore[invalid-function-name]
 
 
 @pytest.mark.parametrize(
-    argnames=["volres", "numprojs", "use_voltex", "blockdims", "exact"],
+    argnames=[
+        "volres",
+        "numprojs",
+        "use_voltex",
+        "blockdims",
+        "order",
+        "exact",
+    ],
     argvalues=[
-        (420, 20, False, [8, 8, 8], True),
-        (640, 20, False, [8, 8, 8], False),
-        (640, 40, False, [8, 8, 8], False),
-        (420, 20, True, [8, 8, 8], True),
-        (640, 20, True, [8, 8, 8], False),
-        (640, 40, True, [8, 8, 8], False),
+        (420, 20, False, [8, 8, 8], "C", True),
+        (640, 20, False, [8, 8, 8], "F", False),
+        (640, 40, False, [8, 8, 8], "C", False),
+        (420, 20, True, [8, 8, 8], "F", True),
+        (640, 20, True, [8, 8, 8], "C", False),
+        (640, 40, True, [8, 8, 8], "F", False),
     ],
     ids=[
-        "BP_mem_420-20",
-        "BP_mem_840-20-fast",
-        "BP_mem_840-40-fast",
-        "BP_tex_420-20",
-        "BP_tex_840-20-fast",
-        "BP_tex_840-40-fast",
+        "BP_mem_420-20-C",
+        "BP_mem_840-20-F-fast",
+        "BP_mem_840-40-C-fast",
+        "BP_tex_420-20-F",
+        "BP_tex_840-20-C-fast",
+        "BP_tex_840-40-F-fast",
     ],
     scope="class",
 )
@@ -108,6 +116,7 @@ class TestCB_BACKPROJ_randomnoise:
         numprojs: int,
         use_voltex: bool,
         blockdims: list[int | None],
+        order: typing.Literal["C", "F"],
         exact: bool,
         request,  # ruff: ignore[missing-type-function-argument]
     ):
@@ -196,7 +205,7 @@ class TestCB_BACKPROJ_randomnoise:
             self.input_projs.strides, dtype=ks_uivec3.dtype
         )
         self.vol: cp.ndarray = cp.zeros(
-            (volres, volres, volres), dtype=cp.float32
+            (volres, volres, volres), dtype=cp.float32, order=order
         )
         if self.usevoltex:
             self.vtex = texture_tools.Texture(
@@ -206,6 +215,7 @@ class TestCB_BACKPROJ_randomnoise:
                 include_surface=True,
                 include_texture=True,
                 layered=False,
+                order=order,
             )
             self.dtex = texture_tools.Texture(
                 self.input_projs,
@@ -225,7 +235,7 @@ class TestCB_BACKPROJ_randomnoise:
 
         # Copy the data out of the texture
         if self.usevoltex:
-            self.vtex.cuda_array.copy_to(self.vol)  # ty:ignore[unresolved-attribute]
+            self.vtex.copy_to(self.vol)  # ty:ignore[unresolved-attribute]
         # Plot, if desired
         # imview.plot_volume(self.vol, title=test_id)
         # Clean up the used memory. This indeed seems to be necessary, as pytest doesn't do it automatically for some reason
@@ -236,7 +246,7 @@ class TestCB_BACKPROJ_randomnoise:
         del self.projspec_array
         # Reset the texture memory to 0s
         # self.vol.fill(0)
-        # self.vtex.cuda_array.copy_from(self.vol)
+        # self.vtex.copy_from(self.vol)
         # gpu_tools.clear_cache()
 
     # @pytest.mark.parametrize(
@@ -336,13 +346,17 @@ class TestCB_BACKPROJ_randomnoise:
                 dtype=ks_proj_chunk_spec_maxlen10,
             )
             if self.usevoltex:
+                assert self.vtex is not None
                 args = (  # input args
                     config,
                     texchunkspec,
-                    self.vtex.surfobj,  # ty:ignore[unresolved-attribute]
+                    self.vtex.surfobj,
+                    np.bool(self.vtex.order == "F"),
                     None,  # the summand_multiplier surface. For these tests, the config is set not to use it.
+                    None,
                     input_proj_chunk_spec,
                     None,  # the secondary volume, not used in this unit test
+                    None,
                 )
             else:
                 args = (  # input args

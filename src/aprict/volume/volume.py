@@ -57,6 +57,7 @@ class Volume[
     # Used to store the TypeVars which are inferred from the input.
     _shape: _ShapeType
     _dtype: _DType
+    _order: typing.Literal["C", "F"]
 
     # Other fields
     _texture: texture_tools.Texture
@@ -107,14 +108,18 @@ class Volume[
         pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
         | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
         initialize_texture: bool = True,
+        order: typing.Literal["C", "F"] = "C",
     ) -> None:
         # Essentially, we are storing the resolved types of the TypeVars
         self._dtype = arr.dtype
         self._shape = arr.shape
+        self._order = order
         # Create the texture and load the data
         if initialize_texture:
             self._texture = self._new_texture(
-                shape=self._shape, dtype=self._dtype
+                shape=self._shape,
+                dtype=self._dtype,
+                order=self._order,
             )
         self._voxwid = voxwid
         self._pos_c = np.array(pos_c)
@@ -169,13 +174,14 @@ class Volume[
             msg = "Input array should be 2-dimensional and match the shape[:2] of this volume."
             raise ValueError(msg)
         xygrid_tex3d = texture_tools.Texture(
-            xygrid_[:, :, cp.newaxis],
+            xygrid_[:, :, cp.newaxis].copy(order=self._order),
             address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
             filter_mode=texture_tools.FilterMode.cudaFilterModePoint,
             layered=False,
             normalise_coordinates=False,
             include_texture=True,
             include_surface=True,
+            order=self._order,
         )
         tops.multiply_textures(
             t1=self._texture,
@@ -198,24 +204,38 @@ class Volume[
     ) -> np.ndarray:
         """Copy this volume's data into a numpy array."""
         # Note: the option 'allow_indirect_copy' allows a fast-but-not-fastest copy when the output array is not C-contiguous.
-        if out is not None and not out.flags["C_CONTIGUOUS"]:
-            # The output volume is not C contiguous. A copy cannot be performed unless
-            # allow_indirect_copy=True is supplied.
-            if not allow_indirect_copy:
-                msg = "The array supplied to the out=... keyword is not C contiguous. The data cannot be copied directly, and indirect copying must be explicitly allowed via allow_indirect_copy=True."
-                raise ValueError(msg)
-            out_ = self.as_numpy(out=None)
-            ne_tools.fastcopy(src=out_, dst=out)
-            gpu_tools.clear_pinned_cache()
-            return out
+        if out is not None:
+            c_contig, f_contig = (
+                out.flags["C_CONTIGUOUS"],
+                out.flags["F_CONTIGUOUS"],
+            )
+            if self._texture.order == "C" and not c_contig:
+                # The output volume is not C contiguous. A copy cannot be performed unless
+                # allow_indirect_copy=True is supplied.
+                if not allow_indirect_copy:
+                    msg = "The array supplied to the out=... keyword is not C-contiguous. The data cannot be copied directly, and indirect copying must be explicitly allowed via allow_indirect_copy=True."
+                out_ = self.as_numpy(out=None)
+                ne_tools.fastcopy(src=out_, dst=out)
+                gpu_tools.clear_pinned_cache()
+                return out
+            if self._texture.order == "F" and not f_contig:
+                # The output volume is not F contiguous. A copy cannot be performed unless
+                # allow_indirect_copy=True is supplied.
+                if not allow_indirect_copy:
+                    msg = "The array supplied to the out=... keyword is not F-contiguous. The data cannot be copied directly, and indirect copying must be explicitly allowed via allow_indirect_copy=True."
+                    raise ValueError(msg)
+                out_ = self.as_numpy(out=None)
+                ne_tools.fastcopy(src=out_, dst=out)
+                gpu_tools.clear_pinned_cache()
+                return out
         x = (
             out
             if out is not None
-            else cupyx.empty_pinned(self._shape, dtype=self._dtype)
+            else cupyx.empty_pinned(
+                self._shape, dtype=self._dtype, order=self._texture.order
+            )
         )
-        self._texture.cuda_array.copy_to(
-            x
-        )  # Warning: this copies asynchronously!
+        self._texture.copy_to(x)  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
         return x
 
@@ -229,11 +249,11 @@ class Volume[
         x = (
             out
             if out is not None
-            else cp.empty(self._shape, dtype=self._dtype)
+            else cp.empty(
+                self._shape, dtype=self._dtype, order=self._texture.order
+            )
         )
-        self._texture.cuda_array.copy_to(
-            x
-        )  # Warning: this copies asynchronously!
+        self._texture.copy_to(x)  # Warning: this copies asynchronously!
         cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
         return x
 
@@ -255,7 +275,9 @@ class Volume[
         )
 
     @classmethod
-    def _new_texture(cls, shape: Shape, dtype: DType) -> texture_tools.Texture:
+    def _new_texture(
+        cls, shape: Shape, dtype: DType, order: typing.Literal["C", "F"]
+    ) -> texture_tools.Texture:
         return texture_tools.Texture(
             (dtype, shape),
             address_mode=texture_tools.AddressMode.cudaAddressModeBorder,
@@ -264,6 +286,7 @@ class Volume[
             normalise_coordinates=False,
             include_texture=True,
             include_surface=True,
+            order=order,
         )
 
     @classmethod
@@ -276,6 +299,7 @@ class Volume[
         pos_c: np.ndarray[tuple[typing.Literal[3]], np.dtype[np.float32]]
         | tuple[float, float, float] = np.array((0, 0, 0), dtype=np.float32),
         initialize_texture: bool = True,  # provided as a way to create a dummy volume, so we may inspect things like its geometries properties, bounding box, etc, without allocating room on the GPU
+        order: typing.Literal["C", "F"] = "C",
     ) -> Volume:
         """Initialise a new volume, filled with zeros. (Supply initialize_texture=False for a dummy volume.)"""  # ruff: ignore[missing-trailing-period]
         if type(shape) is not tuple or len(shape) != 3:
@@ -286,10 +310,12 @@ class Volume[
         self._dtype = np.dtype(dtype)
         self._shape = shape
         self._pos_c = np.array(pos_c)
+        self._order = order
         if initialize_texture:
             self._texture = self._new_texture(
                 shape=self._shape,  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.,
                 dtype=self._dtype,  # ty: ignore[invalid-argument-type]  # ty might be correct about this being a typing error; I'm not sure.
+                order=self._order,
             )
             self.fill(0)
         return self
@@ -301,25 +327,36 @@ class Volume[
             voxwid=self._voxwid,
             dtype=self._dtype,
             pos_c=self.pos_c,
+            order=self._order,
         )
 
     def fill(self, value: int | float) -> None:
         """Fill the volume with a constant value."""
         tops.fill(self._texture, value)
 
-    def copy_from(self, arr: np.ndarray[Shape, DType]) -> None:
+    def copy_from(
+        self,
+        arr: np.ndarray[Shape, DType]
+        | cp.ndarray[Shape, DType]
+        | np.memmap[Shape, DType],
+        block: bool = True,
+    ) -> None:
         """Copy a numpy/cupy array into this Volume object."""
-        self._texture.cuda_array.copy_from(
-            arr
-        )  # Warning: this copies asynchronously!
-        cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
+        self._texture.copy_from(arr)  # Warning: this copies asynchronously!
+        if block:
+            cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
 
-    def copy_to(self, arr: np.ndarray[Shape, DType]) -> None:
+    def copy_to(
+        self,
+        arr: np.ndarray[Shape, DType]
+        | cp.ndarray[Shape, DType]
+        | np.memmap[Shape, DType],
+        block: bool = True,
+    ) -> None:
         """Copy this Volume into a numpy/cupy array."""
-        self._texture.cuda_array.copy_to(
-            arr
-        )  # Warning: this copies asynchronously!
-        cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
+        self._texture.copy_to(arr)  # Warning: this copies asynchronously!
+        if block:
+            cp.cuda.get_current_stream().synchronize()  # This SHOULD NOT BE NECESSARY when on the null stream, but it is. CuPy may be bugged, or I am misunderstanding something.
 
     def soften_to_xy_cylinder(
         self,
@@ -559,7 +596,6 @@ class FBVolume:
         return s
 
     def translate(self, axis: int | str, amount: float) -> None:
-        """Translate the phantom along the given axis, by the given amount."""
         """Translate the phantom along the given axis, by the given amount."""
         self.shapes = np.array(
             [

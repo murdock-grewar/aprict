@@ -784,6 +784,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
         pos_c=args.volpos,
         initialize_texture=False,  # just a dummy volume. Don't try to allocate room on the GPU for it.
+        order="F",
     )
     (
         _pg,
@@ -901,6 +902,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 voxwid=args.voxwid,
                 dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
                 pos_c=volpos,
+                order="F",
             )
         )
         return (slz, vol)
@@ -994,10 +996,14 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         assert path_output is not None  # ensured by validate_args(...)
         savepath = path_output.joinpath("recon" + ".npy")
         vol_np = np.lib.format.open_memmap(
-            savepath, shape=volshape, dtype=vol_dtype, mode="w+"
+            savepath,
+            shape=volshape,
+            dtype=vol_dtype,
+            mode="w+",
+            fortran_order=True,
         )
     else:
-        vol_np = np.empty(volshape, dtype=vol_dtype)
+        vol_np = np.empty(volshape, dtype=vol_dtype, order="F")
     lib.ne_tools.set_array_to_constant_pbar(
         vol_np,
         const=0,
@@ -1221,9 +1227,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 logger.debug(msg)
                 if vol is not None:
                     # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    vol.as_numpy(
-                        out=vol_np[..., sl_vol], allow_indirect_copy=True
-                    )
+                    vol.copy_to(vol_np[..., sl_vol], block=True)
                     del vol
                     lib.gpu_tools.clear_cache()
             else:

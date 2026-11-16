@@ -810,6 +810,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 voxwid=args.voxwid,
                 dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
                 pos_c=volpos,
+                order="F",
             )
         )
         minivol = (
@@ -820,6 +821,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 voxwid=args.voxwid * args.n,
                 dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
                 pos_c=volpos_mini,
+                order="F",
             )
         )
         vol_weightsum = (
@@ -830,6 +832,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 voxwid=args.voxwid,
                 dtype=vol_dtype,  # ty:ignore[invalid-argument-type]
                 pos_c=volpos,
+                order="F",
             )
         )
         minivol_weightsum = (
@@ -840,6 +843,7 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 voxwid=args.voxwid * args.n,
                 dtype=vol_dtype,  # ty: ignore[invalid-argument-type]
                 pos_c=volpos_mini,
+                order="F",
             )
         )
         return (
@@ -961,15 +965,23 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
         # These are temporary arrays which may be overwritten during filtration.
         savepath = path_output.joinpath("tmp_backproj" + ".npy")
         vol_np = np.lib.format.open_memmap(
-            savepath, shape=padded_volshape, dtype=vol_dtype, mode="w+"
+            savepath,
+            shape=padded_volshape,
+            dtype=vol_dtype,
+            mode="w+",
+            fortran_order=True,
         )
         savepath = path_output.joinpath("tmp_backproj" + "_mini" + ".npy")
         volmini_np = np.lib.format.open_memmap(
-            savepath, shape=padded_volshape_mini, dtype=vol_dtype, mode="w+"
+            savepath,
+            shape=padded_volshape_mini,
+            dtype=vol_dtype,
+            mode="w+",
+            fortran_order=True,
         )
     else:
-        vol_np = np.empty(padded_volshape, dtype=vol_dtype)
-        volmini_np = np.empty(padded_volshape_mini, dtype=vol_dtype)
+        vol_np = np.empty(padded_volshape, dtype=vol_dtype, order="F")
+        volmini_np = np.empty(padded_volshape_mini, dtype=vol_dtype, order="F")
     lib.ne_tools.set_array_to_constant_pbar(
         vol_np,
         const=0,
@@ -1209,18 +1221,12 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
                 msg = "Transferring backprojected volume chunk from GPU..."
                 logger.debug(msg)
                 # Copy minivol.
-                # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                minivol.as_numpy(
-                    out=volmini_np[..., sl_minivol], allow_indirect_copy=True
-                )
+                minivol.copy_to(volmini_np[..., sl_minivol], block=True)
                 del minivol
                 lib.gpu_tools.clear_cache()
                 # Copy vol.
                 if vol is not None:
-                    # Not efficient. Can't copy from CUDAArray directly to the chunk because it's not C-contiguous.
-                    vol.as_numpy(
-                        out=vol_np[..., sl_vol], allow_indirect_copy=True
-                    )
+                    vol.copy_to(vol_np[..., sl_vol], block=True)
                     del vol
                     lib.gpu_tools.clear_cache()
 

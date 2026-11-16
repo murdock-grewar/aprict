@@ -18,6 +18,7 @@
 import enum
 import itertools
 import math
+import typing
 
 import cupy as cp
 import numpy as np
@@ -95,6 +96,7 @@ class Texture:
     shape: tuple[int, int] | tuple[int, int, int]
     nbytes: int
     dtype: np.dtype
+    order: typing.Literal["C", "F"]
 
     @property
     def is_flagset_layered(self) -> bool:
@@ -151,6 +153,7 @@ class Texture:
         normalise_coordinates: bool = False,
         include_texture: bool = True,
         include_surface: bool = True,
+        order: str | None = None,  # None, 'C' or 'F'
     ) -> None:
 
         # Validate that a proper address_mode has been passed
@@ -182,6 +185,11 @@ class Texture:
             msg = "Unknown type for address_mode. Either pass an AddressMode, or a tuple of them."
             raise TypeError(msg)
 
+        if order is not None:
+            if order not in ("C", "F"):
+                msg = f"Invalid value for order: '{order}'. Use either None, 'C' or 'F'."
+                raise ValueError(msg)
+
         # Get the dtype and shape. These are needed immediately, for argument validation.
         dtype: cp.dtype
         shape: tuple[int, int] | tuple[int, int, int]
@@ -189,6 +197,7 @@ class Texture:
         if type(arraylike_or_dtypeshapetuple) is tuple:
             tup = arraylike_or_dtypeshapetuple
             dtype, shape = cp.dtype(tup[0]), tup[1]
+            order = order or "C"  # null-coalesce to default choice of 'C'
         elif type(arraylike_or_dtypeshapetuple) in (
             np.ndarray,
             np.memmap,
@@ -196,6 +205,22 @@ class Texture:
         ):
             arr = arraylike_or_dtypeshapetuple
             dtype, shape = cp.dtype(arr.dtype), arr.shape  # ty:ignore[unresolved-attribute]
+            c_contig, f_contig = (
+                arr.flags["C_CONTIGUOUS"],  # ty: ignore[unresolved-attribute]  # ty seems to be bugged here
+                arr.flags["F_CONTIGUOUS"],  # ty: ignore[unresolved-attribute]  # ty seems to be bugged here
+            )
+            if not (c_contig or f_contig):
+                msg = "Input array is neither C-contiguous nor F-contiguous. Please pass an input array that is one or the other."
+                raise ValueError(msg)
+            # Check mismatch between input order= keyword and actual memory layout of input array.
+            if order is None:
+                order = "C" if c_contig else "F"
+            elif order == "C" and not c_contig:
+                msg = "Input array is not C-contiguous, but input keyword says order='C'."
+                raise ValueError(msg)
+            elif order == "F" and not f_contig:
+                msg = "Input array is not F-contiguous, but input keyword says order='F'."
+                raise ValueError(msg)
         elif type(arraylike_or_dtypeshapetuple) is cp.cuda.texture.CUDAarray:
             raise NotImplementedError()
             shape = (
@@ -203,6 +228,7 @@ class Texture:
                 arraylike_or_dtypeshapetuple.height,
                 arraylike_or_dtypeshapetuple.width,
             )
+            order = order or "C"  # null-coalesce to default choice of 'C'
         else:
             msg = f"Unknown type for the arraylike_or_shape input: '{type(arraylike_or_dtypeshapetuple)!s}'."
             raise TypeError(msg)
@@ -244,6 +270,9 @@ class Texture:
             if len(shape) == 2
             else tuple(reversed(shape))
         )
+        if order == "F":
+            cuda_shape = tuple(reversed(cuda_shape))  # ty: ignore[invalid-assignment]
+
         # ---- Flags ----
         # From the CUDA toolkit documentation: https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__MEMORY.html
         #     The flags parameter enables different options to be specified that affect the allocation, as follows.
@@ -314,7 +343,14 @@ class Texture:
             np.memmap,
             cp.ndarray,
         ):
-            cuda_arr.copy_from(arraylike_or_dtypeshapetuple)
+            arr = arraylike_or_dtypeshapetuple
+            if order == "C":
+                cuda_arr.copy_from(arr)
+            else:
+                # Flip the axis order of the array to make it C-contiguous, then copy into the CUDAArray.
+                cuda_arr.copy_from(
+                    arr.transpose(tuple(reversed(range(arr.ndim))))  # ty: ignore[unresolved-attribute]  # ty seems to be bugged here
+                )
         elif type(arraylike_or_dtypeshapetuple) is tuple:
             pass
         else:
@@ -329,3 +365,30 @@ class Texture:
         self.cuda_array = cuda_arr
         self.shape = shape
         self.dtype = dtype
+        self.order = order
+
+    def copy_to(
+        self,
+        arr: np.ndarray | np.memmap | cp.ndarray,
+        stream: cp.cuda.Stream | None = None,
+    ) -> None:
+        """Copy the underlying CUDAarray to an array-like object."""
+        arr_ = (
+            arr
+            if self.order == "C"
+            else arr.transpose(tuple(reversed(range(arr.ndim))))
+        )
+        return self.cuda_array.copy_to(arr_, stream=stream)
+
+    def copy_from(
+        self,
+        arr: np.ndarray | np.memmap | cp.ndarray,
+        stream: cp.cuda.Stream | None = None,
+    ) -> None:
+        """Copy the data from an array-like object to the underlying CUDAarray."""
+        arr_ = (
+            arr
+            if self.order == "C"
+            else arr.transpose(tuple(reversed(range(arr.ndim))))
+        )
+        return self.cuda_array.copy_from(arr_, stream=stream)
