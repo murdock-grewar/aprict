@@ -10,3 +10,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# ptx file generated for testing-- don't need to retain
+src/aprict/data/ptx/module_get_struct_layout_Config_Sum.ptx
