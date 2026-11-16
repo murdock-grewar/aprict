@@ -28,6 +28,7 @@ from .project_cbfp import main as main_project_cbfp
 from .recon_cbfp_cyl_fbp import Alg as fbp_Alg
 from .recon_cbfp_cyl_fbp import main as main_fbp
 from .recon_cbfp_cyl_gbc import main as main_gbc
+from .view_pyqt import main as main_view_pyqt
 
 _progdesc: str = f"Entry point for CLI interface to aprict version {version}"
 
@@ -62,6 +63,7 @@ def view() -> None:  # ruff: ignore[undocumented-public-function]
 
 main.add_command(view)
 view.add_command(cmd=main_neuroglance, name="neuroglance")
+view.add_command(cmd=main_view_pyqt, name="pyqt")
 
 
 @ce.group(

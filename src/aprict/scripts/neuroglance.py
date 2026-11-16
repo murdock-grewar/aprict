@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Script to display a 3D numpy array on disk in neuroglancer."""
+"""Script to display a 3D array using neuroglancer."""
 
 import pathlib
 
