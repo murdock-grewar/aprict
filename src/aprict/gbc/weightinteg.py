@@ -24,26 +24,27 @@ from ..cb import flatpanel as cbfp
 def backproj_gbc_weight_integ_GPU(  # ruff: ignore[invalid-function-name]
     r_on_R: np.ndarray,  # should be a 1D nonnegative and monotonically increasing array # ruff: ignore[invalid-argument-name]
     config: cbfp.ConfigBackproject,
-    num_ang_samps: int,
     num_z_samps: int,
+    num_ang_samps: int,
 ) -> np.ndarray:
     """Integrate the weight*softening over the cylindrical source locus."""
     if r_on_R.ndim != 1:
         msg = "r_on_R should be a 1-dimensional array."
         raise ValueError(msg)
+
     kern = cbfp._backprojection_module.get_function("get_GBC_weight_integ")  # ruff: ignore[private-member-access]
     input_r_on_R_arr = cp.array(r_on_R.astype(np.float32))  # ruff: ignore[non-lowercase-variable-in-function]
     input_r_on_R_arr_len = np.uint32(len(r_on_R))  # ruff: ignore[non-lowercase-variable-in-function]
     input_output_arr = cp.zeros_like(input_r_on_R_arr)
-    input_num_ang_samps = np.uint32(num_ang_samps)
     input_num_z_samps = np.uint32(num_z_samps)
+    input_num_ang_samps = np.uint32(num_ang_samps)
     input_config = config.contents
     args = (
         input_r_on_R_arr,
         input_r_on_R_arr_len,
         input_output_arr,
-        input_num_ang_samps,
         input_num_z_samps,
+        input_num_ang_samps,
         input_config,
     )
 
@@ -63,8 +64,8 @@ def backproj_gbc_weight_integ_xygrid_GPU(  # ruff: ignore[invalid-function-name]
     ys: np.ndarray,
     R: float,  # ruff: ignore[invalid-argument-name]
     config: cbfp.ConfigBackproject,
-    num_ang_samps: int = 600,
-    num_z_samps: int = 600,
+    num_z_samps: int = 6000,
+    num_ang_samps: int = 6000,
 ) -> np.ndarray:
     """Return a 2D array giving the integrated weights over an xy meshgrid."""
     relRarr = (  # ruff: ignore[non-lowercase-variable-in-function]
@@ -79,9 +80,10 @@ def backproj_gbc_weight_integ_xygrid_GPU(  # ruff: ignore[invalid-function-name]
     weight_integ = backproj_gbc_weight_integ_GPU(
         r_on_R_input,
         config,
-        num_ang_samps,
         num_z_samps,
+        num_ang_samps,
     )
+    # 1D linear interpolation
     return np.interp(
         relRarr,
         r_on_R_input,
