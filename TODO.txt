@@ -14,23 +14,7 @@ TODO for 0.2.0:
    - [ ] investigate cause of bugs when asynchronicity is enabled. A reproducible example will have to be found. Suspects:
      - nested `with cp.cuda.Stream(...)` contexts may not work properly
      - quirky interaction between numexpr and cupy 
+ - [ ] Allow block=False in the projection script
+ - [ ] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections.
+ - [ ] Add PDF images of geometry encoding and/or special geometries in the docs.
 
-TODO for 0.1.0:
- - [w] Unload one chunk from GPU while the next is being computed -- this can now be done because of the change to Fortran order in the reconstruction scripts. This enables direct and asychronous copying from the GPU. However, simultaneously backprojecting while the previous chunk is being copied will take up more VRAM. The direct copy is fast enough, and VRAM limited enough, that I don't think it would be desirable to implement this. It's better to save the VRAM and take just a little more time to reconstruct, I think. There might be some special edge cases where we want to backproject into many tiny volumes, in which case it could be worth revisiting this.
- - [x] Document status of non-square pixel support
- - [d] Allow block=False in the projection script -- this is not as straightforward as I had imagined.
- - [x] Chunk the FBP script
- - [x] Add --memmap-vols option to FBP script
- - [x] Add --memmap-vols option to GBC script -- I may not figure out a good way to perform FFTs on disk. For now, I have mentioned in README.md that a swapfile can be used to emulate additional RAM. This is suitable for using GBC on large volumes.
- - [x] Speed up GBC precomputations, maybe with GPU -- done with GPU now
- - [x] Optimise case of 1 chunk for -- already copies directly to output array?
-   - [x] GBC 
-   - [x] FBP
- - [x] Check that all methods are performant on my home PC.
-   - [x] GBC, rock  -- can't do full-size recon, but the small recon works
-   - [x] FBP, rock
-   - [x] GBC, LDS
-   - [x] FBP, LDS
- - [d] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections. -- deferred due to low priority. The scripts already skip projection chunks which don't intersect the volume. Also, the CUDA thread blocks not intersecting the backprojections should be returning quickly anyway. Implementing this point might squeeze some more performance for cases where parts of the volume don't receive backprojections at all. In that case, the time spent transferring data to/from the GPU could be reduced. But this would probably be minor.
-  - [d] Document the expected memory layout of projections and volumes in the cbfp submodule. E.g. include PDFs illustrating the du, dv vectors for the projection. Explain the indexing. -- partially accomplished; no figures included but described in words and with examples.
-  - [x] Add `aprict view` subcommand tree.
