@@ -10,4 +10,10 @@ pdoc \
     --favicon /img/logo_pic.svg \
     --footer-text "Copyright © 2026 Murdock Grewar. Licensed under GPLv3+." \
     ./src/aprict/ ./src/aprict/examples/ ./src/aprict/phantoms/FORBILD_phantoms.py
+
+# Copy in the images referenced by the documentation
 cp -r img docs/
+
+# Generate additional data referenced by the documentation
+mkdir docs/res/
+uv run aprict --tree > docs/res/aprict-tree.txt

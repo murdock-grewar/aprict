@@ -1,0 +1,33 @@
+aprict                          CLI entry point to aprict version 0.0.48.dev1
+├── convert                     Conversion between data formats.
+│   ├── help [COMMAND_PATH]...  Show help for a command.
+│   ├── npy_to_omez             Convert a numpy array on disk to an OME-Zarr-
+│   │                           compliant .zarr directory.
+│   └── omez_to_npy             Convert an OME-Zarr-compliant directory on disk
+│                               to a numpy array.
+├── help [COMMAND_PATH]...      Show help for a command.
+├── make-geom                   Make a geometry object.
+│   ├── cone-cyl                Produce a ProjGeom object for a cylindrical
+│   │                           cone-beam scan, and save it as a .json file.
+│   ├── fan-circ                Produce a ProjGeom object for a circular fan-
+│   │                           beam scan, and save it as a .json file.
+│   └── help [COMMAND_PATH]...  Show help for a command.
+├── project                     Generate projection data.
+│   ├── cbfp                    Compute flat-panel projection data.
+│   └── help [COMMAND_PATH]...  Show help for a command.
+├── recon                       Tomographic reconstruction routines.
+│   ├── fbp-cone-cyl            Filtered backprojection for a cone-beam
+│   │                           geometry with a cylindrical source locus.
+│   ├── fbp-fan-circ            Filtered backprojection for a fan-beam geometry
+│   │                           with a circular source locus.
+│   ├── fdk-cone-circ           FDK algorithm for a circular scan with a cone-
+│   │                           beam.
+│   ├── gbc-cone-cyl            Global Backprojection-Convolution for a cone-
+│   │                           beam geometry with a cylindrical source locus.
+│   └── help [COMMAND_PATH]...  Show help for a command.
+└── view                        View data.
+    ├── help [COMMAND_PATH]...  Show help for a command.
+    ├── neuroglance             Launch a neuroglancer instance to view a 3D
+    │                           volume by file path or URI.
+    └── pyqt *.npy              Launch a pyqtgraph window to view a 3D numpy
+                                array on-disk.

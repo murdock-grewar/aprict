@@ -30,7 +30,7 @@ from .recon_cbfp_cyl_fbp import main as main_fbp
 from .recon_cbfp_cyl_gbc import main as main_gbc
 from .view_pyqt import main as main_view_pyqt
 
-_progdesc: str = f"Entry point for CLI interface to aprict version {version}"
+_progdesc: str = f"CLI entry point to aprict version {version}"
 
 
 _cs = {

@@ -93,8 +93,13 @@ aprict convert npy_to_omez \
 
 The entry point for the main commandline interface is the shell command `aprict`. This shell command should be available on `$PATH` if the module is installed in the current environment. All shell commands are self-documented:
 ```bash
-$ aprict --help
+aprict --help
 ```
+Running `aprict --tree` will output a tree of all available commands:
+<details><summary>Output of `aprict --tree`</summary>
+<pre id="aprict-tree-text"></pre>
+<script>fetch("/res/aprict-tree.txt").then(r=>r.text()).then(t=>document.getElementById("aprict-tree-text").textContent=t)</script>
+</details>
 
 ## Python API
 ### Recommended import pattern
