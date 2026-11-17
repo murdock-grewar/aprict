@@ -44,9 +44,6 @@ This software has been tested with the following GPUs:
 
 ## Known limitations
 * Only flat-panel X-ray data with square pixels is supported, at this time.
-* Lack of documentation:
-  * The way that geometry is encoded in `*.json` files is not yet documented.
-  * The encoding of projection data and volume data is not yet documented. (Numpy arrays; memory-mapped in the case of projections.)
 * Implementation-related issues which could be alleviated in the future:
   * Volume size is limited by CUDA texture limit. For example, a `(2400,2400,4800)` volume can be reconstructed, but not a `(30000,30000,1)` volume, due to a volume of this size not fitting within a single CUDA texture
   * The FORBILD shape `Tetrahedron` is not yet implemented, and no primitive shape is permitted to have more than 3 clipping planes applied, due to internal limitations. All other FORBILD phantoms should be supported.
