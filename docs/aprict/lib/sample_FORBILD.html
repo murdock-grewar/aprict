@@ -36,7 +36,7 @@
       <a href="/" style="text-decoration: none; color: inherit;">
         <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
         <span style="font-size: 24px; font-weight: 600; vertical-align: middle; text-align: center;">aprict</span>
-        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev9</span>
+        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev10</span>
       </a>
   </span>
 
@@ -239,7 +239,7 @@
 </span><span id="L-95"><a href="#L-95"><span class="linenos"> 95</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span>
 </span><span id="L-96"><a href="#L-96"><span class="linenos"> 96</span></a>    <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float16</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
 </span><span id="L-97"><a href="#L-97"><span class="linenos"> 97</span></a><span class="p">]:</span>
-</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to a cupy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="L-98"><a href="#L-98"><span class="linenos"> 98</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Rasterise a list of FORBILD shapes to a cupy array by point-sampling. Supports supersampling, for anti-aliased raster images.&quot;&quot;&quot;</span>
 </span><span id="L-99"><a href="#L-99"><span class="linenos"> 99</span></a>    <span class="c1"># Handle lists and floats etc by converting to np.ndarray</span>
 </span><span id="L-100"><a href="#L-100"><span class="linenos">100</span></a>    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
 </span><span id="L-101"><a href="#L-101"><span class="linenos">101</span></a>    <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ys</span><span class="p">)</span>
@@ -341,7 +341,7 @@
 </span><span id="sample_FORBILD-96"><a href="#sample_FORBILD-96"><span class="linenos"> 96</span></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span>
 </span><span id="sample_FORBILD-97"><a href="#sample_FORBILD-97"><span class="linenos"> 97</span></a>    <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float16</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
 </span><span id="sample_FORBILD-98"><a href="#sample_FORBILD-98"><span class="linenos"> 98</span></a><span class="p">]:</span>
-</span><span id="sample_FORBILD-99"><a href="#sample_FORBILD-99"><span class="linenos"> 99</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to a cupy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="sample_FORBILD-99"><a href="#sample_FORBILD-99"><span class="linenos"> 99</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Rasterise a list of FORBILD shapes to a cupy array by point-sampling. Supports supersampling, for anti-aliased raster images.&quot;&quot;&quot;</span>
 </span><span id="sample_FORBILD-100"><a href="#sample_FORBILD-100"><span class="linenos">100</span></a>    <span class="c1"># Handle lists and floats etc by converting to np.ndarray</span>
 </span><span id="sample_FORBILD-101"><a href="#sample_FORBILD-101"><span class="linenos">101</span></a>    <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">xs</span><span class="p">)</span>
 </span><span id="sample_FORBILD-102"><a href="#sample_FORBILD-102"><span class="linenos">102</span></a>    <span class="n">ys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ys</span><span class="p">)</span>
@@ -417,7 +417,7 @@
 </span></pre></div>
 
 
-            <div class="docstring"><p>Convert to a cupy array by simple point-sampling.</p>
+            <div class="docstring"><p>Rasterise a list of FORBILD shapes to a cupy array by point-sampling. Supports supersampling, for anti-aliased raster images.</p>
 </div>
 
 

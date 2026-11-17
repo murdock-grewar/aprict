@@ -95,7 +95,7 @@ def sample_FORBILD(  # ruff: ignore[complex-structure, invalid-function-name]
 ) -> cp.ndarray[
     tuple[int, int, int], np.dtype[np.float16 | np.float32 | np.float64]
 ]:
-    """Convert to a cupy array by simple point-sampling."""
+    """Rasterise a list of FORBILD shapes to a cupy array by point-sampling. Supports supersampling, for anti-aliased raster images."""
     # Handle lists and floats etc by converting to np.ndarray
     xs = np.array(xs)
     ys = np.array(ys)

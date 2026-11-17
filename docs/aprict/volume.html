@@ -36,7 +36,7 @@
       <a href="/" style="text-decoration: none; color: inherit;">
         <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
         <span style="font-size: 24px; font-weight: 600; vertical-align: middle; text-align: center;">aprict</span>
-        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev9</span>
+        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev10</span>
       </a>
   </span>
 
@@ -349,7 +349,7 @@
 </span><span id="FBVolume-406"><a href="#FBVolume-406"><span class="linenos">406</span></a>        <span class="n">supersamp_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="FBVolume-407"><a href="#FBVolume-407"><span class="linenos">407</span></a>        <span class="n">block</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 </span><span id="FBVolume-408"><a href="#FBVolume-408"><span class="linenos">408</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]]:</span>
-</span><span id="FBVolume-409"><a href="#FBVolume-409"><span class="linenos">409</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert to a float32 cupy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="FBVolume-409"><a href="#FBVolume-409"><span class="linenos">409</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a raster float32 cupy array by point-sampling. Supports supersampling for an anti-aliased raster.&quot;&quot;&quot;</span>
 </span><span id="FBVolume-410"><a href="#FBVolume-410"><span class="linenos">410</span></a>        <span class="k">return</span> <span class="n">sample_FORBILD</span><span class="o">.</span><span class="n">sample_FORBILD</span><span class="p">(</span>
 </span><span id="FBVolume-411"><a href="#FBVolume-411"><span class="linenos">411</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">,</span>
 </span><span id="FBVolume-412"><a href="#FBVolume-412"><span class="linenos">412</span></a>            <span class="n">xs</span><span class="p">,</span>
@@ -447,7 +447,7 @@
 </span><span id="FBVolume-504"><a href="#FBVolume-504"><span class="linenos">504</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span>
 </span><span id="FBVolume-505"><a href="#FBVolume-505"><span class="linenos">505</span></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">ys</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">zs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </span><span id="FBVolume-506"><a href="#FBVolume-506"><span class="linenos">506</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]]:</span>
-</span><span id="FBVolume-507"><a href="#FBVolume-507"><span class="linenos">507</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert to a float32 numpy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="FBVolume-507"><a href="#FBVolume-507"><span class="linenos">507</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a raster float32 numpy array by point-sampling. Supports supersampling for an anti-aliased raster.&quot;&quot;&quot;</span>
 </span><span id="FBVolume-508"><a href="#FBVolume-508"><span class="linenos">508</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cupy</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">zs</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
 </span><span id="FBVolume-509"><a href="#FBVolume-509"><span class="linenos">509</span></a>
 </span><span id="FBVolume-510"><a href="#FBVolume-510"><span class="linenos">510</span></a>    <span class="nd">@classmethod</span>
@@ -967,7 +967,7 @@
 </span><span id="FBVolume.to_cupy-406"><a href="#FBVolume.to_cupy-406"><span class="linenos">406</span></a>        <span class="n">supersamp_factor</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="FBVolume.to_cupy-407"><a href="#FBVolume.to_cupy-407"><span class="linenos">407</span></a>        <span class="n">block</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 </span><span id="FBVolume.to_cupy-408"><a href="#FBVolume.to_cupy-408"><span class="linenos">408</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">cp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]]:</span>
-</span><span id="FBVolume.to_cupy-409"><a href="#FBVolume.to_cupy-409"><span class="linenos">409</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert to a float32 cupy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="FBVolume.to_cupy-409"><a href="#FBVolume.to_cupy-409"><span class="linenos">409</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a raster float32 cupy array by point-sampling. Supports supersampling for an anti-aliased raster.&quot;&quot;&quot;</span>
 </span><span id="FBVolume.to_cupy-410"><a href="#FBVolume.to_cupy-410"><span class="linenos">410</span></a>        <span class="k">return</span> <span class="n">sample_FORBILD</span><span class="o">.</span><span class="n">sample_FORBILD</span><span class="p">(</span>
 </span><span id="FBVolume.to_cupy-411"><a href="#FBVolume.to_cupy-411"><span class="linenos">411</span></a>            <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">,</span>
 </span><span id="FBVolume.to_cupy-412"><a href="#FBVolume.to_cupy-412"><span class="linenos">412</span></a>            <span class="n">xs</span><span class="p">,</span>
@@ -981,7 +981,7 @@
 </span></pre></div>
 
 
-            <div class="docstring"><p>Convert to a float32 cupy array by simple point-sampling.</p>
+            <div class="docstring"><p>Return a raster float32 cupy array by point-sampling. Supports supersampling for an anti-aliased raster.</p>
 </div>
 
 
@@ -1153,12 +1153,12 @@
             <div class="pdoc-code codehilite"><pre><span></span><span id="FBVolume.to_numpy-504"><a href="#FBVolume.to_numpy-504"><span class="linenos">504</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span>
 </span><span id="FBVolume.to_numpy-505"><a href="#FBVolume.to_numpy-505"><span class="linenos">505</span></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">xs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">ys</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">zs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
 </span><span id="FBVolume.to_numpy-506"><a href="#FBVolume.to_numpy-506"><span class="linenos">506</span></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">]]:</span>
-</span><span id="FBVolume.to_numpy-507"><a href="#FBVolume.to_numpy-507"><span class="linenos">507</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert to a float32 numpy array by simple point-sampling.&quot;&quot;&quot;</span>
+</span><span id="FBVolume.to_numpy-507"><a href="#FBVolume.to_numpy-507"><span class="linenos">507</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a raster float32 numpy array by point-sampling. Supports supersampling for an anti-aliased raster.&quot;&quot;&quot;</span>
 </span><span id="FBVolume.to_numpy-508"><a href="#FBVolume.to_numpy-508"><span class="linenos">508</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_cupy</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">,</span> <span class="n">zs</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
 </span></pre></div>
 
 
-            <div class="docstring"><p>Convert to a float32 numpy array by simple point-sampling.</p>
+            <div class="docstring"><p>Return a raster float32 numpy array by point-sampling. Supports supersampling for an anti-aliased raster.</p>
 </div>
 
 

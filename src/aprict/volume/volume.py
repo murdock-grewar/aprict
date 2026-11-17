@@ -405,7 +405,7 @@ class FBVolume:
         supersamp_factor: int | None = None,
         block: bool = True,
     ) -> cp.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
-        """Convert to a float32 cupy array by simple point-sampling."""
+        """Return a raster float32 cupy array by point-sampling. Supports supersampling for an anti-aliased raster."""
         return sample_FORBILD.sample_FORBILD(
             self.shapes,
             xs,
@@ -503,7 +503,7 @@ class FBVolume:
     def to_numpy(
         self, xs: np.ndarray, ys: np.ndarray, zs: np.ndarray
     ) -> np.ndarray[tuple[int, int, int], np.dtype[np.float32]]:
-        """Convert to a float32 numpy array by simple point-sampling."""
+        """Return a raster float32 numpy array by point-sampling. Supports supersampling for an anti-aliased raster."""
         return self.to_cupy(xs, ys, zs).get()
 
     @classmethod

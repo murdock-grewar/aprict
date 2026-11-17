@@ -13,7 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Miscellaneous helper tools."""
+"""
+Miscellaneous helper tools.
+
+These tools are mostly used internally, but some may also be useful to end-users, such as `aprict.lib.lds`.
+"""
 
 from . import argparse_tools as argparse_tools
 from . import click_tools as click_tools
