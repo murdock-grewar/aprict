@@ -254,10 +254,17 @@ def validate_args(args: types.SimpleNamespace) -> None:
     """Validate a set of args."""
     if args.plot_mode is PlotMode.PYQTGRAPH and not _mod_avail_imview:
         msg = "Cannot use --plot-mode PYQTGRAPH because the relevant modules are not installed."
-        raise ValueError(msg)
+        raise ce.UsageError(msg)
+
+    if args.ssu < 1 or args.ssv < 1:
+        msg = "--ssu and --ssv must be positive integers."
+        raise ce.UsageError(msg)
 
 
 def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure, undocumented-public-function]
+
+    # Validate args
+    validate_args(args)
 
     artefact_path = args.output
     artefact_path.mkdir(exist_ok=False)
@@ -289,12 +296,6 @@ def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex
     ##########################################################
     ###################### Preparation #######################
     ##########################################################
-
-    # Validate args
-    validate_args(args)
-    if args.ssu < 1 or args.ssv < 1:
-        msg = "--ssu and --ssv must be positive integers."
-        raise ValueError(msg)
 
     # Get the output dtype
     proj_dtype = _outdtype_to_dtype(args.out_dtype)
