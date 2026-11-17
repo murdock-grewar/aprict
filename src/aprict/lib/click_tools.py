@@ -24,7 +24,7 @@ from copy import deepcopy
 import click
 import click_extra as ce
 
-# ruff: disable [undocumented-public-class,undocumented-public-method,missing-type-function-argument,undocumented-public-function,invalid-function-name]
+# ruff: disable [missing-type-function-argument,invalid-function-name]
 
 
 def command_with_option_substitutions(
@@ -34,6 +34,7 @@ def command_with_option_substitutions(
     fixed_option_values: dict[str, typing.Any],
     help: str | None = None,
 ) -> ce.Command:
+    """Wrap a click_extra.Command object and substitutes argument values with constants."""
     params = []
     for param in deepcopy(
         command
@@ -69,9 +70,11 @@ def command_with_option_substitutions(
 
 
 class ContiguousSliceArgType(click.ParamType[slice]):
+    """A click arg type that represents a contiguous slice of indices, like slice(1,4) or slice(None, None) or slice(3, None)."""
+
     name: str = "(" + click.INT.name + "," + click.INT.name + ")"
 
-    def convert(self, value, param, ctx) -> slice:  # ruff: ignore[unused-method-argument]
+    def convert(self, value, param, ctx) -> slice:  # ruff: ignore[undocumented-public-method, unused-method-argument]
 
         if isinstance(value, slice):
             if value.step is not None:
@@ -99,7 +102,7 @@ class ContiguousSliceArgType(click.ParamType[slice]):
 def FloatTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-public-function]
     *, numfloats: int
 ):
-    """A factory for functions that take in a string representing a float tuple, such as (1.0, 1.4)."""  # ruff: ignore[non-imperative-mood]
+    """Create a click argument type to take in n-tuples of floats, like (1.0, 1.4)."""
     if type(numfloats) is not int or numfloats < 0:
         msg = "'numfloats' should be a nonnegative integer"
         raise ValueError(msg)
@@ -138,7 +141,7 @@ def FloatTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-p
 def IntTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-public-function]
     *, numints: int
 ):
-    """A factory for functions that take in a string representing an int tuple, such as (1, 2, 3)."""  # ruff: ignore[non-imperative-mood]
+    """Create a click argument type to take in n-tuples of ints, like (1, 2, 3)."""
     if type(numints) is not int or numints < 0:
         msg = "'numints' should be a nonnegative integer"
         raise ValueError(msg)
@@ -175,9 +178,11 @@ def IntTupleArgTypeFactory(  # ruff: ignore[missing-return-type-undocumented-pub
 
 
 class BoolArgType(click.ParamType[bool]):
+    """A click arg type that represents a boolean (True or False)."""
+
     name: str = "BOOL"
 
-    def convert(self, value, param, ctx) -> bool:  # ruff: ignore[unused-method-argument]
+    def convert(self, value, param, ctx) -> bool:  # ruff: ignore[undocumented-public-method, unused-method-argument]
         if isinstance(value, bool):
             return value
         string: str = value
@@ -195,6 +200,7 @@ class BoolArgType(click.ParamType[bool]):
 def MaybeType[T](
     instantiated_paramtype: click.ParamType[T],
 ) -> click.ParamType[T | None]:
+    """Extend a click arg type with 'None' as a sentinel value."""
     obj = instantiated_paramtype
 
     class _cls(click.ParamType[T | None]):  # ty: ignore[shadowed-type-variable]  # ruff: ignore[invalid-class-name]
@@ -211,4 +217,4 @@ def MaybeType[T](
     return _cls()
 
 
-# ruff: enable [undocumented-public-class,undocumented-public-method,missing-type-function-argument,undocumented-public-function,invalid-function-name]
+# ruff: enable [missing-type-function-argument,invalid-function-name]
