@@ -6,10 +6,12 @@
       {{ module.modulename.split(".")[0] }}
     #}
     {% if root_module_name and root_module_name in all_modules %}
-      {% set root_module = all_modules[root_module_name] %}
-      <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
-      <span style="font-weight: 600;">{{ root_module.modulename }}</span>
-      <span style="font-weight: 200;">v{{ root_module.obj.version.version }}</span>
+      <a href="/" style="text-decoration: none; color: inherit;">
+        {% set root_module = all_modules[root_module_name] %}
+        <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
+        <span style="font-weight: 600;">{{ root_module.modulename }}</span>
+        <span style="font-weight: 200;">v{{ root_module.obj.version.version }}</span>
+      </a>
     {% endif %}
   </span>
 
