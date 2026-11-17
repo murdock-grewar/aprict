@@ -14,13 +14,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 r"""
+# What is `aprict`?
 [![Static Badge](https://img.shields.io/badge/Author_ORCiD-0000--0002--0015--8284-green?logo=orcid)](https://orcid.org/0000-0002-0015-8284)
 [![Static Badge](https://img.shields.io/badge/Project_DOI-10.5281%2Fzenodo.23632625-yellow?logo=DOI&color=yellow)](https://doi.org/10.5281/zenodo.23632625)
 [![PyPI Version](https://img.shields.io/pypi/v/aprict)](https://pypi.org/project/aprict/)
 [![Static Badge](https://img.shields.io/badge/github-murdock--grewar%2Faprict-212121?logo=github&logoColor=white)](https://github.com/murdock-grewar/aprict)
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
-# What is `aprict`?
 
 `aprict` is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).
 

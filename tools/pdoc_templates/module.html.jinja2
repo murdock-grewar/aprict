@@ -1,17 +1,96 @@
 {% extends "default/module.html.jinja2" %}
 
-{% block title %}
-  {% if module.name == root_module_name %}
-    {{ module.modulename }} v{{ module.obj.version.version }} API documentation
-  {% else %}
-    {{ super() }}
+{% block topbar %}
+  <span class="pdoc-topbar__project">
+    {# comment this out since I have a better way of fetching the root module name now
+      {{ module.modulename.split(".")[0] }}
+    #}
+    {% if root_module_name and root_module_name in all_modules %}
+      {% set root_module = all_modules[root_module_name] %}
+      <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
+      <span style="font-weight: 600;">{{ root_module.modulename }}</span>
+      <span style="font-weight: 200;">v{{ root_module.obj.version.version }}</span>
+    {% endif %}
+  </span>
+
+
+  <button
+    id="pdoc-theme-button"
+    class="pdoc-theme-button"
+    type="button"
+    aria-label="Theme: System default. Activate to change theme."
+    title="Theme: System default"
+  ></button>
+
+  {% if search and all_modules|length > 1 %}
+      {# we set a pattern here so that we can use the :valid CSS selector #}
+      <input type="search" placeholder="Search..." role="searchbox" aria-label="search"
+             pattern=".+" required>
   {% endif %}
+
+  <script>
+    (() => {
+      const key = "pdoc-theme-mode-v2";
+      const modes = ["system", "light", "dark"];
+      const labels = {
+        system: "System default",
+        light: "Light mode",
+        dark: "Dark mode",
+      };
+      const icons = {
+        system: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+        light: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>',
+        dark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.463.402.807a5 5 0 0 0 8.268 8.268c.344-.215.829-.003.803.397z"/></svg>',
+      };
+
+      const button = document.getElementById("pdoc-theme-button");
+      if (!button) return;
+
+      let mode = "system";
+      try {
+        const saved = localStorage.getItem(key);
+        if (modes.includes(saved)) mode = saved;
+      } catch {}
+
+      function render() {
+        button.innerHTML = icons[mode];
+        button.title = `Theme: ${labels[mode]}`;
+        button.setAttribute(
+          "aria-label",
+          `Theme: ${labels[mode]}. Activate to change theme.`
+        );
+        document.documentElement.style.colorScheme =
+          mode === "system" ? "light dark" : mode;
+      }
+
+      button.addEventListener("click", () => {
+        mode = modes[(modes.indexOf(mode) + 1) % modes.length];
+        render();
+        try {
+          localStorage.setItem(key, mode);
+        } catch {}
+      });
+
+      render();
+    })();
+  </script>
+
 {% endblock %}
 
-{% block nav_title %}
-  {{ super() }}
+{% block nav %}
+  {{ self.module_list_link() }}
+  {{ self.nav_index() }}
+  {{ self.nav_submodules() }}
+  {{ self.nav_members() }}
+  {{ self.nav_footer() }}
+  {{ self.attribution() }}
+{% endblock %}
+
+{% block title %}
   {% if module.name == root_module_name %}
-    <small>v{{ module.obj.version.version }}</small>
+    {{ module.modulename }} docs
+  {% else %}
+    {{ super() }}
   {% endif %}
 {% endblock %}
 
@@ -29,87 +108,34 @@
                 <wbr>.
             {%- endif -%}
         {% endfor %}
-        {% if module.name == root_module_name %}
-          v{{ module.obj.version.version }}
-        {% endif %}
     </h1>
 {% enddefaultmacro %}
 
 
 {% block head %}
 {{ super() }}
-<style>
-  .code-container {
-    position: relative;
-    margin: 20px 0;
-  }
 
-  .code-header {
-    background-color: #e9ecef;
-    padding: 8px 12px;
-    border-radius: 4px 4px 0 0;
-    font-size: 12px;
-    font-weight: bold;
-    color: #495057;
-    border-bottom: 1px solid #dee2e6;
-  }
+<script>
+  (() => {
+    const key = "pdoc-theme-mode-v2";
+    let mode = "system";
 
-  .code-wrapper {
-    position: relative;
-    background-color: #f5f5f5;
-    border-radius: 0 0 4px 4px;
-  }
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === "light" || saved === "dark") mode = saved;
+    } catch {}
 
-  .copy-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    padding: 8px 12px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    z-index: 10;
-  }
-
-  .copy-btn:hover {
-    background-color: #0056b3;
-  }
-
-  .copy-btn.copied {
-    background-color: #28a745;
-  }
-
-  pre {
-    padding: 15px;
-    padding-left: 50px;
-    margin: 0;
-    overflow-x: auto;
-    counter-reset: line-number;
-  }
-
-  .line {
-    display: block;
-    counter-increment: line-number;
-  }
-
-  .line::before {
-    content: counter(line-number);
-    display: inline-block;
-    width: 30px;
-    margin-right: 15px;
-    text-align: right;
-    color: #999;
-    font-size: 12px;
-    user-select: none;
-  }
-</style>
+    document.documentElement.style.colorScheme =
+      mode === "system" ? "light dark" : mode;
+  })();
+</script>
 {% endblock %}
 
 {% block search_js %}
-{{ super() }}
+  {% if search and all_modules|length > 1 %}
+    {% include "topbar-search.html.jinja2" %}
+  {% endif %}
+
 <script>
   document.querySelectorAll('pre code').forEach(code => {
     const pre = code.parentElement;
@@ -162,3 +188,9 @@
   });
 </script>
 {% endblock %}
+
+
+{% block module_list_link %}
+  {{ super() }}
+{% endblock %}
+
