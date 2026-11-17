@@ -17,4 +17,4 @@ TODO for 0.2.0:
  - [ ] Allow block=False in the projection script
  - [ ] In the GBC and FBP scripts, prune the volume chunks to only the required region to be in range of the projections.
  - [ ] Add PDF images of geometry encoding and/or special geometries in the docs.
-
+ - [ ] Find a way to anticipate memory usage of GBC filtration, and check for sufficient memory before launching. (Maybe a log warning? Or actually abort if insufficient? Maybe add an override flag?) Suggest to the user that they add a swap partition, if necessary.
