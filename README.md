@@ -18,7 +18,9 @@ pip install aprict[gui]
 This software is provided with no warranty or guarantee of correctness. This is my research code sandbox, subject to breaking changes on a whim. This is not mature software. So, if you like it and wish to use it, then it is best to download a fixed version and use that. Updates may break things.
 
 ## Features
-`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' an 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). It is assumed that the RAM on the machine is at least twice the size of the used VRAM on the GPU. Included features as of aprict==0.1.0:
+`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' an 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). RAM requirements vary according to the reconstruction method. It is recommended to add a large swap partition for additional virtual memory when using the GBC method on large volumes that can't fit in RAM at least a couple of times. Also, it is generally assumed that the RAM on the machine is at least twice the size of the used VRAM on the GPU. 
+
+Included features as of aprict==0.1.0:
 
  - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)
  - Out-of-core analytic reconstruction for special geometries:
@@ -39,6 +41,7 @@ This software requires CUDA toolkit `13.x` or newer to be installed on the syste
 It is strongly recommended to use high-speed mass storage, such as an NVMe drive. The software has not been tested on slower mass storage, and is not expected to perform well without it.
 
 This software has been tested with the following GPUs: 
+* NVIDIA RTX 3050
 * NVIDIA RTX 3090
 * NVIDIA RTX PRO 6000 Blackwell
 
