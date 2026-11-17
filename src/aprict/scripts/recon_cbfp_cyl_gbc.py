@@ -323,7 +323,7 @@ def main(**kwargs) -> None:  # ruff: ignore[missing-type-kwargs]
     main_from_args(args)
 
 
-def validate_args(args: types.SimpleNamespace) -> None:
+def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure]
     """Validate a set of args."""
     # Ensure that the output directory doesn't already exist
     if args.output is not None and args.output.exists():
@@ -361,6 +361,10 @@ def validate_args(args: types.SimpleNamespace) -> None:
 
     if args.plot_mode is PlotMode.NEUROGLANCER and not _mod_avail_neuroglancer:
         msg = "Cannot use --plot-mode NEUROGLANCER because the relevant modules are not installed."
+        raise ce.UsageError(msg)
+
+    if not args.geom.is_file():
+        msg = f"'{args.geom!s}' is not a file."
         raise ce.UsageError(msg)
 
 

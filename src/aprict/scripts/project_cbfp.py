@@ -260,6 +260,10 @@ def validate_args(args: types.SimpleNamespace) -> None:
         msg = "--ssu and --ssv must be positive integers."
         raise ce.UsageError(msg)
 
+    if not args.geom.is_file():
+        msg = f"'{args.geom!s}' is not a file."
+        raise ce.UsageError(msg)
+
 
 def main_from_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-structure, undocumented-public-function]
 

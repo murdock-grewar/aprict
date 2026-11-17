@@ -360,6 +360,10 @@ def validate_args(args: types.SimpleNamespace) -> None:  # ruff: ignore[complex-
         msg = "Cannot use --plot-mode NEUROGLANCER because the relevant modules are not installed."
         raise ce.UsageError(msg)
 
+    if not args.geom.is_file():
+        msg = f"'{args.geom!s}' is not a file."
+        raise ce.UsageError(msg)
+
 
 def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
     projdata_path: pathlib.Path,
