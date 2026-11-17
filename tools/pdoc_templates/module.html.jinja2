@@ -9,8 +9,8 @@
       <a href="/" style="text-decoration: none; color: inherit;">
         {% set root_module = all_modules[root_module_name] %}
         <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
-        <span style="font-weight: 600;">{{ root_module.modulename }}</span>
-        <span style="font-weight: 200;">v{{ root_module.obj.version.version }}</span>
+        <span style="font-size: 24px; font-weight: 600; vertical-align: middle; text-align: center;">{{ root_module.modulename }}</span>
+        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v{{ root_module.obj.version.version }}</span>
       </a>
     {% endif %}
   </span>
