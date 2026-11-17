@@ -36,7 +36,7 @@
       <a href="/" style="text-decoration: none; color: inherit;">
         <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
         <span style="font-size: 24px; font-weight: 600; vertical-align: middle; text-align: center;">aprict</span>
-        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev1</span>
+        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.1.dev2</span>
       </a>
   </span>
 
@@ -341,7 +341,7 @@
 <li><code>det_vvec[i]</code> is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same column.</li>
 </ul>
 
-<p>As the time of writing (<code>aprict==0.0.49</code>), most API operations assume that the detector pixels are square, i.e. that <code>det_uvec[i]</code> and <code>det_vvec[i]</code> are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!</p>
+<p>At the time of writing (<code>aprict==0.1.1</code>), most API operations assume that the detector pixels are square, i.e. that <code>det_uvec[i]</code> and <code>det_vvec[i]</code> are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!</p>
 
 <h2 id="data-storage">Data storage</h2>
 
@@ -438,7 +438,7 @@
 </span><span id="L-62"><a href="#L-62"><span class="linenos">  62</span></a><span class="sd"> - `det_uvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same row.</span>
 </span><span id="L-63"><a href="#L-63"><span class="linenos">  63</span></a><span class="sd"> - `det_vvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same column.</span>
 </span><span id="L-64"><a href="#L-64"><span class="linenos">  64</span></a>
-</span><span id="L-65"><a href="#L-65"><span class="linenos">  65</span></a><span class="sd">As the time of writing (`aprict==0.0.49`), most API operations assume that the detector pixels are square, i.e. that `det_uvec[i]` and `det_vvec[i]` are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!</span>
+</span><span id="L-65"><a href="#L-65"><span class="linenos">  65</span></a><span class="sd">At the time of writing (`aprict==0.1.1`), most API operations assume that the detector pixels are square, i.e. that `det_uvec[i]` and `det_vvec[i]` are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!</span>
 </span><span id="L-66"><a href="#L-66"><span class="linenos">  66</span></a>
 </span><span id="L-67"><a href="#L-67"><span class="linenos">  67</span></a><span class="sd">## Data storage</span>
 </span><span id="L-68"><a href="#L-68"><span class="linenos">  68</span></a><span class="sd">Projection data is typically stored on-disk as a numpy array, until it is loaded into a `ProjectionSet` object, at which time it is loaded onto the GPU. You don&#39;t need to hold an entire numpy array in memory to manipulate it&amp;mdash; you can use `numpy`&#39;s `np.memmap` type to memory-map it. &#39;Memory-mapping&#39; is basically when a resource is mapped to a virtual space in memory. This means that it can be treated as if it were an object in memory, but reads and writes will actually happen on disk. This can support very large arrays, e.g. 1TB+.</span>

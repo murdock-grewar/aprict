@@ -62,7 +62,7 @@ Note the following conventions:
  - `det_uvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same row.
  - `det_vvec[i]` is the vector between the centre of a pixel and the centre of a neighbouring pixel in the same column.
 
-As the time of writing (`aprict==0.0.49`), most API operations assume that the detector pixels are square, i.e. that `det_uvec[i]` and `det_vvec[i]` are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!
+At the time of writing (`aprict==0.1.1`), most API operations assume that the detector pixels are square, i.e. that `det_uvec[i]` and `det_vvec[i]` are orthogonal and of equal length. Apart from this, there is no restriction on how the detector and cone-beam source are oriented in space!
 
 ## Data storage
 Projection data is typically stored on-disk as a numpy array, until it is loaded into a `ProjectionSet` object, at which time it is loaded onto the GPU. You don't need to hold an entire numpy array in memory to manipulate it&mdash; you can use `numpy`'s `np.memmap` type to memory-map it. 'Memory-mapping' is basically when a resource is mapped to a virtual space in memory. This means that it can be treated as if it were an object in memory, but reads and writes will actually happen on disk. This can support very large arrays, e.g. 1TB+.
