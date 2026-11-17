@@ -30,7 +30,9 @@ An NVIDIA GPU supporting CUDA 13.x is required to use `aprict`.
 
 ## Features
 
-`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' and 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice. Included features as of `aprict==0.1.0`:
+`aprict` uses the GPU for all the heavy operations. The terminology 'in-core' and 'out-of-core' here refers to whether the relevant data must fit entirely within the GPU VRAM (in-core) or not (out-of-core). Most operations have no minimum RAM requirement in practice, though the filtration step of the GBC method can be memory-hungry, and may require adding a large swap partition for large volumes.
+
+Included features as of `aprict==0.1.0`:
  - Out-of-core calculation of projection data for arbitrary flat-panel geometries. Supports voxelised volumes and (almost) any FORBILD phantom. (Exact line integrals in all cases.)
  - Out-of-core analytic reconstruction for special geometries.
  - In-core iterative reconstruction for arbitrary geometries.
