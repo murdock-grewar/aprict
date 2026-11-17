@@ -22,7 +22,7 @@ This module contains the end-user interfaces to the flat-panel cone-beam project
 
 The main provided methods are
  - `project` - used to generate projection data from a `aprict.volume.Volume` or `aprict.volume.FBVolume` object.
- - `backproject` - used to generate backprojection data from a `aprict.volume.Volume` or `aprict.volume.FBVolume` object.
+ - `backproject` - used to generate backprojection data from a `aprict.cb.flatpanel.ProjectionSet` object.
 
 The main provided classes are
  - `ProjGeom` - object to encode a flat-panel (back)projection geometry.
