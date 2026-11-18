@@ -69,9 +69,7 @@ def hilbert_transform_kernel(
         msg = "Window length must be odd."
         raise ValueError(msg)
     halfn = (n + 1) // 2
-    arange: np.ndarray = (
-        np.arange(2 * halfn - 1, dtype=np.float128) - halfn + 1
-    )
+    arange: np.ndarray = np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1
     with np.errstate(divide="ignore", invalid="ignore"):
         kern = np.true_divide(2, arange)
     kern[halfn - 1] = 0
@@ -89,9 +87,7 @@ def hilbert_transform_kernel_halfoffset(
         msg = "Window length must be odd."
         raise ValueError(msg)
     halfn = (n + 1) // 2
-    arange: np.ndarray = (
-        np.arange(2 * halfn - 1, dtype=np.float128) - halfn + 1
-    )
+    arange: np.ndarray = np.arange(2 * halfn - 1, dtype=np.float64) - halfn + 1
     with np.errstate(divide="ignore", invalid="ignore"):
         kern = np.true_divide(2, (arange + 1 / 2))
     # NOTE: physpixsize has no effect on this filter! It's omitted from the formula deliberately, while maintaining the function signature.
