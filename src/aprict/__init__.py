@@ -22,7 +22,7 @@ r"""
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
 
-`aprict` is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).
+`aprict` (pronounced "apricot") is a Python module for simulating and reconstructing from flat-panel transmission X-ray experiments. In other words, it is a library for Cone-Beam Computed Tomography (CBCT).
 
 ## Requirements
 
