@@ -591,8 +591,8 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                 angs = np.array([0.0], dtype=np.float32)
             else:
                 angs = np.linspace(
-                    -filt.zeta + (filt.zeta / num_rot_angs / 2),
-                    filt.zeta - (filt.zeta / num_rot_angs / 2),
+                    -filt.zeta + (2 * filt.zeta / num_rot_angs / 2),
+                    filt.zeta - (2 * filt.zeta / num_rot_angs / 2),
                     endpoint=True,
                     num=num_rot_angs,
                 )
@@ -630,20 +630,28 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                         cp.multiply(
                             filt_arrs[index], mult, out=filt_arrs[index]
                         )
-                pss = [
-                    cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
-                    for filt_arr in filt_arrs
-                ]
+                    pss = [
+                        cbfp.ProjectionSet(pg.sliced(sl), data=filt_arr)
+                        for filt_arr in filt_arrs
+                    ]
+                    stream.synchronize()  # a precaution, since the hotfix below is required
             else:
+                # HOTFIX
+                # The stream is marked as "non_blocking=False", and yet
+                # it seems to not block. I need to insert all these synchronization
+                # statements, otherwise it doesn't work. Weird.
+                # To test this, try running the script with --num-rot-angs 100
                 with cp.cuda.Stream(non_blocking=False) as stream:
                     pss = [
                         cbfp.ProjectionSet(pg.sliced(sl), data=None)
                         for _ in range(2 if two_sided else 1)
                     ]
+                    stream.synchronize()
                     for ps in pss:
                         ps.create_buffer(dtype=cp.float32)
                         assert ps.data is not None  # useful for type-checking
                         ps.data.fill(0)
+                        stream.synchronize()
                     for ang in angs:
                         filt_arrs, event_completed = (
                             filt.filter_bulk_axis1_concat(
@@ -659,6 +667,7 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                                 pss[index].data,
                                 out=pss[index].data,
                             )
+                        stream.synchronize()
                     if not (fan_beam_mode or fdk_mode):
                         mult = (
                             2
@@ -666,10 +675,12 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
                             / np.float_power(np.sin(filt.zeta / 2), 2)
                             / len(angs)
                         )
+                        stream.synchronize()
                         for index in range(len(filt_arrs)):
                             cp.multiply(
                                 pss[index].data, mult, out=pss[index].data
                             )
+                            stream.synchronize()
             # Yield
             yield sl, tuple(pss)
             # Increment the slice
