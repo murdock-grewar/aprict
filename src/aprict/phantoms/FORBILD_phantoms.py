@@ -231,7 +231,7 @@ class PhantomContainer:
     @classmethod
     @functools.cache
     def RockCanisterAlWithHoles(cls) -> FBVolume:
-        """A phantom resembling a 6-millimeter-wide double-chambered tube of rocks, with small cavities inthe aluminium cylinder."""
+        """A phantom resembling a 6-millimeter-wide double-chambered tube of rocks, with small cavities in the aluminium cylinder."""
         fbv = FBVolume(
             ppf.convert_ph_file_to_shapes(
                 _path_to_FORBILD_src.joinpath(
