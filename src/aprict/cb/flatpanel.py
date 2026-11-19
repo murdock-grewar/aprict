@@ -440,7 +440,7 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
             nv=self.nv,
         )
 
-    def rotated(self, *, xy_rads: float) -> ProjGeom:
+    def rotated(self, *, xy_rads: float | np.floating) -> ProjGeom:
         """Return a new ProjGeom which is rotated about the z axis."""
         rotmat = np.array(
             [
@@ -460,7 +460,13 @@ class ProjGeom:  # ruff: ignore[eq-without-hash]
             nv=self.nv,
         )
 
-    def translated(self, *, x: float, y: float, z: float) -> ProjGeom:
+    def translated(
+        self,
+        *,
+        x: float | np.floating,
+        y: float | np.floating,
+        z: float | np.floating,
+    ) -> ProjGeom:
         """Return a new ProjGeom which is translated by the specified amounts."""
         trans = np.array([x, y, z], dtype=np.float32)
         trans = np.reshape(trans, (1,) * len(self.projs_list_shape) + (3,))

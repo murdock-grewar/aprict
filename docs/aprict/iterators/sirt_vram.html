@@ -36,7 +36,7 @@
       <a href="/" style="text-decoration: none; color: inherit;">
         <img src=/img/logo_pic.svg height="45" class="logo" alt="project logo"/>
         <span style="font-size: 24px; font-weight: 600; vertical-align: middle; text-align: center;">aprict</span>
-        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.3.dev2</span>
+        <span style="font-size: 24px; font-weight: 200; vertical-align: middle; text-align: center;">v0.1.3.dev3</span>
       </a>
   </span>
 
@@ -187,7 +187,7 @@
 </span><span id="L-13"><a href="#L-13"><span class="linenos"> 13</span></a><span class="c1"># You should have received a copy of the GNU General Public License</span>
 </span><span id="L-14"><a href="#L-14"><span class="linenos"> 14</span></a><span class="c1"># along with this program.  If not, see &lt;https://www.gnu.org/licenses/&gt;.</span>
 </span><span id="L-15"><a href="#L-15"><span class="linenos"> 15</span></a>
-</span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a><span class="sd">&quot;&quot;&quot;A module for an iterative SIRT reconstructor object applying to flat-panel cone-beam data.&quot;&quot;&quot;</span>
+</span><span id="L-16"><a href="#L-16"><span class="linenos"> 16</span></a><span class="sd">"""A module for an iterative SIRT reconstructor object applying to flat-panel cone-beam data."""</span>
 </span><span id="L-17"><a href="#L-17"><span class="linenos"> 17</span></a>
 </span><span id="L-18"><a href="#L-18"><span class="linenos"> 18</span></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 </span><span id="L-19"><a href="#L-19"><span class="linenos"> 19</span></a>
@@ -203,7 +203,7 @@
 </span><span id="L-29"><a href="#L-29"><span class="linenos"> 29</span></a>
 </span><span id="L-30"><a href="#L-30"><span class="linenos"> 30</span></a>
 </span><span id="L-31"><a href="#L-31"><span class="linenos"> 31</span></a><span class="k">class</span><span class="w"> </span><span class="nc">SIRT_flatpanel</span><span class="p">:</span>  <span class="c1"># ruff: ignore[invalid-class-name]</span>
-</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;An iterable SIRT reconstructor.&quot;&quot;&quot;</span>
+</span><span id="L-32"><a href="#L-32"><span class="linenos"> 32</span></a><span class="w">    </span><span class="sd">"""An iterable SIRT reconstructor."""</span>
 </span><span id="L-33"><a href="#L-33"><span class="linenos"> 33</span></a>
 </span><span id="L-34"><a href="#L-34"><span class="linenos"> 34</span></a>    <span class="c1"># _current_iteration_number: int</span>
 </span><span id="L-35"><a href="#L-35"><span class="linenos"> 35</span></a>    <span class="n">_config</span><span class="p">:</span> <span class="n">Config</span>
@@ -218,7 +218,7 @@
 </span><span id="L-44"><a href="#L-44"><span class="linenos"> 44</span></a>
 </span><span id="L-45"><a href="#L-45"><span class="linenos"> 45</span></a>    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">dataclasses</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span id="L-46"><a href="#L-46"><span class="linenos"> 46</span></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
-</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Configuration dataclass for the SIRT iterator.&quot;&quot;&quot;</span>
+</span><span id="L-47"><a href="#L-47"><span class="linenos"> 47</span></a><span class="w">        </span><span class="sd">"""Configuration dataclass for the SIRT iterator."""</span>
 </span><span id="L-48"><a href="#L-48"><span class="linenos"> 48</span></a>
 </span><span id="L-49"><a href="#L-49"><span class="linenos"> 49</span></a>        <span class="n">fast_backproject</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span id="L-50"><a href="#L-50"><span class="linenos"> 50</span></a>        <span class="n">soft_from_cylinder_relrad</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="p">(</span>
@@ -248,11 +248,11 @@
 </span><span id="L-74"><a href="#L-74"><span class="linenos"> 74</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_config_bp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigBackproject</span><span class="p">(</span>
 </span><span id="L-75"><a href="#L-75"><span class="linenos"> 75</span></a>            <span class="n">fast_approx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">fast_backproject</span><span class="p">,</span>
 </span><span id="L-76"><a href="#L-76"><span class="linenos"> 76</span></a>            <span class="n">cyl_mask_rad</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="o">*</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">volume</span><span class="o">.</span><span class="n">voxwid</span><span class="p">,</span>
-</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we&#39;ll multiply by the preconditioner</span>
+</span><span id="L-77"><a href="#L-77"><span class="linenos"> 77</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we'll multiply by the preconditioner</span>
 </span><span id="L-78"><a href="#L-78"><span class="linenos"> 78</span></a>            <span class="n">soften_det_edges_proportion</span><span class="o">=</span><span class="n">soften_det_edges_proportion</span><span class="p">,</span>
 </span><span id="L-79"><a href="#L-79"><span class="linenos"> 79</span></a>        <span class="p">)</span>
 </span><span id="L-80"><a href="#L-80"><span class="linenos"> 80</span></a>        <span class="k">if</span> <span class="n">projs</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;The provided ProjectionSet object has no data.&quot;</span>
+</span><span id="L-81"><a href="#L-81"><span class="linenos"> 81</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">"The provided ProjectionSet object has no data."</span>
 </span><span id="L-82"><a href="#L-82"><span class="linenos"> 82</span></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 </span><span id="L-83"><a href="#L-83"><span class="linenos"> 83</span></a>        <span class="c1"># The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1</span>
 </span><span id="L-84"><a href="#L-84"><span class="linenos"> 84</span></a>        <span class="c1"># We will calculate M now.</span>
@@ -302,7 +302,7 @@
 </span><span id="L-128"><a href="#L-128"><span class="linenos">128</span></a>            <span class="n">v</span><span class="o">.</span><span class="n">soften_to_xy_cylinder</span><span class="p">(</span><span class="n">rr</span><span class="p">)</span>
 </span><span id="L-129"><a href="#L-129"><span class="linenos">129</span></a>
 </span><span id="L-130"><a href="#L-130"><span class="linenos">130</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">iterate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform an iteration of the algorithm.&quot;&quot;&quot;</span>
+</span><span id="L-131"><a href="#L-131"><span class="linenos">131</span></a><span class="w">        </span><span class="sd">"""Perform an iteration of the algorithm."""</span>
 </span><span id="L-132"><a href="#L-132"><span class="linenos">132</span></a>        <span class="c1"># Put the projection residual into the projection scratch space</span>
 </span><span id="L-133"><a href="#L-133"><span class="linenos">133</span></a>        <span class="n">cp</span><span class="o">.</span><span class="n">copyto</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_meas</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dst</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_proj_scratch_space</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
 </span><span id="L-134"><a href="#L-134"><span class="linenos">134</span></a>        <span class="n">config_fp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigProject</span><span class="p">(</span><span class="n">multiply_before_adding</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
@@ -327,7 +327,7 @@
 </span><span id="L-153"><a href="#L-153"><span class="linenos">153</span></a>
 </span><span id="L-154"><a href="#L-154"><span class="linenos">154</span></a>    <span class="nd">@property</span>
 </span><span id="L-155"><a href="#L-155"><span class="linenos">155</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Volume</span><span class="p">:</span>
-</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;The volume/tomogram.&quot;&quot;&quot;</span>
+</span><span id="L-156"><a href="#L-156"><span class="linenos">156</span></a><span class="w">        </span><span class="sd">"""The volume/tomogram."""</span>
 </span><span id="L-157"><a href="#L-157"><span class="linenos">157</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vol</span>
 </span></pre></div>
 
@@ -345,7 +345,7 @@
     </div>
     <a class="headerlink" href="#SIRT_flatpanel"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="SIRT_flatpanel-32"><a href="#SIRT_flatpanel-32"><span class="linenos"> 32</span></a><span class="k">class</span><span class="w"> </span><span class="nc">SIRT_flatpanel</span><span class="p">:</span>  <span class="c1"># ruff: ignore[invalid-class-name]</span>
-</span><span id="SIRT_flatpanel-33"><a href="#SIRT_flatpanel-33"><span class="linenos"> 33</span></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;An iterable SIRT reconstructor.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel-33"><a href="#SIRT_flatpanel-33"><span class="linenos"> 33</span></a><span class="w">    </span><span class="sd">"""An iterable SIRT reconstructor."""</span>
 </span><span id="SIRT_flatpanel-34"><a href="#SIRT_flatpanel-34"><span class="linenos"> 34</span></a>
 </span><span id="SIRT_flatpanel-35"><a href="#SIRT_flatpanel-35"><span class="linenos"> 35</span></a>    <span class="c1"># _current_iteration_number: int</span>
 </span><span id="SIRT_flatpanel-36"><a href="#SIRT_flatpanel-36"><span class="linenos"> 36</span></a>    <span class="n">_config</span><span class="p">:</span> <span class="n">Config</span>
@@ -360,7 +360,7 @@
 </span><span id="SIRT_flatpanel-45"><a href="#SIRT_flatpanel-45"><span class="linenos"> 45</span></a>
 </span><span id="SIRT_flatpanel-46"><a href="#SIRT_flatpanel-46"><span class="linenos"> 46</span></a>    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">dataclasses</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel-47"><a href="#SIRT_flatpanel-47"><span class="linenos"> 47</span></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel-48"><a href="#SIRT_flatpanel-48"><span class="linenos"> 48</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Configuration dataclass for the SIRT iterator.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel-48"><a href="#SIRT_flatpanel-48"><span class="linenos"> 48</span></a><span class="w">        </span><span class="sd">"""Configuration dataclass for the SIRT iterator."""</span>
 </span><span id="SIRT_flatpanel-49"><a href="#SIRT_flatpanel-49"><span class="linenos"> 49</span></a>
 </span><span id="SIRT_flatpanel-50"><a href="#SIRT_flatpanel-50"><span class="linenos"> 50</span></a>        <span class="n">fast_backproject</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span id="SIRT_flatpanel-51"><a href="#SIRT_flatpanel-51"><span class="linenos"> 51</span></a>        <span class="n">soft_from_cylinder_relrad</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="p">(</span>
@@ -390,11 +390,11 @@
 </span><span id="SIRT_flatpanel-75"><a href="#SIRT_flatpanel-75"><span class="linenos"> 75</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_config_bp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigBackproject</span><span class="p">(</span>
 </span><span id="SIRT_flatpanel-76"><a href="#SIRT_flatpanel-76"><span class="linenos"> 76</span></a>            <span class="n">fast_approx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">fast_backproject</span><span class="p">,</span>
 </span><span id="SIRT_flatpanel-77"><a href="#SIRT_flatpanel-77"><span class="linenos"> 77</span></a>            <span class="n">cyl_mask_rad</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="o">*</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">volume</span><span class="o">.</span><span class="n">voxwid</span><span class="p">,</span>
-</span><span id="SIRT_flatpanel-78"><a href="#SIRT_flatpanel-78"><span class="linenos"> 78</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we&#39;ll multiply by the preconditioner</span>
+</span><span id="SIRT_flatpanel-78"><a href="#SIRT_flatpanel-78"><span class="linenos"> 78</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we'll multiply by the preconditioner</span>
 </span><span id="SIRT_flatpanel-79"><a href="#SIRT_flatpanel-79"><span class="linenos"> 79</span></a>            <span class="n">soften_det_edges_proportion</span><span class="o">=</span><span class="n">soften_det_edges_proportion</span><span class="p">,</span>
 </span><span id="SIRT_flatpanel-80"><a href="#SIRT_flatpanel-80"><span class="linenos"> 80</span></a>        <span class="p">)</span>
 </span><span id="SIRT_flatpanel-81"><a href="#SIRT_flatpanel-81"><span class="linenos"> 81</span></a>        <span class="k">if</span> <span class="n">projs</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel-82"><a href="#SIRT_flatpanel-82"><span class="linenos"> 82</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;The provided ProjectionSet object has no data.&quot;</span>
+</span><span id="SIRT_flatpanel-82"><a href="#SIRT_flatpanel-82"><span class="linenos"> 82</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">"The provided ProjectionSet object has no data."</span>
 </span><span id="SIRT_flatpanel-83"><a href="#SIRT_flatpanel-83"><span class="linenos"> 83</span></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel-84"><a href="#SIRT_flatpanel-84"><span class="linenos"> 84</span></a>        <span class="c1"># The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1</span>
 </span><span id="SIRT_flatpanel-85"><a href="#SIRT_flatpanel-85"><span class="linenos"> 85</span></a>        <span class="c1"># We will calculate M now.</span>
@@ -444,7 +444,7 @@
 </span><span id="SIRT_flatpanel-129"><a href="#SIRT_flatpanel-129"><span class="linenos">129</span></a>            <span class="n">v</span><span class="o">.</span><span class="n">soften_to_xy_cylinder</span><span class="p">(</span><span class="n">rr</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel-130"><a href="#SIRT_flatpanel-130"><span class="linenos">130</span></a>
 </span><span id="SIRT_flatpanel-131"><a href="#SIRT_flatpanel-131"><span class="linenos">131</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">iterate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel-132"><a href="#SIRT_flatpanel-132"><span class="linenos">132</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform an iteration of the algorithm.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel-132"><a href="#SIRT_flatpanel-132"><span class="linenos">132</span></a><span class="w">        </span><span class="sd">"""Perform an iteration of the algorithm."""</span>
 </span><span id="SIRT_flatpanel-133"><a href="#SIRT_flatpanel-133"><span class="linenos">133</span></a>        <span class="c1"># Put the projection residual into the projection scratch space</span>
 </span><span id="SIRT_flatpanel-134"><a href="#SIRT_flatpanel-134"><span class="linenos">134</span></a>        <span class="n">cp</span><span class="o">.</span><span class="n">copyto</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_meas</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dst</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_proj_scratch_space</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel-135"><a href="#SIRT_flatpanel-135"><span class="linenos">135</span></a>        <span class="n">config_fp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigProject</span><span class="p">(</span><span class="n">multiply_before_adding</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
@@ -469,7 +469,7 @@
 </span><span id="SIRT_flatpanel-154"><a href="#SIRT_flatpanel-154"><span class="linenos">154</span></a>
 </span><span id="SIRT_flatpanel-155"><a href="#SIRT_flatpanel-155"><span class="linenos">155</span></a>    <span class="nd">@property</span>
 </span><span id="SIRT_flatpanel-156"><a href="#SIRT_flatpanel-156"><span class="linenos">156</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Volume</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel-157"><a href="#SIRT_flatpanel-157"><span class="linenos">157</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;The volume/tomogram.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel-157"><a href="#SIRT_flatpanel-157"><span class="linenos">157</span></a><span class="w">        </span><span class="sd">"""The volume/tomogram."""</span>
 </span><span id="SIRT_flatpanel-158"><a href="#SIRT_flatpanel-158"><span class="linenos">158</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vol</span>
 </span></pre></div>
 
@@ -503,11 +503,11 @@
 </span><span id="SIRT_flatpanel.__init__-75"><a href="#SIRT_flatpanel.__init__-75"><span class="linenos"> 75</span></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_config_bp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigBackproject</span><span class="p">(</span>
 </span><span id="SIRT_flatpanel.__init__-76"><a href="#SIRT_flatpanel.__init__-76"><span class="linenos"> 76</span></a>            <span class="n">fast_approx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_config</span><span class="o">.</span><span class="n">fast_backproject</span><span class="p">,</span>
 </span><span id="SIRT_flatpanel.__init__-77"><a href="#SIRT_flatpanel.__init__-77"><span class="linenos"> 77</span></a>            <span class="n">cyl_mask_rad</span><span class="o">=</span><span class="nb">min</span><span class="p">(</span><span class="o">*</span><span class="n">volume</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">volume</span><span class="o">.</span><span class="n">voxwid</span><span class="p">,</span>
-</span><span id="SIRT_flatpanel.__init__-78"><a href="#SIRT_flatpanel.__init__-78"><span class="linenos"> 78</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we&#39;ll multiply by the preconditioner</span>
+</span><span id="SIRT_flatpanel.__init__-78"><a href="#SIRT_flatpanel.__init__-78"><span class="linenos"> 78</span></a>            <span class="n">apply_summand_multiplier</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># we'll multiply by the preconditioner</span>
 </span><span id="SIRT_flatpanel.__init__-79"><a href="#SIRT_flatpanel.__init__-79"><span class="linenos"> 79</span></a>            <span class="n">soften_det_edges_proportion</span><span class="o">=</span><span class="n">soften_det_edges_proportion</span><span class="p">,</span>
 </span><span id="SIRT_flatpanel.__init__-80"><a href="#SIRT_flatpanel.__init__-80"><span class="linenos"> 80</span></a>        <span class="p">)</span>
 </span><span id="SIRT_flatpanel.__init__-81"><a href="#SIRT_flatpanel.__init__-81"><span class="linenos"> 81</span></a>        <span class="k">if</span> <span class="n">projs</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel.__init__-82"><a href="#SIRT_flatpanel.__init__-82"><span class="linenos"> 82</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;The provided ProjectionSet object has no data.&quot;</span>
+</span><span id="SIRT_flatpanel.__init__-82"><a href="#SIRT_flatpanel.__init__-82"><span class="linenos"> 82</span></a>            <span class="n">msg</span> <span class="o">=</span> <span class="s2">"The provided ProjectionSet object has no data."</span>
 </span><span id="SIRT_flatpanel.__init__-83"><a href="#SIRT_flatpanel.__init__-83"><span class="linenos"> 83</span></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel.__init__-84"><a href="#SIRT_flatpanel.__init__-84"><span class="linenos"> 84</span></a>        <span class="c1"># The preconditioner volume is a multiplier equal to M = diag(A^T A \vec{1})^-1</span>
 </span><span id="SIRT_flatpanel.__init__-85"><a href="#SIRT_flatpanel.__init__-85"><span class="linenos"> 85</span></a>        <span class="c1"># We will calculate M now.</span>
@@ -563,7 +563,7 @@
     </div>
     <a class="headerlink" href="#SIRT_flatpanel.iterate"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="SIRT_flatpanel.iterate-131"><a href="#SIRT_flatpanel.iterate-131"><span class="linenos">131</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">iterate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel.iterate-132"><a href="#SIRT_flatpanel.iterate-132"><span class="linenos">132</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform an iteration of the algorithm.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel.iterate-132"><a href="#SIRT_flatpanel.iterate-132"><span class="linenos">132</span></a><span class="w">        </span><span class="sd">"""Perform an iteration of the algorithm."""</span>
 </span><span id="SIRT_flatpanel.iterate-133"><a href="#SIRT_flatpanel.iterate-133"><span class="linenos">133</span></a>        <span class="c1"># Put the projection residual into the projection scratch space</span>
 </span><span id="SIRT_flatpanel.iterate-134"><a href="#SIRT_flatpanel.iterate-134"><span class="linenos">134</span></a>        <span class="n">cp</span><span class="o">.</span><span class="n">copyto</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_meas</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dst</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_proj_scratch_space</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel.iterate-135"><a href="#SIRT_flatpanel.iterate-135"><span class="linenos">135</span></a>        <span class="n">config_fp</span> <span class="o">=</span> <span class="n">cbfp</span><span class="o">.</span><span class="n">ConfigProject</span><span class="p">(</span><span class="n">multiply_before_adding</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
@@ -604,7 +604,7 @@
     <a class="headerlink" href="#SIRT_flatpanel.volume"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="SIRT_flatpanel.volume-155"><a href="#SIRT_flatpanel.volume-155"><span class="linenos">155</span></a>    <span class="nd">@property</span>
 </span><span id="SIRT_flatpanel.volume-156"><a href="#SIRT_flatpanel.volume-156"><span class="linenos">156</span></a>    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Volume</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel.volume-157"><a href="#SIRT_flatpanel.volume-157"><span class="linenos">157</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;The volume/tomogram.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel.volume-157"><a href="#SIRT_flatpanel.volume-157"><span class="linenos">157</span></a><span class="w">        </span><span class="sd">"""The volume/tomogram."""</span>
 </span><span id="SIRT_flatpanel.volume-158"><a href="#SIRT_flatpanel.volume-158"><span class="linenos">158</span></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vol</span>
 </span></pre></div>
 
@@ -629,7 +629,7 @@
     <a class="headerlink" href="#SIRT_flatpanel.Config"></a>
             <div class="pdoc-code codehilite"><pre><span></span><span id="SIRT_flatpanel.Config-46"><a href="#SIRT_flatpanel.Config-46"><span class="linenos">46</span></a>    <span class="nd">@pydantic</span><span class="o">.</span><span class="n">dataclasses</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span id="SIRT_flatpanel.Config-47"><a href="#SIRT_flatpanel.Config-47"><span class="linenos">47</span></a>    <span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">:</span>
-</span><span id="SIRT_flatpanel.Config-48"><a href="#SIRT_flatpanel.Config-48"><span class="linenos">48</span></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Configuration dataclass for the SIRT iterator.&quot;&quot;&quot;</span>
+</span><span id="SIRT_flatpanel.Config-48"><a href="#SIRT_flatpanel.Config-48"><span class="linenos">48</span></a><span class="w">        </span><span class="sd">"""Configuration dataclass for the SIRT iterator."""</span>
 </span><span id="SIRT_flatpanel.Config-49"><a href="#SIRT_flatpanel.Config-49"><span class="linenos">49</span></a>
 </span><span id="SIRT_flatpanel.Config-50"><a href="#SIRT_flatpanel.Config-50"><span class="linenos">50</span></a>        <span class="n">fast_backproject</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 </span><span id="SIRT_flatpanel.Config-51"><a href="#SIRT_flatpanel.Config-51"><span class="linenos">51</span></a>        <span class="n">soft_from_cylinder_relrad</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="p">(</span>

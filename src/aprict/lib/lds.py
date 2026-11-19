@@ -383,7 +383,7 @@ def points_by_equal_area_partitioning_on_sphere(  # ruff: ignore[complex-structu
 
     # 5. Creating a list of the ideal number of regions in each collar.
     delta_F: float = n_I / n * delta_I  # ruff: ignore[non-lowercase-variable-in-function]
-    theta_F: list[float] = list(theta_c + np.arange(n + 1) * delta_F)  # ruff: ignore[non-lowercase-variable-in-function]
+    theta_F: list[float] = (theta_c + np.arange(n + 1) * delta_F).tolist()  # ruff: ignore[non-lowercase-variable-in-function]
     y: list[float] = [
         (Nu(theta_F[i + 1]) - Nu(theta_F[i])) / Nu_R for i in range(n)
     ]
@@ -401,7 +401,7 @@ def points_by_equal_area_partitioning_on_sphere(  # ruff: ignore[complex-structu
         Nu_R = 4 * np.pi / (2 + sum(m))  # ruff: ignore[non-lowercase-variable-in-function]
 
     # 7. Creating a list of colatitudes of each zone.
-    m_cumsum: list[float] = [0] + list(np.cumsum(m))  # ruff: ignore[collection-literal-concatenation]
+    m_cumsum: list[float] = [0] + np.cumsum(m).tolist()  # ruff: ignore[collection-literal-concatenation]
     theta: list[float] = [0]
     theta.extend([Theta((1 + m_cumsum[i]) * Nu_R) for i in range(n + 1)])
     if not _take_half:

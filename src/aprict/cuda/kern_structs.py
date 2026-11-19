@@ -300,7 +300,9 @@ extern "C" __global__ void get_struct_layout_{struct_name}(
             raise ValueError(msg)
         # Test that all 'dtypes' can actually be interpreted by numpy as dtypes
         for dtype in dtypes:
-            np.dtype(dtype)  # May raise a TypeError. This is intentional.
+            np.dtype(
+                dtype
+            )  # May raise a TypeError. This is intentional.  # ty: ignore[no-matching-overload]
         ###################
 
         tuples_type_name = list(zip(dtypes, names))

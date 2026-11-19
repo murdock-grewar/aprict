@@ -484,8 +484,8 @@ def get_projectionset_generator(  # ruff: ignore[complex-structure]
         L,
     )
 
-    zs_max = pg.source_pos[:, 2].max()
-    zs_min = pg.source_pos[:, 2].min()
+    zs_max = float(pg.source_pos[:, 2].max())
+    zs_min = float(pg.source_pos[:, 2].min())
     recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
     recon_support_height: float = max(
         0,

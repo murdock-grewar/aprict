@@ -506,8 +506,8 @@ def get_filtered_projectionset_generator(  # ruff: ignore[complex-structure]
         L,
     )
 
-    zs_max = pg.source_pos[:, 2].max()
-    zs_min = pg.source_pos[:, 2].min()
+    zs_max = float(pg.source_pos[:, 2].max())
+    zs_min = float(pg.source_pos[:, 2].min())
     recon_support_radius: float = R * np.sin(np.arctan(pixwid * nu / 2 / L))
     cyl_mask_rad = cyl_mask_rad or recon_support_radius
     max_r_of_any_volpoint: float = min(

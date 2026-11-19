@@ -449,7 +449,7 @@ class FBVolume:
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Bounding box, like ((minx,miny,minz),(maxx,maxy,maxz))."""
         bbox = self.get_bbox()
-        return (tuple(bbox[0]), tuple(bbox[1]))
+        return (tuple(bbox[0].tolist()), tuple(bbox[1].tolist()))  # ty: ignore[invalid-return-type]
 
     def prune_to_bbox(
         self,

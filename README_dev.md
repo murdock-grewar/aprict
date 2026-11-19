@@ -15,4 +15,10 @@ The python environment should be activated when developing or building the modul
 
 Important note on CUDA toolchain version: the versions of cuda-toolkit and 
 cuda-bindings is controlled by the uv.lock file to ensure that the generated ptx
-code is compatible with CUDA version 13.X.
+code is compatible with CUDA version 13.X. If the uv lock file is updated,
+then the 13.X versions of these packages should be restored. E.g. the Python venv
+should be updated like this:
+```bash
+uv lock -U -P cuda-toolkit~=13.0.0 -P cuda-bindings~=13.0.0
+uv sync --all-extras
+```

@@ -123,8 +123,8 @@ class QLivePlotWindow(QtWidgets.QMainWindow):
 
 
 class QLivePlotWorker(QThread):
-    signal_qliveplot_do_action = pyqtSignal(QLivePlotInstruction, object)
-    signal_qliveplotwin_do_action = pyqtSignal(QLivePlotInstruction, object)
+    signal_qliveplot_do_action = pyqtSignal(QLivePlotInstruction, object)  # ty: ignore[missing-argument]
+    signal_qliveplotwin_do_action = pyqtSignal(QLivePlotInstruction, object)  # ty: ignore[missing-argument]
 
     qliveplotwin: QLivePlotWindow
     qliveplot: QLivePlot
