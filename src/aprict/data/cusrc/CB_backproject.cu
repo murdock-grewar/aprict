@@ -1111,7 +1111,7 @@ __global__ void backproject_CB_voltex_GBC_cyl(
 __global__ void get_GBC_weight_integ(
     const float*                    r_on_R_arr,  // should be increasing monotonically
     const unsigned int              r_on_R_arr_len,
-    float*                          output_arr, // should input an array of 0s to this kernel, equal in length to the r_on_R arr
+    double*                          output_arr, // should input an array of 0s to this kernel, equal in length to the r_on_R arr. Needs to be double precision to avoid errors from summing tons of floats.
     const unsigned int              num_z_samps,
     const unsigned int              num_ang_samps,
     const config_CB_backproject     config
@@ -1160,7 +1160,7 @@ __global__ void get_GBC_weight_integ(
             // Add this block's contribution to the integral for this r_on_R value
             __syncthreads();
             if (block_leader) {
-                atomicAdd(&output_arr[r_ind], integ * multiplicand);
+                atomicAdd(&output_arr[r_ind], (double)(integ * multiplicand));
             }
             __syncthreads();
         }

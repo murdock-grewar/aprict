@@ -35,7 +35,7 @@ def backproj_gbc_weight_integ_GPU(  # ruff: ignore[invalid-function-name]
     kern = cbfp._backprojection_module.get_function("get_GBC_weight_integ")  # ruff: ignore[private-member-access]
     input_r_on_R_arr = cp.array(r_on_R.astype(np.float32))  # ruff: ignore[non-lowercase-variable-in-function]
     input_r_on_R_arr_len = np.uint32(len(r_on_R))  # ruff: ignore[non-lowercase-variable-in-function]
-    input_output_arr = cp.zeros_like(input_r_on_R_arr)
+    input_output_arr = cp.zeros_like(input_r_on_R_arr, dtype=np.float64)
     input_num_z_samps = np.uint32(num_z_samps)
     input_num_ang_samps = np.uint32(num_ang_samps)
     input_config = config.contents
@@ -56,7 +56,7 @@ def backproj_gbc_weight_integ_GPU(  # ruff: ignore[invalid-function-name]
     )
     kern(grid_dims, (bX, bY, bZ), args)
     cp.cuda.get_current_stream().synchronize()  # maybe not necessary?
-    return input_output_arr.get()
+    return input_output_arr.get().astype(np.float32)
 
 
 def backproj_gbc_weight_integ_xygrid_GPU(  # ruff: ignore[invalid-function-name]
