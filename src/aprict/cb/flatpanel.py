@@ -84,6 +84,7 @@ Observe these important rules for how the data layout interacts with the geometr
 
 Note that `numpy` does not multithread most array operations, like addition, multiplication etc. For multi-threaded operations on large numpy arrays, including memory-mapped arrays, I'd suggest using `numexpr`.
 
+---
 
 """  # ruff: ignore[missing-trailing-period]
 
