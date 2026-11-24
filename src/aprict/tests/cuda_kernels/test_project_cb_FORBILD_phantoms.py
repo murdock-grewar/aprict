@@ -79,9 +79,11 @@ def injected_module_texture_chunked() -> cp.RawModule:  # ruff: ignore[undocumen
     argnames=["numprojs", "dtype_proj"],
     argvalues=[
         (1000, np.float16),
+        (1000, np.float32),
     ],
     ids=[
-        "project_FORBILD-head",
+        "project_FORBILD-head-fp16",
+        "project_FORBILD-head-fp32",
     ],
 )
 class TestCB_phantom_FORBILD_head:
@@ -170,7 +172,7 @@ class TestCB_phantom_FORBILD_head:
         # Prepare the kernel
         blockx = 5
         blocky = 5
-        blocklayer = 5
+        blocklayer = 1
         # Launch the kernel
         num_shapes: int = self.shapes_cp_arr.size
         # stacksize = cp.cuda.runtime.deviceGetLimit(cp.cuda.runtime.cudaLimitStackSize)
@@ -200,6 +202,11 @@ class TestCB_phantom_FORBILD_head:
             ),
         )
         cp.cuda.get_current_stream().synchronize()  # Needed to ensure that the test doesn't return early before the computation is complete.
+
+        assert self.out_of_mem_count_arr[0].get() == 0
+
+        norm = cp.linalg.norm(self.output_projs).get()
+        assert norm > 0  # make sure the test isn't trivial
 
 
 # ruff: enable[undocumented-public-class,undocumented-public-method,invalid-class-name,missing-return-type-undocumented-public-function]
