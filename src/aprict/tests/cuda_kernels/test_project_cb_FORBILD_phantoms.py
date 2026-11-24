@@ -105,8 +105,8 @@ class TestCB_phantom_FORBILD_head:
             (1.0, add_attenuations, 1, 1), dtype=ks_config.dtype
         )
         num_projs = np.uint32(numprojs)
-        detwid: int = 800
-        dethei: int = 800
+        detwid: int = 8  # 00
+        dethei: int = 8  # 00
         self.output_projs: cp.ndarray = cp.zeros(
             (num_projs, detwid, dethei), dtype=dtype_proj
         )
