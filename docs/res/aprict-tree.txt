@@ -1,4 +1,4 @@
-aprict                          CLI entry point to aprict version 0.1.4.dev5
+aprict                          CLI entry point to aprict version 0.1.5
 ├── convert                     Conversion between data formats.
 │   ├── help [COMMAND_PATH]...  Show help for a command.
 │   ├── npy_to_omez             Convert a numpy array on disk to an OME-Zarr-
