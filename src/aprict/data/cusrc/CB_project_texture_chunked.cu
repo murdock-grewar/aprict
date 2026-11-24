@@ -464,13 +464,13 @@ __global__ void project_CB_FORBILD_shapes(
     fvec3 source_pos;
     bool in_range = (proj_idx < num_projs);
     if (in_range) {
+        projspec = projspecs[proj_idx];
         in_range = (
             in_range &&
             (det_idx_x < projspec.dspec.nu) &&
             (det_idx_y < projspec.dspec.nv)
         );
         if (in_range) {
-            projspec = projspecs[proj_idx];
             // Get the start point of the projection line
             source_pos = projspec.sourcepos;
         }
