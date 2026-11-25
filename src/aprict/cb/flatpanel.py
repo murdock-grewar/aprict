@@ -1006,9 +1006,10 @@ def project(
     is_fb: bool = type(volume) is FBVolume
     # Prepare the kernel and the static kernel args
     if is_fb:
-        blockx = 32  # needs to be at least 4
+        # WARNING: the constant NUM_WORKER_THREADS defined in the kernel gives the minimum total block size!
+        blockx = 32
         blocky = 20
-        blocklayer = 1
+        blocklayer = 1  # best to leave at 1 so that pruning can take place for individual projections
     else:
         blockx = min(32, projs.data.shape[-2])
         blocky = min(20, projs.data.shape[-1])

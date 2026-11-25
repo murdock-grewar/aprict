@@ -412,6 +412,8 @@ __global__ void project_CB_texture_chunked(
 }
 
 
+
+#define NUM_WORKER_THREADS 32  // Each thread block needs to have AT LEAST this many threads!
 #define MAX_INTERSECTIONS_PER_LINE 1000  // the maximum number of shapes that a single ray is allowed to intersect. About 12 bytes of memory will be reserved for each thread, for each shape in the maximimum number of shapes. If a ray intersects more than this maximum number of shapse, then the 'out_of_mem_count' will be incremented to indicate that memory was exhausted. Wouldn't it be funny if it was incremented back to exactly 0...
 // NOTE:
 // The blockDim.x must be AT LEAST 4, since 4 worker threads are used.
@@ -423,41 +425,22 @@ template<
     typename Ts   // Can be FORBILD_Shape, which is inefficient but allows passing a bunch of different shapes at once. Or can be a specific shape type, like FORBILD_Sphere, et cetera
 >
 __global__ void project_CB_FORBILD_shapes(
-        unsigned int*             out_of_mem_count,
-        const config_CB_project_FORBILD   config,          // any miscellaneous config for the CB projection
-        const proj_spec*          projspecs,       // contains the source and detector configurations
-        const unsigned int        num_projs,       // length of projspecs array
-        Ts*                       shapes_glob,          // shapes array
-        const unsigned int        num_shapes,      // number of shapes
-        const ulvec3              output_projs_strides,
-        Tp*                       output_projs
+        unsigned int* __restrict__          out_of_mem_count,
+        const config_CB_project_FORBILD     config,          // any miscellaneous config for the CB projection
+        const proj_spec* __restrict__       projspecs,       // contains the source and detector configurations
+        const unsigned int                  num_projs,       // length of projspecs array
+        const Ts* __restrict__              shapes_glob,          // shapes array
+        const unsigned int                  num_shapes,      // number of shapes
+        const ulvec3                        output_projs_strides,
+        Tp*                                 output_projs
 )
 {
     // Get the detector position and which projection layer
-    unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
-    unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
-    unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
-
-    const bool is_block_worker_1 = (
-        (threadIdx.x == 0) &&
-        (threadIdx.y == (blockDim.y-1)) &&
-        (threadIdx.z == 0)
-    );
-    const bool is_block_worker_2 = (
-        (threadIdx.x == 1) &&
-        (threadIdx.y == (blockDim.y-1)) &&
-        (threadIdx.z == 0)
-    );
-    const bool is_block_worker_3 = (
-        (threadIdx.x == 2) &&
-        (threadIdx.y == (blockDim.y-1)) &&
-        (threadIdx.z == 0)
-    );
-    const bool is_block_worker_4 = (
-        (threadIdx.x == 3) &&
-        (threadIdx.y == (blockDim.y-1)) &&
-        (threadIdx.z == 0)
-    );
+    const unsigned int det_idx_x = threadIdx.x + blockIdx.x * blockDim.x;
+    const unsigned int det_idx_y = threadIdx.y + blockIdx.y * blockDim.y;
+    const unsigned int proj_idx  = threadIdx.z + blockIdx.z * blockDim.z;
+    const unsigned long tid      = threadIdx.x + threadIdx.y * blockDim.x + threadIdx.z * blockDim.y * blockDim.x;
+    const bool is_worker = (tid < NUM_WORKER_THREADS);
 
     // Check if in range. Needs to pass a check, then if that passes, do two more checks
     proj_spec projspec;
@@ -477,10 +460,10 @@ __global__ void project_CB_FORBILD_shapes(
     }
 
     // Get the index offsets between samples
-    unsigned int ssu = config.ssu;
-    unsigned int ssv = config.ssv;
-    float idx_offx = 1/((float)ssu);
-    float idx_offy = 1/((float)ssv);
+    const  unsigned int ssu = config.ssu;
+    const unsigned int ssv = config.ssv;
+    const float idx_offx = 1/((float)ssu);
+    const float idx_offy = 1/((float)ssv);
 
     bool out_of_mem_flag = false;
     Tp totval = 0;
@@ -497,37 +480,23 @@ __global__ void project_CB_FORBILD_shapes(
             // Now calculate and store the intervals
             fvec2 intervals[MAX_INTERSECTIONS_PER_LINE];
             float rhos[MAX_INTERSECTIONS_PER_LINE];
-            __shared__ Ts ss[4];  // One shape for each of the four workers
+            __shared__ Ts ss[NUM_WORKER_THREADS];  // One shape for each of the four workers
             unsigned int j = 0;
             unsigned int num_shapes_relevant = 0;
-            const unsigned int groups = (num_shapes+(4-1))/4;  // deliberate use of integer division
+            const unsigned int groups = (num_shapes+(NUM_WORKER_THREADS-1))/NUM_WORKER_THREADS;  // deliberate use of integer division
             for (unsigned int gnum = 0; gnum < groups; gnum++) {
-                unsigned int istop = min(num_shapes, 4*(gnum+1));
-                unsigned int id = 4*gnum;
+                unsigned int istop = min(num_shapes, NUM_WORKER_THREADS*(gnum+1));
+                unsigned int id = NUM_WORKER_THREADS*gnum;
                 __syncthreads();
-                // Attempting to turn this into a loop, even with a #pragmo unroll, results in a 100% performance penalty!
-                if ((id < num_shapes) && (is_block_worker_1)) {
-                    ss[0] = shapes_glob[id];
+                if (((id + tid) < num_shapes) && (is_worker)) {
+                    ss[tid] = shapes_glob[id + tid];
                 }
-                id++;
-                if ((id < num_shapes) && (is_block_worker_2)) {
-                    ss[1] = shapes_glob[id];
-                }
-                id++;
-                if ((id < num_shapes) && (is_block_worker_3)) {
-                    ss[2] = shapes_glob[id];
-                }
-                id++;
-                if ((id < num_shapes) && (is_block_worker_4)) {
-                    ss[3] = shapes_glob[id];
-                }
-                id = 4*gnum;
+                id = NUM_WORKER_THREADS*gnum;
                 __syncthreads();
                 if (in_range) {
                     Ts s;
                     fvec2 interval;
-                    #pragma unroll // I have no idea why it hurts performance so much to have this loop. It's about a 30% increase in computation time if the loop is not unrolled.
-                    for (unsigned char offset_ind : {0, 1, 2, 3}) {
+                    for (unsigned char offset_ind = 0; offset_ind < NUM_WORKER_THREADS; offset_ind++) {
                         if (id + offset_ind < num_shapes) {
                             s = ss[offset_ind];
                             interval = FORBILD_clip_line_segment(source_pos, det_pos, s);
